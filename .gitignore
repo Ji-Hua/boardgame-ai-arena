@@ -1,0 +1,72 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+**/*.rs.bk
+
+# Editor files
+**/*.swp
+**/*.swo
+*.DS_Store
+.idea/
+.vscode/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.old
+
+# Build artifacts
+replay_output/
+generated/
+build_artifacts/
+tests/tmp/
+
+# Documentation (ignore unless explicitly needed)
+/docs/
+
+# Legacy code archive (ignore unless explicitly needed)
+/legacy/
+
+# Python / FFI artifacts
+*.so
+*.pyd
+*.pyc
+__pycache__/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.coverage
+htmlcov/
+*.cover
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env/
+uv.lock
+
+# Node / frontend artifacts if any
+node_modules/
+
+# IDE and system files
+*.bak
+*.orig
+.cache/
+*.code-workspace
+
+# Training/ML artifacts (if any)
+checkpoints/
+logs/
+wandb/
+*.pt
+*.pth
+*.ckpt
+experiments/
+runs/
