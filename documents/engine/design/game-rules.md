@@ -33,7 +33,10 @@ The rules defined here constitute domain-level constraints. All Engine implement
 ## 3. Setup
 
 - Place the board so that each player starts centered on their home edge.
-- For a 2-player game: White (or Player 1) starts on square (5,1) and Black (or Player 2) starts on square (5,9). Coordinates here use (column,row) with (1,1) at one corner; implementations must adopt a consistent coordinate mapping.
+- For a 2-player game, under the canonical logical coordinate system:
+  - Player 1 starts at (4,0,Square)
+  - Player 2 starts at (4,8,Square)
+- In display notation, these correspond to e1 and e9 respectively.
 - Each player begins with 10 walls.
 
 ---

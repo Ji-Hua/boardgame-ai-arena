@@ -2,68 +2,137 @@
 
 Author: Ji Hua
 Created Date: 2026-02-17
-Last Modified: 2026-02-17
+Last Modified: 2026-02-18
 
-Current Version: 2
+Current Version: 6
 Document Type: Design
 Document Subtype: Engine Architecture
 Document Status: Draft
 Document Authority Scope: Engine module
 Document Purpose:
-This document defines the structural architecture of the Quoridor Engine. It specifies the decomposition of topology, model, rule, and engine runtime components, and clarifies their responsibilities, lifecycle semantics, and trust model. It does not define concrete API signatures or implementation details.
+This document defines the structural architecture of the Quoridor Engine system. It specifies the decomposition of the Rule Engine and Game Manager, clarifies their responsibilities, lifecycle semantics, trust model, and internal structure. It does not define concrete API signatures or language-specific implementation details.
 
 ---
 
-# 1. Architectural Overview
+# 1. Engine System Structure
 
-The Quoridor Engine is structured as a two-level engine system:
+## 1.1 Two-Level Engine Model
+
+The Quoridor Engine system is structured as a two-level engine model:
 
 1. Rule Engine (stateless rule kernel)
-2. Game Engine (stateful game runtime container)
+2. Game Manager (stateful runtime container)
 
-The Rule Engine internally follows a layered rule architecture composed of:
+The Rule Engine internally follows a layered structure:
 
 Topology → Model → Rule
 
-The Game Engine depends on a Rule Engine instance but does not redefine rules.
+The Game Manager depends on a Rule Engine instance but does not redefine rule semantics.
 
-Lower layers define structural truth.
+Lower layers define structural and rule truth.
 Higher layers define runtime orchestration.
 
-The engine is designed to function as a deterministic rule kernel suitable for live gameplay, replay systems, and AI training environments.
+The system is designed to support live gameplay, replay systems, AI training, and simulation workflows.
 
 ---
 
-# 2. Rule Engine
+## 1.2 Dependency Relationships
 
-## 2.1 Purpose
+Dependency direction:
 
-The Rule Engine is a stateless rule kernel responsible for validating and transforming game state under Quoridor rules.
+Game Manager → Rule Engine
+Rule Engine → Topology → Model → Rule
 
-It does not maintain game runtime information such as current state or history.
+Calculation utilities support Rule logic but do not define gameplay semantics.
 
-Each reference must hold its own Rule Engine instance. Rule Engines are not shared across games or contexts.
+The Rule Engine is self-contained and stateless.
 
----
-
-## 2.2 Construction Semantics
-
-The Rule Engine is constructed from a GameConfig.
-
-During construction, it initializes:
-
-- Topology (geometric structure of the board)
-- Model definitions (data structures)
-- Rule logic
-- Calculation utilities (e.g., BFS)
-
-Topology is immutable once constructed and is private to the Rule Engine instance.
+Training workflows may interact directly with the Rule Engine and do not require a Game Manager.
 
 ---
 
-## 2.3 Internal Layering
+## 1.3 Responsibility Separation
 
-Within the Rule Engine, the internal dependency direction is:
+### Rule Engine
+
+The Rule Engine is a stateless rule kernel responsible for validating and transforming Raw State under Quoridor rules.
+
+It defines:
+
+- What is legally true
+- How state transitions occur
+- How rule invariants are enforced
+
+It does not:
+
+- Maintain current game state
+- Record history
+- Manage sessions
+
+Each external reference must construct and hold its own Rule Engine instance.
+Rule Engine instances are not shared across games or contexts.
+
+From a rule perspective, the Rule Engine is functionally complete.
+
+---
+
+### Game Manager
+
+The Game Manager represents a single running game instance.
+
+It defines:
+
+- Runtime state container
+- Game progression management
+- Action history tracking
+- Invocation of the Rule Engine
+
+It introduces no new rule authority and does not extend rule capabilities.
+
+It serves purely as a runtime orchestration layer built on top of a Rule Engine.
+
+---
+
+# 2. Rule Engine — Functional Specification
+
+## 2.1 Core Transition Model
+
+The Rule Engine operates as a pure state transformation system:
+
+(Raw State, Action) → Raw State' | Rule Error
+
+It guarantees:
+
+- No mutation of input Raw State
+- Deterministic output for identical inputs
+- No hidden mutable state
+- No side effects
+- No runtime memory of prior invocations
+
+Each invocation is independent.
+
+---
+
+## 2.2 Trust Model
+
+The Rule Engine assumes the input Raw State is valid.
+
+It:
+
+- Does not implicitly re-validate state invariants on every transition
+- Validates only the legality of the proposed Action
+
+If the initial state is valid and all transitions are legal, all subsequent states remain valid.
+
+Optional explicit state validation may exist but is not part of the default transition path.
+
+Performance-critical execution and safety validation are intentionally separated.
+
+---
+
+# 3. Rule Engine Internal Structure
+
+Within the Rule Engine, internal dependency direction is:
 
 Topology → Model → Rule
 
@@ -71,19 +140,19 @@ Calculation utilities support Rule logic but do not define gameplay semantics.
 
 ---
 
-# 3. Topology Layer
+## 3.1 Topology Layer
 
-## 3.1 Purpose
+### Purpose
 
-The Topology layer defines the geometric structure of the board independently of game rules.
+Defines the geometric structure of the board independently of rule logic.
 
-It describes connectivity and spatial relationships but does not encode rule semantics such as wall legality or turn order.
+Topology describes connectivity and spatial relationships but does not encode rule semantics.
 
 ---
 
-## 3.2 Responsibilities
+### Responsibilities
 
-The Topology layer defines:
+Topology defines:
 
 - Board dimensions
 - Valid square positions
@@ -97,17 +166,17 @@ Topology is immutable and independent of GameState.
 
 ---
 
-# 4. Model Layer
+## 3.2 Model Layer
 
-## 4.1 Purpose
+### Purpose
 
-The Model layer defines structural data representations.
+Defines structural data representations.
 
-It contains no rule enforcement logic.
+Contains no rule enforcement or rule-derived computation logic.
 
 ---
 
-## 4.2 Core Entities
+### Core Entities
 
 The Model layer defines representations for:
 
@@ -119,173 +188,289 @@ The Model layer defines representations for:
 - GameConfig
 - GameState
 
-These are structural definitions only.
-
 ---
 
-## 4.3 GameState Structure
+### GameState Structure
 
-GameState consists of two conceptual components:
+GameState consists of:
 
-### 4.3.1 Raw State (Canonical)
+#### Raw State (Canonical)
 
-The raw state contains authoritative rule-relevant information:
+Contains rule-relevant information:
 
 - Current player
 - Pawn positions
 - Wall positions
-- Wall ownership
+- Remaining Walls per player
 
-The raw state is the sole input used by the Rule Engine for state transitions.
-
-Rule semantics depend exclusively on the raw state.
+Rule semantics depend exclusively on Raw State.
+Note: Remaining walls are canonical rule constraints and MUST be maintained by Rule Engine transitions.
 
 ---
 
-### 4.3.2 Derived Views (Non-Canonical)
+#### Derived Views (Non-Canonical)
 
-Derived information includes:
+Derived information may include:
 
-- Remaining walls per player
 - Game-over condition
 - Winning player
 - Shortest path lengths
 - Connectivity checks
 
-Derived views must satisfy:
+Derived must satisfy:
 
-Derived = f(Raw State, Topology)
+Derived = f(Raw State, Topology, Rule Semantics)
 
-Derived values:
+Derived:
 
-- Do not participate in rule validation
-- Do not affect state transitions
-- Do not define state equivalence
-- May be omitted without affecting rule correctness
+- Does not participate in rule validation
+- Does not affect state transitions
+- Does not define state equivalence
+- Is computed by the Rule Engine
 
-The Rule Engine ignores derived values during validation and transition.
+The Model layer does not compute derived values.
+The Rule Engine may compute derived projections when requested.
 
 ---
 
-# 5. Rule Layer
+## 3.3 Rule Layer
 
-## 5.1 Purpose
+### Purpose
 
-The Rule layer defines legal state transitions under Quoridor rules.
+Defines legal state transitions and rule-derived semantics under Quoridor rules.
 
-It operates as a pure state transformation system:
+Operates as:
 
 (Raw State, Action) → Raw State' | Rule Error
 
-The Rule layer does not mutate input state.
+Additionally, the Rule layer is responsible for computing rule-derived semantic projections from Raw State.
 
 ---
 
-## 5.2 Trust Model
+### Transition Phases
 
-The Rule Engine follows an explicit trust model:
+1. Structural Precondition Checks
+2. Geometric Validation (Topology)
+3. Rule Validation (turn, occupancy, wall stock)
+4. Invariant Validation (path existence via Calculation)
+5. Raw Transformation
+6. Result Return
 
-- It assumes the input Raw State is valid.
-- It does not implicitly re-validate state invariants on every transition.
-- It validates only the legality of the proposed Action.
-
-If the initial state is valid and all transitions are legal, all subsequent states remain valid.
-
-Optional state validation may exist but is not part of the default transition path.
-
-Performance-critical execution and safety validation are intentionally separated.
+The Rule layer defines semantic transformation.
+Object construction is delegated to the Model layer.
 
 ---
 
-## 5.3 Responsibilities
+### Invariant Closure Principle
 
-The Rule layer is responsible for:
+If:
 
-- Action validation
-- Pawn movement legality
-- Wall placement legality
-- Turn enforcement
-- Path existence enforcement
-- Game termination detection
-- Deterministic state transitions
+- The initial Raw State is valid
+- Every transition is legal
 
-Rule computations may rely on:
+Then:
 
-- BFS or equivalent graph traversal
+- All subsequent Raw States remain valid
+
+---
+
+### Legal Action Evaluation
+
+Action validation reuses transition logic without producing new state.
+
+Legal action generation:
+
+1. Enumerate candidate actions
+2. Validate each
+3. Collect valid actions
+
+Correctness is guaranteed; performance strategy is not defined here.
+
+---
+
+## 3.4 Calculation Module
+
+### Role
+
+Provides algorithmic support:
+
+- Graph traversal
 - Shortest path computation
-- Connectivity analysis
+- Connectivity validation
 
-All rule computations must be deterministic.
+Does not define rule semantics.
 
----
-
-## 5.4 Error Semantics
-
-Rule errors represent rule-level violations.
-
-Errors must be:
-
-- Structured
-- Machine-readable
-- Independent of internal topology representation details
+All computations must be deterministic.
 
 ---
 
-# 6. Game Engine
+# 4. Rule Engine Lifecycle
 
-## 6.1 Purpose
+## 4.1 Construction Phase
 
-The Game Engine represents a single running game.
+Constructed from GameConfig.
 
-It is a stateful runtime container built on top of a Rule Engine instance.
+Initializes:
+
+- Topology
+- Rule logic
+- Calculation utilities
+
+After construction:
+
+- Structure is fixed
+- Topology is immutable
+- Rule semantics cannot be altered
+- No GameState is created
+
+Each external owner manages its own instance.
 
 ---
 
-## 6.2 Responsibilities
+## 4.2 Initial State Generation
 
-The Game Engine:
+The Rule Engine provides canonical Raw State generation.
+
+Initial Raw State:
+
+- Derived solely from GameConfig
+- Satisfies all rule invariants
+- Contains no derived projections
+
+Forms the base of invariant closure.
+
+---
+
+## 4.3 Operational Phase
+
+During operation:
+
+- Accepts Raw State and Action
+- Produces new Raw State or Rule Error
+- Maintains no internal runtime state
+
+---
+
+## 4.4 Destruction Phase
+
+The Rule Engine:
+
+- Holds no runtime state
+- Requires no special teardown
+- Does not affect existing GameState instances
+
+---
+
+# 5. Game Manager
+
+## 5.1 Purpose
+
+The Game Manager represents a single running game instance.
+
+It is a stateful runtime container built on top of a Rule Engine.
+
+---
+
+## 5.2 Responsibilities
+
+The Game Manager:
 
 - Maintains the authoritative current GameState
-- Maintains action history
-- Manages game progression
-- Invokes the Rule Engine to perform state transitions
+- Maintains action and state history
+- Delegates all rule semantics to the Rule Engine
+- Invokes the Rule Engine for transitions
+- Ensures sequential state updates
+- Supports undo (revert last action)
 
-The Game Engine does not redefine rule semantics.
+It does not:
 
----
-
-## 6.3 Lifecycle
-
-The Game Engine lifecycle is bound to a single game instance.
-
-The Rule Engine lifecycle is managed externally and may outlive or be reused independently of any specific game runtime.
-
----
-
-# 7. Training Context
-
-Training workflows interact directly with the Rule Engine.
-
-They:
-
-- Manage GameState externally
-- Do not require a Game Engine
-- Rely exclusively on deterministic rule transformations
+- Redefine rule semantics
+- Implement or infer rule validation logic
+- Independently track game-over state (delegates to Rule Engine queries)
+- Modify Raw State directly
+- Bypass the Rule Engine
+- Record invalid actions
 
 ---
 
-# 8. Architectural Guarantees
+## 5.3 State Ownership and History Model
+
+The Game Manager is the sole owner of runtime state.
+
+Rule Engine:
+
+- Does not store state
+- Does not modify external state
+- Returns new Raw State instances only
+
+All state mutation occurs through controlled replacement:
+
+current_state ← RuleEngine transition result
+
+History model:
+
+- initial_state is stored separately and is immutable
+- actions is an append-only list of accepted actions (source of truth)
+- states is a list of non-initial states derived from actions
+- len(actions) == len(states)
+- states[i] corresponds to the result of applying actions[0..=i]
+- Invalid actions are rejected and never recorded
+
+---
+
+## 5.4 Game Manager Lifecycle
+
+The Game Manager operates under a three-stage lifecycle:
+
+UNINITIALIZED → RUNNING → TERMINAL
+
+### UNINITIALIZED
+
+- No state exists
+- Only initialization is allowed
+
+---
+
+### RUNNING
+
+For each action:
+
+1. Retrieve current Raw State
+2. Invoke Rule Engine
+3. Receive new Raw State or Rule Error
+4. If successful:
+   - Update current_state
+   - Append action and resulting state to history
+
+Undo is permitted during this stage.
+
+---
+
+### TERMINAL
+
+Terminal is externally controlled and represents a mutation freeze.
+
+- All mutation operations (submit_action, undo) are disabled
+- All query and read operations remain available
+- Terminal is idempotent
+
+Destruction of Game Manager does not affect the Rule Engine.
+
+---
+
+# 6. Architectural Guarantees
 
 This architecture guarantees:
 
-- Clear separation between rule logic and game runtime
+- Clear separation between rule logic and runtime management
 - Deterministic state transitions
 - Explicit trust boundaries
-- Single canonical rule truth based on Raw State
-- Derived views as observational projections
+- Canonical rule truth based on Raw State
+- Derived views as pure projections
 - No hidden mutable global state
+- Single authoritative runtime state owner
 
-The engine answers:
+The system answers:
 
 “What is legally true in this game world?”
 
@@ -297,11 +482,24 @@ It does not answer:
 
 # Changelog
 
+Version 6 (2026-02-18)
+- Refined the semantic definition and responsibility boundaries of Derived GameState projections.
+- Clarified that derived values are computed by the Rule Engine and not by the Model layer
+
+Version 5 (2026-02-18)
+- Integrated full Game Manager structural specification into the architecture document.
+- Clarified state ownership and lifecycle boundaries between Rule Engine and Game Manager.
+- Expanded runtime orchestration responsibilities.
+
+Version 4 (2026-02-17)
+- Renamed Game Engine to Game Manager.
+- Clarified Rule Engine completeness.
+
+Version 3 (2026-02-17)
+- Integrated Rule Engine Design content into architecture document.
+
 Version 2 (2026-02-17)
-- Introduced two-level engine structure (Rule Engine and Game Engine).
-- Clarified GameState raw vs derived semantics.
-- Added explicit trust model for state validation.
-- Separated runtime container responsibilities from rule logic.
+- Introduced two-level engine structure and trust model.
 
 Version 1 (2026-02-17)
-- Initial draft of layered engine architecture with Topology, Model, Rule, and API separation.
+- Initial draft of layered engine architecture.

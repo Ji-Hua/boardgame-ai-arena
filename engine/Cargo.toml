@@ -1,0 +1,19 @@
+[package]
+name = "quoridor-engine"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "quoridor_engine"
+path = "src/lib.rs"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["extension-module"], optional = true }
+
+[dev-dependencies]
+regex = "1"
+
+[features]
+default = []
+python = ["pyo3"]
