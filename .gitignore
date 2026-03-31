@@ -1,5 +1,6 @@
 # Rust build artifacts
 /target/
+engine/target/
 Cargo.lock
 **/*.rs.bk
 
@@ -9,6 +10,7 @@ Cargo.lock
 *.DS_Store
 .idea/
 .vscode/
+.copilot/
 
 # Logs and temporary files
 *.log

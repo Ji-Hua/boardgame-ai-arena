@@ -2,9 +2,8 @@
 
 Author: Ji Hua
 Created Date: 2026-02-17
-Last Modified: 2026-02-17
-Current Version: 3
-
+Last Modified: 2026-03-28
+Current Version: 4
 Document Type: Design
 Document Subtype: Internal Geometric Model
 Document Status: In Development
@@ -50,11 +49,40 @@ A wall is represented using a head edge coordinate and extends along its orienta
 
 - A wall placed at (x, y, horizontal) occupies:
   - (x, y, horizontal)
-  - (x, y+1, horizontal)
+  - (x+1, y, horizontal)
+
+  Blocking semantics:
+
+  Each horizontal edge (i, y, horizontal) blocks movement between:
+    - (i, y, square)
+    - (i, y+1, square)
+
+  Therefore, a horizontal wall at (x, y) blocks the following movements:
+
+    - Between (x, y)     and (x, y+1)
+    - Between (x+1, y)   and (x+1, y+1)
+
+  In other words:
+    A horizontal wall blocks vertical movement across two adjacent columns.
+
 
 - A wall placed at (x, y, vertical) occupies:
   - (x, y, vertical)
-  - (x+1, y, vertical)
+  - (x, y+1, vertical)
+
+  Blocking semantics:
+
+  Each vertical edge (x, j, vertical) blocks movement between:
+    - (x, j, square)
+    - (x+1, j, square)
+
+  Therefore, a vertical wall at (x, y) blocks the following movements:
+
+    - Between (x, y)     and (x+1, y)
+    - Between (x, y+1)   and (x+1, y+1)
+
+  In other words:
+    A vertical wall blocks horizontal movement across two adjacent rows.
 
 Walls must respect board boundaries and must not overlap previously occupied edges.
 
@@ -264,6 +292,12 @@ Those concerns are defined in Interface or Architecture documents.
 ---
 
 # Changelog
+
+Version 4 (2026-03-28)
+- Fixed wall extension semantics:
+  - horizontal walls now extend along x-axis (x+1)
+  - vertical walls now extend along y-axis (y+1)
+- Ensured orientation semantics match geometric direction.
 
 Version 3 (2026-02-17)
 - Renamed edge types from horizontal_edge/vertical_edge to horizontal/vertical.
