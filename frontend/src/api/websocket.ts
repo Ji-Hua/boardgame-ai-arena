@@ -42,6 +42,11 @@ export interface ActionResultEvent {
   error: string | null;
 }
 
+export interface LegalActionsResultEvent {
+  type: "legal_actions_result";
+  actions: Array<{ player: 1 | 2; type: "pawn"; target: [number, number] }>;
+}
+
 export interface GameStartedEvent {
   type: "game_started";
   game_id: string;
@@ -68,6 +73,7 @@ export interface WsErrorEvent {
 type RoomSnapshotHandler = (event: RoomSnapshotEvent) => void;
 type StateUpdateHandler = (event: StateUpdateEvent) => void;
 type ActionResultHandler = (event: ActionResultEvent) => void;
+type LegalActionsResultHandler = (event: LegalActionsResultEvent) => void;
 type GameStartedHandler = (event: GameStartedEvent) => void;
 type GameEndedHandler = (event: GameEndedEvent) => void;
 type ErrorHandler = (event: WsErrorEvent) => void;
@@ -81,6 +87,7 @@ export class WebSocketClient {
   private roomSnapshotHandlers: Set<RoomSnapshotHandler> = new Set();
   private stateUpdateHandlers: Set<StateUpdateHandler> = new Set();
   private actionResultHandlers: Set<ActionResultHandler> = new Set();
+  private legalActionsResultHandlers: Set<LegalActionsResultHandler> = new Set();
   private gameStartedHandlers: Set<GameStartedHandler> = new Set();
   private gameEndedHandlers: Set<GameEndedHandler> = new Set();
   private errorHandlers: Set<ErrorHandler> = new Set();
@@ -150,6 +157,11 @@ export class WebSocketClient {
           h(msg as unknown as ActionResultEvent),
         );
         break;
+      case "legal_actions_result":
+        this.legalActionsResultHandlers.forEach((h) =>
+          h(msg as unknown as LegalActionsResultEvent),
+        );
+        break;
       case "game_started":
         this.gameStartedHandlers.forEach((h) =>
           h(msg as unknown as GameStartedEvent),
@@ -180,6 +192,10 @@ export class WebSocketClient {
     this.send({ type: "take_action", action });
   }
 
+  getLegalActions(): void {
+    this.send({ type: "get_legal_actions" });
+  }
+
   surrender(seat: 1 | 2): void {
     this.send({ type: "surrender", seat });
   }
@@ -199,6 +215,11 @@ export class WebSocketClient {
   onActionResult(handler: ActionResultHandler): () => void {
     this.actionResultHandlers.add(handler);
     return () => this.actionResultHandlers.delete(handler);
+  }
+
+  onLegalActionsResult(handler: LegalActionsResultHandler): () => void {
+    this.legalActionsResultHandlers.add(handler);
+    return () => this.legalActionsResultHandlers.delete(handler);
   }
 
   onGameStarted(handler: GameStartedHandler): () => void {

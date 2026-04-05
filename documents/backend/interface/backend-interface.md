@@ -2,8 +2,8 @@
 
 Author: Ji Hua  
 Created Date: 2026-04-03  
-Last Modified: 2026-04-04  
-Current Version: 2  
+Last Modified: 2026-04-05  
+Current Version: 3  
 Document Type: Interface  
 Document Subtype: Backend API Contract  
 Document Status: In Development  
@@ -337,6 +337,23 @@ Server responds with `validate_result` to submitter only.
 
 ---
 
+### get_legal_actions
+
+Request all legal pawn moves for the current player.
+
+```json
+{
+  "type": "get_legal_actions"
+}
+```
+
+Server responds with `legal_actions_result` to the requesting client only. The returned actions represent only pawn moves for the current player. Wall placement legality is not included.
+
+**Errors:**
+- If no active game exists, returns `legal_actions_result` with an empty `actions` array.
+
+---
+
 ### surrender
 
 Surrender the game.
@@ -420,6 +437,29 @@ Response to a validate_action request.
   "reason": "string | null"
 }
 ```
+
+---
+
+### legal_actions_result
+
+Response to a `get_legal_actions` request. Sent only to the requesting client.
+
+```json
+{
+  "type": "legal_actions_result",
+  "actions": [
+    {
+      "player": 1 | 2,
+      "type": "pawn",
+      "target": [row, col]
+    }
+  ]
+}
+```
+
+- `actions` — Array of legal pawn moves for the current player. Empty array if no game is active or no legal moves are available.
+- Each action follows the standard Action schema (Section 4.1).
+- Only pawn moves are returned. Wall placement legality is determined only after a `take_action` attempt.
 
 ---
 
@@ -611,6 +651,10 @@ Local Mode allows a single WebSocket connection to control both seats.
 ---
 
 # Changelog
+
+Version 3 (2026-04-05)
+- Added `get_legal_actions` client → server message (Section 3.2)
+- Added `legal_actions_result` server → client event (Section 3.3)
 
 Version 2 (2026-04-04)
 - Added Section 5.5: Local Mode (single-connection two-player)

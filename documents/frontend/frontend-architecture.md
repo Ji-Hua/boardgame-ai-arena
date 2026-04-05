@@ -2,8 +2,8 @@
 
 Author: Ji Hua  
 Created Date: 2026-04-04  
-Last Modified: 2026-04-04  
-Current Version: 1  
+Last Modified: 2026-04-05  
+Current Version: 2  
 Document Type: Design  
 Document Subtype: Frontend Architecture  
 Document Status: In Development  
@@ -208,19 +208,32 @@ Endpoint:
 
 ws://{host}/ws/{room_id}
 
-Events:
+Client → Server events:
 
-- subscribe (client → server)
-- state_update (server → client)
-- action_result (server → client)
-- game_started (server → client)
-- game_ended (server → client)
+- subscribe
+- take_action
+- validate_action
+- get_legal_actions
+- surrender
+
+Server → Client events:
+
+- room_snapshot
+- state_update
+- action_result
+- legal_actions_result
+- validate_result
+- game_started
+- game_ended
+- error
 
 Rules:
 
 - state_update fully replaces frontend state
-- action_result is acknowledgment only
+- action_result is acknowledgment only; no UI update on rejection
+- legal_actions_result is for highlight rendering only; not authoritative state
 - No state reconstruction from partial events
+- No optimistic rendering of any action before action_result
 
 ---
 
@@ -248,6 +261,7 @@ Key fields:
 - currentSeat
 - stepCount
 - lastAction
+- legalActions (optional — populated from `legal_actions_result`, cleared on state_update)
 - isTerminal
 - result
 
@@ -275,7 +289,7 @@ These responsibilities are either removed or handled automatically in the backen
 
 # 8. Interaction Model
 
-## Live Interaction
+## Live Interaction — Action
 
 - User interacts with board
 - InteractionLayer captures input
@@ -283,6 +297,15 @@ These responsibilities are either removed or handled automatically in the backen
 - LiveController sends action via WebSocket
 - Backend processes action and emits state_update
 - UI updates via RenderState
+
+## Live Interaction — Legal Move Highlight
+
+- User clicks current player's pawn
+- LiveController sends get_legal_actions via WebSocket
+- Backend returns legal_actions_result
+- LiveController maps coordinates; updates legalMoves in GamePage
+- HighlightLayer renders legal move indicators
+- Highlights cleared on next state_update or on user action submission
 
 ---
 
@@ -312,6 +335,12 @@ All complexity related to game rules, state transitions, and validation remains 
 ---
 
 # Changelog
+
+Version 2 (2026-04-05)
+- Added get_legal_actions and legal_actions_result to WebSocket event sets (Section 5.2)
+- Added legalActions to RenderState key fields (Section 6)
+- Added Legal Move Highlight interaction model (Section 8)
+- Clarified no optimistic rendering rule in Section 5.2
 
 Version 1 (2026-04-04)
 - Initial definition of frontend architecture aligned with new backend API

@@ -42,6 +42,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
   });
   const [wallPreview, setWallPreview] = useState<WallPreview | null>(null);
   const [wallError, setWallError] = useState<string | null>(null);
+  const [legalMoves, setLegalMoves] = useState<[number, number][]>([]);
   const [, setTick] = useState(0);
   const initializedRef = useRef(false);
 
@@ -70,6 +71,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
   useEffect(() => {
     const unsub = renderStore.subscribe((state) => {
       setRenderState(state);
+      setLegalMoves([]);  // Clear highlights on any state change
       if (state.isTerminal && flow !== "ended") {
         setFlow("ended");
       }
@@ -99,6 +101,21 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
       target: [col, row],
     };
     controller.takeAction(action);
+    setLegalMoves([]);  // Clear highlights after move
+  };
+
+  const handlePawnClick = async () => {
+    // Toggle: if highlights already showing, clear them; otherwise fetch from backend.
+    if (legalMoves.length > 0) {
+      setLegalMoves([]);
+      return;
+    }
+    try {
+      const moves = await controller.getLegalPawnMoves();
+      setLegalMoves(moves);
+    } catch {
+      setLegalMoves([]);
+    }
   };
 
   const handleConfirmWall = (preview: WallPreview) => {
@@ -121,6 +138,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
       renderState.currentSeat === seat &&
       !renderState.isTerminal
     ) {
+      setLegalMoves([]);  // Clear pawn highlights when entering wall mode
       setWallPlacement({ isActive: true, playerId: player });
     }
   };
@@ -140,6 +158,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
     setWallPlacement({ isActive: false, playerId: null });
     setWallPreview(null);
     setWallError(null);
+    setLegalMoves([]);
     setError(null);
     setFlow("loading");
 
@@ -306,13 +325,14 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
             pawns={pawns}
             walls={walls}
             mode="play"
-            legalMoves={[]}
+            legalMoves={legalMoves}
             currentPlayer={renderState.currentSeat === 1 ? "P1" : "P2"}
             wallPlacement={wallPlacement}
             wallPreview={wallPreview}
             onUpdateWallPreview={setWallPreview}
             onConfirmWall={handleConfirmWall}
             onMovePawn={handleMovePawn}
+            onPawnClick={handlePawnClick}
             onCancelWallPlacement={handleCancelWallPlacement}
             externalWallError={wallError}
             onClearExternalWallError={() => setWallError(null)}

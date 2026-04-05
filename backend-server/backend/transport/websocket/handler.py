@@ -65,6 +65,12 @@ async def websocket_endpoint(
                     continue
                 await _handle_validate_action(websocket, msg, room, gm)
 
+            elif msg_type == "get_legal_actions":
+                if client_id is None:
+                    await _send_error(websocket, "UNBOUND_CLIENT", "Must subscribe first")
+                    continue
+                await _handle_get_legal_actions(websocket, room, gm)
+
             elif msg_type == "surrender":
                 if client_id is None:
                     await _send_error(websocket, "UNBOUND_CLIENT", "Must subscribe first")
@@ -168,6 +174,21 @@ async def _handle_validate_action(ws, msg, room, gm: GameManager):
         "valid": result["valid"],
         "reason": result.get("reason"),
     })
+
+
+async def _handle_get_legal_actions(ws: WebSocket, room, gm: GameManager):
+    """Return all legal pawn moves for the current player."""
+    if room.status != "using" or room.current_game_id is None:
+        await ws.send_json({"type": "legal_actions_result", "actions": []})
+        return
+
+    game = gm.get_game(room.current_game_id)
+    if game is None:
+        await ws.send_json({"type": "legal_actions_result", "actions": []})
+        return
+
+    actions = game.engine.legal_pawn_actions()
+    await ws.send_json({"type": "legal_actions_result", "actions": actions})
 
 
 async def _handle_surrender(ws, msg, room, gm: GameManager, hub: BroadcastHub, room_id: str, rm: RoomManager):

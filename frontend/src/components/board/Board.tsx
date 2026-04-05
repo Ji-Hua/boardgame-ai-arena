@@ -59,6 +59,7 @@ export interface BoardProps {
   onUpdateWallPreview?: (preview: WallPreview | null) => void;
   onConfirmWall?: (preview: WallPreview) => void;
   onMovePawn?: (row: number, col: number) => void;
+  onPawnClick?: () => void;
   onCancelWallPlacement?: () => void;
   showDebug?: boolean;
 
@@ -86,6 +87,7 @@ export const Board: React.FC<BoardProps> = ({
   onUpdateWallPreview,
   onConfirmWall,
   onMovePawn,
+  onPawnClick,
   onCancelWallPlacement,
   showDebug = false,
 
@@ -318,12 +320,20 @@ export const Board: React.FC<BoardProps> = ({
   const handleCellClick = useCallback(
     (row: number, col: number) => {
       if (wallPlacement?.isActive) return;
-      if (mode === 'play' && onMovePawn) {
-        // Backend-authoritative: send any click, backend validates
-        onMovePawn(row, col);
+      if (mode === 'play') {
+        // If click is on the current player's pawn, trigger pawn-click (legal moves fetch)
+        const currentPawn = pawns.find((p) => p.playerId === currentPlayer);
+        if (onPawnClick && currentPawn && currentPawn.row === row && currentPawn.col === col) {
+          onPawnClick();
+          return;
+        }
+        if (onMovePawn) {
+          // Backend-authoritative: send any click, backend validates
+          onMovePawn(row, col);
+        }
       }
     },
-    [wallPlacement, mode, onMovePawn]
+    [wallPlacement, mode, onMovePawn, onPawnClick, pawns, currentPlayer]
   );
 
   const gridWidth = boardSize * cellSize;

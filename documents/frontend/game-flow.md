@@ -2,8 +2,8 @@
 
 Author: Ji Hua  
 Created Date: 2026-04-04  
-Last Modified: 2026-04-04  
-Current Version: 1  
+Last Modified: 2026-04-05  
+Current Version: 2  
 Document Type: Design  
 Document Subtype: Game Flow  
 Document Status: In Development  
@@ -148,12 +148,42 @@ All coordinates are 0-based. No notation conversion is required.
 ## 3.1 User Interaction
 
 The user clicks on the board to:
-- Move a pawn to a legal cell.
-- Place a wall at a legal position.
+- Click the current player's pawn to reveal legal moves (highlight mode).
+- Click a highlighted cell to move a pawn.
+- Click elsewhere (non-highlighted cell) to attempt a pawn move directly (backend validates).
+- Place a wall at a position.
 
 The user controls both seats. The frontend determines which seat is acting based on `currentSeat` from RenderState.
 
-## 3.2 Action Construction
+## 3.2 Legal Move Highlight Flow
+
+When the user clicks the current player's pawn:
+
+1. InteractionLayer detects the click is on the current player's pawn position.
+2. LiveController sends `get_legal_actions` via WebSocket:
+   ```json
+   { "type": "get_legal_actions" }
+   ```
+3. Backend calls `legal_pawn_actions()` on the engine and responds with `legal_actions_result`:
+   ```json
+   {
+     "type": "legal_actions_result",
+     "actions": [
+       { "player": 1, "type": "pawn", "target": [row, col] }
+     ]
+   }
+   ```
+4. LiveController maps each `target: [engine_x, engine_y]` → `[engine_y, engine_x]` (RenderState convention).
+5. `legalMoves` state in GamePage is updated.
+6. HighlightLayer renders colored circles at each legal position.
+
+Highlight clearing rules:
+- Legal moves are cleared on any `state_update` from backend.
+- Legal moves are cleared when a move action is submitted.
+- Legal moves are cleared when entering wall placement mode.
+- Clicking the pawn again while highlights are showing clears them (toggle).
+
+## 3.3 Action Construction
 
 1. **InteractionLayer** captures the user click (row, col, action type).
 2. **ActionTranslator** converts the UI event into the backend Action format:
@@ -170,7 +200,7 @@ The user controls both seats. The frontend determines which seat is acting based
 - `type` is `"pawn"` for movement, `"horizontal"` or `"vertical"` for wall placement.
 - `target` is `[row, col]` in 0-based coordinates.
 
-## 3.3 Sending take_action
+## 3.4 Sending take_action
 
 LiveController sends via WebSocket:
 
@@ -202,7 +232,7 @@ The backend responds to the submitter with:
 
 `action_result` is acknowledgment only. The frontend must NOT update game state based on it.
 
-## 3.5 State Update After Action
+## 3.6 State Update After Action
 
 On success, the backend broadcasts `state_update` to all subscribers (Section 2.3). The frontend replaces its entire RenderState.
 
@@ -288,6 +318,12 @@ If the WebSocket connection drops:
 ---
 
 # Changelog
+
+Version 2 (2026-04-05)
+- Added Section 3.2: Legal Move Highlight Flow (get_legal_actions → legal_actions_result → HighlightLayer)
+- Renumbered Sections 3.3–3.6 (previously 3.2–3.5)
+- Clarified action_result: no UI change on rejected actions; wall optimistic rendering explicitly forbidden
+- Aligned with backend-interface.md v3
 
 Version 1 (2026-04-04)
 - Initial game flow document for local mode frontend

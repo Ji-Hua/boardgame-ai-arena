@@ -94,19 +94,8 @@ export class LiveController {
       console.error("WebSocket not connected");
       return;
     }
-
-    // Track wall ownership for rendering
-    // action.target = [x, y] (backend convention); store as {row: y, col: x}
-    if (action.type === "horizontal" || action.type === "vertical") {
-      const seat = action.player;
-      this.walls.push({
-        orientation: action.type === "horizontal" ? "H" : "V",
-        row: action.target[1],
-        col: action.target[0],
-        owner: seat,
-      });
-    }
-
+    // Wall tracking is done only on confirmed state_update (handleStateUpdate).
+    // Do NOT push optimistically here — rejected walls would never be removed.
     this.wsClient.takeAction(action);
   }
 
@@ -119,17 +108,6 @@ export class LiveController {
       if (!this.wsClient) {
         resolve({ success: false, error: "WebSocket not connected" });
         return;
-      }
-
-      // Track wall ownership (same as takeAction)
-      if (action.type === "horizontal" || action.type === "vertical") {
-        const seat = action.player;
-        this.walls.push({
-          orientation: action.type === "horizontal" ? "H" : "V",
-          row: action.target[1],
-          col: action.target[0],
-          owner: seat,
-        });
       }
 
       // One-shot listener for action_result
@@ -148,6 +126,28 @@ export class LiveController {
   surrender(seat: 1 | 2): void {
     if (!this.wsClient) return;
     this.wsClient.surrender(seat);
+  }
+
+  /**
+   * Fetch legal pawn moves for the current player from backend.
+   * Returns a promise of [engine_y, engine_x] pairs (RenderState convention).
+   */
+  getLegalPawnMoves(): Promise<[number, number][]> {
+    return new Promise((resolve) => {
+      if (!this.wsClient) {
+        resolve([]);
+        return;
+      }
+      const unsub = this.wsClient.onLegalActionsResult((event) => {
+        unsub();
+        // Backend target = [engine_x, engine_y]; RenderState uses [engine_y, engine_x]
+        const moves: [number, number][] = event.actions.map(
+          (a) => [a.target[1], a.target[0]]
+        );
+        resolve(moves);
+      });
+      this.wsClient.getLegalActions();
+    });
   }
 
   /**

@@ -109,6 +109,21 @@ class EngineAdapter:
             return {"success": False, "reason": result.error}
         return {"success": True, "new_state": _serialize_state(result.state)}
 
+    def legal_pawn_actions(self) -> list:
+        """Return all legal pawn moves for the current player as wire dicts."""
+        if self._gm is None:
+            return []
+        legal = self._gm.legal_actions()
+        result = []
+        for a in legal:
+            if str(a.kind) == "MovePawn":
+                result.append({
+                    "player": _seat_from_player(a.player),
+                    "type": "pawn",
+                    "target": [a.target_x, a.target_y],
+                })
+        return result
+
     def validate_action(self, action_dict: dict) -> dict:
         if self._gm is None:
             return {"valid": False, "reason": "Engine not initialized"}
