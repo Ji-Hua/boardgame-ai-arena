@@ -2,8 +2,8 @@
 
 Author: Ji Hua  
 Created Date: 2026-04-03  
-Last Modified: 2026-04-03  
-Current Version: 1  
+Last Modified: 2026-04-04  
+Current Version: 2  
 Document Type: Interface  
 Document Subtype: Backend API Contract  
 Document Status: In Development  
@@ -597,9 +597,23 @@ HTTP status codes:
 - Game operations (take_action, surrender, force_end) are only valid when room status is `using`.
 - Room transitions to `config` automatically when a game finishes.
 
+## 5.5 Local Mode (Single-Connection Two-Player)
+
+Local Mode allows a single WebSocket connection to control both seats.
+
+- One client subscribes to a room with a single `client_id`.
+- The client submits `take_action` for either seat by specifying `player: 1` or `player: 2` in the action.
+- The backend does not enforce that a connection may only act for one seat. Seat identity is determined by the `player` field in the action, not by the connection.
+- Turn order is enforced by the engine: only the action for the current player's seat will be accepted.
+- All events (`action_result`, `state_update`, `game_ended`) are delivered to the single connection.
+- This mode requires no special API or configuration. It is the default behavior when one connection sends actions for both seats.
+
 ---
 
 # Changelog
+
+Version 2 (2026-04-04)
+- Added Section 5.5: Local Mode (single-connection two-player)
 
 Version 1 (2026-04-03)
 - Initial backend interface document aligned with backend architecture design
