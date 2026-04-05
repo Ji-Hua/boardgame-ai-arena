@@ -1,0 +1,1327 @@
+{
+  "boardSize": 9,
+  "initialPawns": {
+    "1": [
+      0,
+      4
+    ],
+    "2": [
+      8,
+      4
+    ]
+  },
+  "initialWallsRemaining": {
+    "1": 10,
+    "2": 10
+  },
+  "steps": [
+    {
+      "stepId": "1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          1,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "2",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          7,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "3",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          2,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "4",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          6,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "5",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          3,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "6",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          5,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "6.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          5,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "7",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          4,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "7.1",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          4,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "7.2",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          5,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "8",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          3,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "8.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          3,
+          5
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "8.2",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          3,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "9",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          2,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "10",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          2,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "10.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          4,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "10.2",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          3,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "11",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          2,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "12",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          3,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "13",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          3,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "13.1",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          3,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "13.2",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          2,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "14",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          3,
+          2
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "15",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          4,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "16",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          3,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "17",
+      "action": {
+        "seat": 1,
+        "type": "horizontal",
+        "position": [
+          0,
+          7
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "18",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          2,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "18.1",
+      "action": {
+        "seat": 1,
+        "type": "horizontal",
+        "position": [
+          3,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "18.2",
+      "action": {
+        "seat": 1,
+        "type": "vertical",
+        "position": [
+          3,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "18.3",
+      "action": {
+        "seat": 1,
+        "type": "horizontal",
+        "position": [
+          3,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "19",
+      "action": {
+        "seat": 1,
+        "type": "vertical",
+        "position": [
+          4,
+          2
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "19.1",
+      "action": {
+        "seat": 2,
+        "type": "vertical",
+        "position": [
+          5,
+          8
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "19.2",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          5,
+          8
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "20",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          2,
+          2
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "20.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          4,
+          2
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "21",
+      "action": {
+        "seat": 1,
+        "type": "vertical",
+        "position": [
+          1,
+          0
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "21.1",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          2,
+          0
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "22",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          2,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "23",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          5,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "23.1",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          2,
+          0
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "24",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          1,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "24.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "25",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          6,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "25.1",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          8,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "25.2",
+      "action": {
+        "seat": 2,
+        "type": "vertical",
+        "position": [
+          8,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "26",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          2,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "26.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          8,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "26.2",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          2
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "26.3",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          5
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "26.4",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          4,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "27",
+      "action": {
+        "seat": 1,
+        "type": "horizontal",
+        "position": [
+          6,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "27.1",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          6,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "27.2",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          6,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "27.3",
+      "action": {
+        "seat": 2,
+        "type": "vertical",
+        "position": [
+          5,
+          2
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "28",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          3,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "28.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "29",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          6,
+          2
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "30",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          4,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "31",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          2
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "32",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          7,
+          2
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "32.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          8,
+          2
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "33",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "33.1",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          4,
+          -1
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "34",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          5,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "35",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "35.1",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          7,
+          1
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "36",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          7,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "36.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          8,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "37",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          5
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "37.1",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          7,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "38",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          6,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "38.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          9,
+          5
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "39",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          6
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "40",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          7,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "40.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          8
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "41",
+      "action": {
+        "seat": 1,
+        "type": "horizontal",
+        "position": [
+          7,
+          6
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "42",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          8,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "43",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          5
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "43.1",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          9,
+          1
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "44",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          7,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "45",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          4
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "46",
+      "action": {
+        "seat": 2,
+        "type": "vertical",
+        "position": [
+          6,
+          0
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "47",
+      "action": {
+        "seat": 1,
+        "type": "horizontal",
+        "position": [
+          5,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "48",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          5,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "49",
+      "action": {
+        "seat": 1,
+        "type": "horizontal",
+        "position": [
+          5,
+          5
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "50",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          5,
+          7
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "50.1",
+      "action": {
+        "seat": 1,
+        "type": "horizontal",
+        "position": [
+          7,
+          8
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "51",
+      "action": {
+        "seat": 1,
+        "type": "vertical",
+        "position": [
+          6,
+          7
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "51.1",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          7,
+          0
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "52",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          6,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "53",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "54",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          7,
+          2
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "55",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "56",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          7,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "57",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          2
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "57.1",
+      "action": {
+        "seat": 2,
+        "type": "vertical",
+        "position": [
+          7,
+          1
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "57.2",
+      "action": {
+        "seat": 2,
+        "type": "vertical",
+        "position": [
+          7,
+          2
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "58",
+      "action": {
+        "seat": 2,
+        "type": "vertical",
+        "position": [
+          7,
+          3
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "58.1",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          7,
+          4
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "58.2",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          8,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "58.3",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          6,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "58.4",
+      "action": {
+        "seat": 1,
+        "type": "vertical",
+        "position": [
+          6,
+          2
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "59",
+      "action": {
+        "seat": 1,
+        "type": "horizontal",
+        "position": [
+          3,
+          2
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "60",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          7,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "60.1",
+      "action": {
+        "seat": 1,
+        "type": "horizontal",
+        "position": [
+          3,
+          0
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "61",
+      "action": {
+        "seat": 1,
+        "type": "pawn",
+        "position": [
+          8,
+          1
+        ]
+      },
+      "outcome": "accept"
+    },
+    {
+      "stepId": "61.1",
+      "action": {
+        "seat": 2,
+        "type": "pawn",
+        "position": [
+          7,
+          2
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "61.2",
+      "action": {
+        "seat": 2,
+        "type": "horizontal",
+        "position": [
+          0,
+          3
+        ]
+      },
+      "outcome": "reject"
+    },
+    {
+      "stepId": "61.3",
+      "action": {
+        "seat": 2,
+        "type": "vertical",
+        "position": [
+          0,
+          3
+        ]
+      },
+      "outcome": "reject"
+    }
+  ]
+}

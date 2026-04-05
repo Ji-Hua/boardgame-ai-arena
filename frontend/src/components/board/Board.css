@@ -1,0 +1,127 @@
+/* Board component styles */
+
+.board-wrapper {
+  position: relative;
+  display: inline-block;
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
+
+.board-container {
+  display: block;
+  border: 2px solid #333;
+  border-radius: 4px;
+}
+
+.wall-placement-mode {
+  cursor: crosshair !important;
+}
+
+.wall-error {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #e74c3c;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  z-index: 20;
+  white-space: nowrap;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.wall-stocks-left {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.wall-stocks-right {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+/* Wall placement mode cursor */
+.wall-placement-mode {
+  cursor: crosshair !important;
+}
+
+.wall-placement-mode * {
+  cursor: crosshair !important;
+}
+
+/* Animations */
+@keyframes wall-place {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.wall-placed {
+  animation: wall-place 0.5s ease-out;
+}
+
+@keyframes pawn-move {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.pawn-moved {
+  animation: pawn-move 0.3s ease-out;
+}
+
+/* Error states */
+.wall-invalid {
+  background-color: rgba(220, 53, 69, 0.8) !important;
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Hover effects */
+.wall-stock-item:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.board-cell-hover {
+  background-color: rgba(0, 255, 0, 0.1) !important;
+}

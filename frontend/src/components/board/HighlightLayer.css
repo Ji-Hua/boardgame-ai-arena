@@ -1,0 +1,15 @@
+/* HighlightLayer styles for interactive legal move highlights */
+
+.highlight-circle {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  cursor: pointer;
+}
+
+.highlight-circle:hover {
+  transform: scale(1.25);
+  opacity: 0.65 !important;
+}
+
+.highlight-circle:active {
+  transform: scale(1.1);
+}
