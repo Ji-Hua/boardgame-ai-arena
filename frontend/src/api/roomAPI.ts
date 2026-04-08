@@ -118,4 +118,47 @@ export const roomAPI = {
     const res = await post(`${BASE_URL}/rooms/${roomId}/start_game`);
     return res.json();
   },
+
+  /** POST /api/rooms/{room_id}/agent/create */
+  async createAgent(
+    roomId: string,
+    seat: 1 | 2,
+    agentType: string,
+    config?: Record<string, unknown>,
+  ): Promise<{ instance_id: string; room_id: string; seat: number }> {
+    const body: Record<string, unknown> = { seat, agent_type: agentType };
+    if (config !== undefined) body.config = config;
+    const res = await post(`${BASE_URL}/rooms/${roomId}/agent/create`, body);
+    return res.json();
+  },
+
+  /** POST /api/rooms/{room_id}/agent/start */
+  async startAgents(roomId: string): Promise<{ room_id: string; started: unknown[] }> {
+    const res = await post(`${BASE_URL}/rooms/${roomId}/agent/start`);
+    return res.json();
+  },
+
+  /** POST /api/rooms/{room_id}/game/speed */
+  async setGameSpeed(
+    roomId: string,
+    speedMultiplier: number,
+  ): Promise<{ room_id: string; speed_multiplier: number }> {
+    const res = await post(`${BASE_URL}/rooms/${roomId}/game/speed`, {
+      speed_multiplier: speedMultiplier,
+    });
+    return res.json();
+  },
+
+  /** GET /api/agent/types */
+  async getAgentTypes(): Promise<{ agent_types: AgentTypeInfo[] }> {
+    const res = await fetch(`${BASE_URL}/agent/types`);
+    if (!res.ok) throw new Error(`${res.status}`);
+    return res.json();
+  },
 };
+
+export interface AgentTypeInfo {
+  type_id: string;
+  display_name: string;
+  category: string;
+}

@@ -1,0 +1,33 @@
+services:
+  agent-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8764:8764"
+    environment:
+      - AGENT_SERVICE_URL=http://agent-service:8090
+    depends_on:
+      agent-service:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "8765:8765"
+    depends_on:
+      - backend

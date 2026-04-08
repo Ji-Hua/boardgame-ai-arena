@@ -14,7 +14,7 @@ import type { WallData } from "../../components/board/Wall";
 import { VictoryModal } from "../../components/UI/VictoryModal";
 import { MatchControls } from "../../components/UI/MatchControls";
 import { WallStock } from "../../components/board/WallStock";
-import { LiveController } from "../../modes/live/LiveController";
+import { LiveController, type GameConfig } from "../../modes/live/LiveController";
 import { renderStore } from "../../stores/renderStore";
 import type { RenderState } from "../../core/RenderState";
 import { PLAYER_COLORS } from "../../theme/playerColors";
@@ -23,17 +23,29 @@ import "./GamePage.css";
 
 type GameFlow = "loading" | "playing" | "ended" | "error";
 
+// ── Speed options ────────────────────────────────────────────
+const SPEED_OPTIONS: { label: string; multiplier: number }[] = [
+  { label: "0.5x", multiplier: 0.5 },
+  { label: "1x",   multiplier: 1   },
+  { label: "2x",   multiplier: 2   },
+  { label: "4x",   multiplier: 4   },
+  { label: "8x",   multiplier: 8   },
+];
+const DEFAULT_SPEED_MULTIPLIER = 1;
+
 interface GamePageProps {
+  gameConfig?: GameConfig;
   onBack?: () => void;
 }
 
-export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
+export const GamePage: React.FC<GamePageProps> = ({ gameConfig, onBack }) => {
   const [controller] = useState(() => new LiveController());
   const [renderState, setRenderState] = useState<RenderState>(
     renderStore.getState(),
   );
   const [flow, setFlow] = useState<GameFlow>("loading");
   const [error, setError] = useState<string | null>(null);
+  const [speedMultiplier, setSpeedMultiplier] = useState(DEFAULT_SPEED_MULTIPLIER);
 
   // Board interaction state
   const [wallPlacement, setWallPlacement] = useState<WallPlacement>({
@@ -54,7 +66,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
 
     const init = async () => {
       try {
-        await controller.bootstrap();
+        await controller.bootstrap(gameConfig);
         setFlow("playing");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to initialize");
@@ -65,6 +77,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
 
     return () => controller.disconnect();
   }, [controller]);
+
 
   // ── Subscriptions ────────────────────────────────────────────
 
@@ -93,7 +106,12 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
 
   // ── Action handlers ──────────────────────────────────────────
 
+  /** Whether the current seat is human-controlled (interaction allowed). */
+  const isCurrentSeatHuman = !renderState.actors ||
+    renderState.actors[renderState.currentSeat] === "human";
+
   const handleMovePawn = (row: number, col: number) => {
+    if (!isCurrentSeatHuman) return;
     // row = engine_y, col = engine_x; backend expects target: [x, y]
     const action: ActionWire = {
       player: renderState.currentSeat,
@@ -105,6 +123,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
   };
 
   const handlePawnClick = async () => {
+    if (!isCurrentSeatHuman) return;
     // Toggle: if highlights already showing, clear them; otherwise fetch from backend.
     if (legalMoves.length > 0) {
       setLegalMoves([]);
@@ -119,6 +138,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
   };
 
   const handleConfirmWall = (preview: WallPreview) => {
+    if (!isCurrentSeatHuman) return;
     // preview.logicalRow = engine_y, preview.logicalCol = engine_x
     // backend expects target: [x, y]
     const action: ActionWire = {
@@ -133,6 +153,10 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
 
   const handleEnterWallMode = (player: "P1" | "P2") => {
     const seat = player === "P1" ? 1 : 2;
+    // Only allow wall mode for human-controlled seats that have the current turn
+    if (
+      renderState.actors && renderState.actors[seat as 1 | 2] === "agent"
+    ) return;
     if (
       renderState.wallsRemaining[seat as 1 | 2] > 0 &&
       renderState.currentSeat === seat &&
@@ -152,6 +176,16 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
     controller.surrender(renderState.currentSeat);
   };
 
+  const handleReturnToLobby = () => {
+    controller.disconnect();
+    onBack?.();
+  };
+
+  const handleSpeedChange = (multiplier: number) => {
+    setSpeedMultiplier(multiplier);
+    void controller.setGameSpeed(multiplier);
+  };
+
   const handleNewMatch = async () => {
     controller.disconnect();
     initializedRef.current = false;
@@ -164,7 +198,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
 
     // Re-bootstrap
     try {
-      await controller.bootstrap();
+      await controller.bootstrap(gameConfig);
       setFlow("playing");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to restart");
@@ -203,6 +237,16 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
   const isPlaying = flow === "playing";
   const isEnded = flow === "ended" || renderState.isTerminal;
 
+  // In agent-vs-agent, frontend is a pure viewer
+  const isViewerMode = renderState.actors !== null &&
+    renderState.actors[1] === "agent" && renderState.actors[2] === "agent";
+
+  // Board interaction is allowed only when current seat is human
+  const boardMode = isViewerMode ? "replay" as const : "play" as const;
+
+  const isSeat1Agent = renderState.actors?.["1"] === "agent";
+  const isSeat2Agent = renderState.actors?.["2"] === "agent";
+
   const pawns: PawnData[] = [
     {
       playerId: "P1",
@@ -235,6 +279,30 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
       <header className="game-header">
         <h1 className="game-title">Quoridor</h1>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          {/* Speed selector — visible only in agent vs agent / replay (both seats are agents) */}
+          {isViewerMode && (
+            <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+              <span style={{ fontSize: "0.75rem", color: "#666", userSelect: "none" }}>Speed:</span>
+              {SPEED_OPTIONS.map((opt) => (
+                <button
+                  key={opt.label}
+                  onClick={() => handleSpeedChange(opt.multiplier)}
+                  style={{
+                    padding: "0.25rem 0.5rem",
+                    fontSize: "0.75rem",
+                    fontWeight: speedMultiplier === opt.multiplier ? "bold" : "normal",
+                    background: speedMultiplier === opt.multiplier ? "#333" : "#e0e0e0",
+                    color: speedMultiplier === opt.multiplier ? "white" : "#333",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
           <MatchControls
             isPreGame={false}
             isInGame={isPlaying || isEnded}
@@ -243,7 +311,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
           />
           {onBack && (
             <button
-              onClick={() => { controller.disconnect(); onBack(); }}
+              onClick={handleReturnToLobby}
               style={{
                 padding: "0.4rem 1rem",
                 background: "#666",
@@ -275,9 +343,9 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
             <span style={{ color: PLAYER_COLORS.P2.primary }}>▶</span>
           )}
           <div style={{ backgroundColor: PLAYER_COLORS.P2.primary, color: "white", padding: "4px 10px", borderRadius: "6px", fontWeight: "bold" }}>P2</div>
-          <span style={{ fontWeight: "bold" }}>Player 2</span>
+          <span style={{ fontWeight: "bold" }}>{isSeat2Agent ? "Agent" : "Player 2"}</span>
           <span style={{ color: "#666" }}>Walls: {renderState.wallsRemaining[2]}</span>
-          {!isEnded && (
+          {!isEnded && !isSeat2Agent && (
             <button
               onClick={handleSurrender}
               disabled={renderState.currentSeat !== 2}
@@ -324,8 +392,8 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
             cellSize={48}
             pawns={pawns}
             walls={walls}
-            mode="play"
-            legalMoves={legalMoves}
+            mode={boardMode}
+            legalMoves={isCurrentSeatHuman ? legalMoves : []}
             currentPlayer={renderState.currentSeat === 1 ? "P1" : "P2"}
             wallPlacement={wallPlacement}
             wallPreview={wallPreview}
@@ -367,9 +435,9 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
             <span style={{ color: PLAYER_COLORS.P1.primary }}>▶</span>
           )}
           <div style={{ backgroundColor: PLAYER_COLORS.P1.primary, color: "white", padding: "4px 10px", borderRadius: "6px", fontWeight: "bold" }}>P1</div>
-          <span style={{ fontWeight: "bold" }}>Player 1</span>
+          <span style={{ fontWeight: "bold" }}>{isSeat1Agent ? "Agent" : "Player 1"}</span>
           <span style={{ color: "#666" }}>Walls: {renderState.wallsRemaining[1]}</span>
-          {!isEnded && (
+          {!isEnded && !isSeat1Agent && (
             <button
               onClick={handleSurrender}
               disabled={renderState.currentSeat !== 1}
@@ -417,6 +485,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onBack }) => {
           termination={renderState.result.termination}
           onNewGame={handleNewMatch}
           onNewMatch={handleNewMatch}
+          onReturnToLobby={onBack ? handleReturnToLobby : undefined}
         />
       )}
     </div>

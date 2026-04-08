@@ -21,6 +21,7 @@ class Game:
         self.step_count: int = 0
         self.actions: list[dict] = []
         self.result: Optional[dict] = None
+        self.speed_multiplier: float = 1.0
 
     def get_state(self) -> dict:
         return self.engine.get_state()

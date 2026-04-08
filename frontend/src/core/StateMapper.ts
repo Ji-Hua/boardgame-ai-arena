@@ -6,7 +6,7 @@
 import type { GameStateWire } from "../api/roomAPI";
 import type { Action } from "../types/Action";
 import type { Seat } from "../types/Action";
-import type { RenderState, RenderWall, RenderResult } from "./RenderState";
+import type { RenderState, RenderWall, RenderResult, SeatActors } from "./RenderState";
 
 export interface StateMapperParams {
   /** Backend game state in wire format (logical coordinates). */
@@ -23,6 +23,9 @@ export interface StateMapperParams {
 
   /** Step count from backend. */
   stepCount: number;
+
+  /** Per-seat actor types (null for legacy human-vs-human). */
+  actors?: SeatActors | null;
 }
 
 export class StateMapper {
@@ -34,7 +37,7 @@ export class StateMapper {
    * in its serialised state yet).
    */
   static toRenderState(params: StateMapperParams): RenderState {
-    const { gameState, lastAction, result, walls, stepCount } = params;
+    const { gameState, lastAction, result, walls, stepCount, actors } = params;
 
     // Backend wire format: {row: engine_x, col: engine_y}
     // RenderState convention: [engine_y, engine_x] (row=y, col=x)
@@ -61,7 +64,7 @@ export class StateMapper {
       currentSeat,
       stepCount,
       lastAction,
-      actor: null, // human-vs-human only
+      actors: actors ?? null,
       isTerminal,
       result: result ?? null,
     };

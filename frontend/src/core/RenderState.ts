@@ -2,11 +2,19 @@
 //
 // Pure projection of backend state for UI rendering.
 // All rule-level identities use seat = 1 | 2.
-// No agent/replay fields — human-vs-human only.
 
 import type { Action } from "../types/Action";
 
 export type Seat = 1 | 2;
+
+/** Actor type per seat. */
+export type ActorType = "human" | "agent";
+
+/** Per-seat actor configuration. */
+export interface SeatActors {
+  1: ActorType;
+  2: ActorType;
+}
 
 /** Game result when terminal state is reached. */
 export interface RenderResult {
@@ -36,8 +44,8 @@ export interface RenderState {
   currentSeat: Seat;
   stepCount: number;
   lastAction: Action | null;
-  /** null = no actor info needed for human-vs-human */
-  actor: null;
+  /** Per-seat actor types. null for legacy compatibility. */
+  actors: SeatActors | null;
   legalActions?: Action[];
   isTerminal: boolean;
   result: RenderResult | null;

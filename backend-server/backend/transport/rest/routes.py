@@ -5,9 +5,12 @@ All routes follow the interface defined in backend-interface.md.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+import asyncio
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel
 from typing import Literal
+
+from backend.runtime.orchestrator import maybe_trigger_agent_turn
 
 router = APIRouter(prefix="/api")
 
@@ -24,6 +27,13 @@ class SelectActorRequest(BaseModel):
     actor_type: Literal["human", "agent"]
 
 
+class SetSpeedRequest(BaseModel):
+    speed_multiplier: float
+
+
+_ALLOWED_SPEED_MULTIPLIERS: frozenset[float] = frozenset({0.5, 1.0, 2.0, 4.0, 8.0})
+
+
 # --- Helpers ---
 
 def _room_mgr(request: Request):
@@ -34,11 +44,39 @@ def _game_mgr(request: Request):
     return request.app.state.game_manager
 
 
+def _agent_adapter(request: Request):
+    return request.app.state.agent_adapter
+
+
+def _broadcast_hub(request: Request):
+    return request.app.state.broadcast_hub
+
+
 def _get_room_or_404(request: Request, room_id: str):
     room = _room_mgr(request).get_room(room_id)
     if room is None:
         raise HTTPException(status_code=404, detail=f"Room {room_id} not found")
     return room
+
+
+def _check_replay_constraint(room, agent_adapter) -> None:
+    """If any seat has a replay agent, both seats must be replay agents."""
+    categories = {}
+    for s in (1, 2):
+        if room.seats[s].actor_type == "agent":
+            cat = agent_adapter.get_agent_category(room.room_id, s)
+            categories[s] = cat
+    has_replay = any(cat == "replay" for cat in categories.values())
+    if has_replay:
+        both_replay = (
+            room.seats[1].actor_type == "agent" and categories.get(1) == "replay"
+            and room.seats[2].actor_type == "agent" and categories.get(2) == "replay"
+        )
+        if not both_replay:
+            raise HTTPException(
+                status_code=400,
+                detail="Replay constraint: if any seat is a replay agent, both seats must be replay agents",
+            )
 
 
 # --- Room Domain ---
@@ -77,19 +115,29 @@ def select_actor(room_id: str, body: SelectActorRequest, request: Request):
 
 
 @router.post("/rooms/{room_id}/start_game")
-def start_game(room_id: str, request: Request):
+async def start_game(room_id: str, request: Request):
     rm = _room_mgr(request)
     room = _get_room_or_404(request, room_id)
 
     if not rm.can_start(room):
         raise HTTPException(status_code=400, detail="Preconditions not met for game start")
 
+    agent_adapter = _agent_adapter(request)
+    _check_replay_constraint(room, agent_adapter)
+
     gm = _game_mgr(request)
     game = gm.create_game()
     rm.set_using(room, game.game_id)
+    agent_adapter.start_room_agents(room_id)
 
     snapshot = room.snapshot()
     snapshot["game"] = game.to_dict()
+
+    # If seat 1 is an agent, trigger the first agent turn
+    hub = _broadcast_hub(request)
+    if room.seats[1].actor_type == "agent" and agent_adapter.has_agent(room_id, 1):
+        asyncio.ensure_future(maybe_trigger_agent_turn(room, room_id, gm, rm, hub, agent_adapter))
+
     return snapshot
 
 
@@ -130,7 +178,7 @@ def get_game_state(room_id: str, request: Request):
 
 
 @router.post("/rooms/{room_id}/game/new")
-def new_game(room_id: str, request: Request):
+async def new_game(room_id: str, request: Request):
     rm = _room_mgr(request)
     room = _get_room_or_404(request, room_id)
 
@@ -140,12 +188,22 @@ def new_game(room_id: str, request: Request):
     if not rm.can_start(room):
         raise HTTPException(status_code=400, detail="Preconditions not met for game start")
 
+    agent_adapter = _agent_adapter(request)
+    _check_replay_constraint(room, agent_adapter)
+
     gm = _game_mgr(request)
     game = gm.create_game()
     rm.set_using(room, game.game_id)
+    agent_adapter.start_room_agents(room_id)
 
     snapshot = room.snapshot()
     snapshot["game"] = game.to_dict()
+
+    # If seat 1 is an agent, trigger the first agent turn
+    hub = _broadcast_hub(request)
+    if room.seats[1].actor_type == "agent" and agent_adapter.has_agent(room_id, 1):
+        asyncio.ensure_future(maybe_trigger_agent_turn(room, room_id, gm, rm, hub, agent_adapter))
+
     return snapshot
 
 
@@ -164,6 +222,9 @@ def force_end(room_id: str, request: Request):
     gm = _game_mgr(request)
     result = gm.force_end(game)
     rm.set_config(room)
+
+    # Clean up agents
+    _agent_adapter(request).destroy_room_agents(room_id)
 
     return {"room_id": room.room_id, "status": room.status, "result": result}
 
@@ -185,3 +246,31 @@ def get_replay(room_id: str, request: Request):
         "actions": game.actions,
         "result": game.result,
     }
+
+
+@router.post("/rooms/{room_id}/game/speed")
+def set_game_speed(room_id: str, body: SetSpeedRequest, request: Request):
+    """Update game speed multiplier for the active game.
+
+    Only effective when both seats are agent-controlled (agent vs agent / replay).
+    The backend orchestration layer uses this to compute the inter-step delay:
+      delay = 0.5 / speed_multiplier  (base interval is 0.5 s at 1x)
+    """
+    room = _get_room_or_404(request, room_id)
+
+    if room.status != "using" or room.current_game_id is None:
+        raise HTTPException(status_code=400, detail="No active game")
+
+    if body.speed_multiplier not in _ALLOWED_SPEED_MULTIPLIERS:
+        allowed = sorted(_ALLOWED_SPEED_MULTIPLIERS)
+        raise HTTPException(
+            status_code=400,
+            detail=f"speed_multiplier must be one of {allowed}",
+        )
+
+    game = _game_mgr(request).get_game(room.current_game_id)
+    if game is None:
+        raise HTTPException(status_code=400, detail="No active game")
+
+    game.speed_multiplier = body.speed_multiplier
+    return {"room_id": room_id, "speed_multiplier": game.speed_multiplier}

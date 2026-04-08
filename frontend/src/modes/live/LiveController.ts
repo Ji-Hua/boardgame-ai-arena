@@ -11,13 +11,31 @@ import { WebSocketClient, type StateUpdateEvent, type ActionWire } from "../../a
 import { renderStore } from "../../stores/renderStore";
 import { StateMapper } from "../../core/StateMapper";
 import type { Action, Seat } from "../../types/Action";
-import type { RenderWall, RenderResult } from "../../core/RenderState";
+import type { RenderWall, RenderResult, SeatActors, ActorType } from "../../core/RenderState";
+
+/** Configuration for a game session. */
+export interface GameConfig {
+  seat1: ActorType;
+  seat2: ActorType;
+  /** Agent type for seat 1 (required when seat1 is "agent"). */
+  agent1Type?: string;
+  /** Agent type for seat 2 (required when seat2 is "agent"). */
+  agent2Type?: string;
+  /** Optional agent config for seat 1. */
+  agent1Config?: Record<string, unknown>;
+  /** Optional agent config for seat 2. */
+  agent2Config?: Record<string, unknown>;
+}
 
 export class LiveController {
   private roomId: string | null = null;
   private gameId: string | null = null;
   private clientId: string;
   private wsClient: WebSocketClient | null = null;
+  private config: GameConfig = { seat1: "human", seat2: "human" };
+
+  // Per-seat actor types for rendering
+  public actors: SeatActors = { 1: "human", 2: "human" };
 
   // Accumulated walls (backend GameState may not include wall positions yet)
   private walls: RenderWall[] = [];
@@ -41,6 +59,16 @@ export class LiveController {
     return () => this.listeners.delete(listener);
   }
 
+  /** Update game speed on the backend. Only affects agent-vs-agent / replay modes. */
+  async setGameSpeed(multiplier: number): Promise<void> {
+    if (!this.roomId) return;
+    try {
+      await roomAPI.setGameSpeed(this.roomId, multiplier);
+    } catch (err) {
+      console.warn("setGameSpeed failed:", err);
+    }
+  }
+
   private notify(): void {
     this.listeners.forEach((l) => l());
   }
@@ -48,16 +76,22 @@ export class LiveController {
   // ── Bootstrap (REST) ─────────────────────────────────────────
 
   /**
-   * Full local-mode bootstrap sequence:
+   * Full bootstrap sequence:
    * 1. Create room
    * 2. Join both seats with same client_id
-   * 3. Select actor for both seats (human)
-   * 4. Start game
-   * 5. Connect WebSocket and subscribe
+   * 3. Select actor for both seats
+   * 4. Create agents for agent-controlled seats
+   * 5. Start game
+   * 6. Connect WebSocket and subscribe
    *
    * Returns the room_id.
    */
-  async bootstrap(): Promise<string> {
+  async bootstrap(config?: GameConfig): Promise<string> {
+    if (config) {
+      this.config = config;
+    }
+    this.actors = { 1: this.config.seat1, 2: this.config.seat2 };
+
     // 1. Create room
     const room = await roomAPI.createRoom();
     this.roomId = room.room_id;
@@ -67,17 +101,29 @@ export class LiveController {
     await roomAPI.joinSeat(this.roomId, this.clientId + "-2", 2);
 
     // 3. Select actor type for both seats
-    await roomAPI.selectActor(this.roomId, 1, "human");
-    await roomAPI.selectActor(this.roomId, 2, "human");
+    await roomAPI.selectActor(this.roomId, 1, this.config.seat1);
+    await roomAPI.selectActor(this.roomId, 2, this.config.seat2);
 
-    // 4. Start game
+    // 4. Create agents for agent-controlled seats
+    if (this.config.seat1 === "agent" && this.config.agent1Type) {
+      await roomAPI.createAgent(
+        this.roomId, 1, this.config.agent1Type, this.config.agent1Config,
+      );
+    }
+    if (this.config.seat2 === "agent" && this.config.agent2Type) {
+      await roomAPI.createAgent(
+        this.roomId, 2, this.config.agent2Type, this.config.agent2Config,
+      );
+    }
+
+    // 5. Start game
     const startResp = await roomAPI.startGame(this.roomId);
     this.gameId = startResp.game.game_id;
 
     // Render initial state from start_game response
     this.projectState(startResp.game.state, null, 0);
 
-    // 5. Connect WebSocket
+    // 6. Connect WebSocket
     await this.connectWebSocket(this.roomId);
 
     return this.roomId;
@@ -164,6 +210,8 @@ export class LiveController {
     this.gameEnded = false;
     this.gameResult = null;
     this.lastError = null;
+    this.config = { seat1: "human", seat2: "human" };
+    this.actors = { 1: "human", 2: "human" };
   }
 
   // ── WebSocket ────────────────────────────────────────────────
@@ -214,6 +262,10 @@ export class LiveController {
   }
 
   private handleStateUpdate(event: StateUpdateEvent): void {
+    this._applyStateUpdate(event);
+  }
+
+  private _applyStateUpdate(event: StateUpdateEvent): void {
     // Track wall from last_action
     if (event.last_action) {
       const la = event.last_action;
@@ -263,6 +315,7 @@ export class LiveController {
       result: result ?? null,
       walls: this.walls,
       stepCount,
+      actors: this.actors,
     });
     renderStore.setState(renderState);
   }

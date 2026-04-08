@@ -2,6 +2,7 @@
 
 Handles subscribe, take_action, validate_action, surrender.
 Broadcasts state_update, game_started, game_ended.
+Triggers agent turns via Turn Orchestrator when applicable.
 """
 
 from __future__ import annotations
@@ -11,7 +12,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from backend.application.room_manager import RoomManager
 from backend.application.game_manager import GameManager
+from backend.adapters.agent_service_adapter import AgentServiceAdapter
 from backend.runtime.broadcast import BroadcastHub
+from backend.runtime.orchestrator import maybe_trigger_agent_turn
 
 ws_router = APIRouter()
 
@@ -24,6 +27,7 @@ async def websocket_endpoint(
     rm: RoomManager = websocket.app.state.room_manager
     gm: GameManager = websocket.app.state.game_manager
     hub: BroadcastHub = websocket.app.state.broadcast_hub
+    agent_adapter: AgentServiceAdapter = websocket.app.state.agent_adapter
 
     room = rm.get_room(room_id)
     if room is None:
@@ -57,7 +61,7 @@ async def websocket_endpoint(
                 if client_id is None:
                     await _send_error(websocket, "UNBOUND_CLIENT", "Must subscribe first")
                     continue
-                await _handle_take_action(websocket, msg, room, gm, hub, room_id, rm)
+                await _handle_take_action(websocket, msg, room, gm, hub, room_id, rm, agent_adapter)
 
             elif msg_type == "validate_action":
                 if client_id is None:
@@ -75,7 +79,7 @@ async def websocket_endpoint(
                 if client_id is None:
                     await _send_error(websocket, "UNBOUND_CLIENT", "Must subscribe first")
                     continue
-                await _handle_surrender(websocket, msg, room, gm, hub, room_id, rm)
+                await _handle_surrender(websocket, msg, room, gm, hub, room_id, rm, agent_adapter)
 
             else:
                 await _send_error(websocket, "INVALID_PAYLOAD", f"Unknown message type: {msg_type}")
@@ -110,7 +114,7 @@ async def _send_room_snapshot(ws: WebSocket, room, gm: GameManager) -> None:
     })
 
 
-async def _handle_take_action(ws, msg, room, gm: GameManager, hub: BroadcastHub, room_id: str, rm: RoomManager):
+async def _handle_take_action(ws, msg, room, gm: GameManager, hub: BroadcastHub, room_id: str, rm: RoomManager, agent_adapter: AgentServiceAdapter):
     if room.status != "using" or room.current_game_id is None:
         await _send_error(ws, "NO_ACTIVE_GAME", "No active game in this room")
         return
@@ -151,6 +155,10 @@ async def _handle_take_action(ws, msg, room, gm: GameManager, hub: BroadcastHub,
                 "result": result["result"],
             })
             rm.set_config(room)
+            agent_adapter.destroy_room_agents(room_id)
+        else:
+            # After a successful human action, check if the next turn belongs to an agent
+            await maybe_trigger_agent_turn(room, room_id, gm, rm, hub, agent_adapter)
 
 
 async def _handle_validate_action(ws, msg, room, gm: GameManager):
@@ -191,7 +199,7 @@ async def _handle_get_legal_actions(ws: WebSocket, room, gm: GameManager):
     await ws.send_json({"type": "legal_actions_result", "actions": actions})
 
 
-async def _handle_surrender(ws, msg, room, gm: GameManager, hub: BroadcastHub, room_id: str, rm: RoomManager):
+async def _handle_surrender(ws, msg, room, gm: GameManager, hub: BroadcastHub, room_id: str, rm: RoomManager, agent_adapter: AgentServiceAdapter):
     if room.status != "using" or room.current_game_id is None:
         await _send_error(ws, "NO_ACTIVE_GAME", "No active game in this room")
         return
@@ -214,3 +222,4 @@ async def _handle_surrender(ws, msg, room, gm: GameManager, hub: BroadcastHub, r
         "result": result,
     })
     rm.set_config(room)
+    agent_adapter.destroy_room_agents(room_id)

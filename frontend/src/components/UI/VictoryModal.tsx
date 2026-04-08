@@ -5,9 +5,10 @@ interface VictoryModalProps {
   termination: string | null;
   onNewGame: () => void;
   onNewMatch: () => void;
+  onReturnToLobby?: () => void;
 }
 
-export const VictoryModal: React.FC<VictoryModalProps> = ({ winner, termination, onNewGame, onNewMatch }) => {
+export const VictoryModal: React.FC<VictoryModalProps> = ({ winner, termination, onNewGame, onNewMatch, onReturnToLobby }) => {
   // winner is a seat (1 or 2), display as P1/P2 for UI clarity
   const winnerLabel = winner ? `P${winner}` : null;
   const title = winnerLabel ? `${winnerLabel} wins!` : "Game Over";
@@ -18,13 +19,18 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({ winner, termination,
       <div className="victory-modal">
         <h1 style={{ margin: 0, fontSize: "1.5rem" }}>{title}</h1>
         {subtitle && <p style={{ marginTop: "0.75rem", color: "#555" }}>{subtitle}</p>}
-        <div style={{ marginTop: "1.25rem", display: "flex", gap: "0.75rem", justifyContent: "center" }}>
+        <div style={{ marginTop: "1.25rem", display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
           <button onClick={onNewGame}>
             New Game
           </button>
           <button onClick={onNewMatch} style={{ background: "#666" }}>
             New Match
           </button>
+          {onReturnToLobby && (
+            <button onClick={onReturnToLobby} style={{ background: "#444" }}>
+              ← Lobby
+            </button>
+          )}
         </div>
       </div>
       <style>{`

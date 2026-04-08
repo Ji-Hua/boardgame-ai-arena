@@ -1,38 +1,26 @@
 import { useState } from "react";
 import { GamePage } from "./view/pages/GamePage";
-import { ReplayPage } from "./view/replay/ReplayPage";
-import type { ReplayData } from "./types/Replay";
+import { ConfigPage } from "./view/pages/ConfigPage";
+import type { GameConfig } from "./modes/live/LiveController";
 import "./App.css";
 
-type AppMode = "menu" | "live" | "replay";
+type AppMode = "menu" | "config" | "game";
 
 function App() {
   const [mode, setMode] = useState<AppMode>("menu");
-  const [replayData, setReplayData] = useState<ReplayData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [gameConfig, setGameConfig] = useState<GameConfig>({ seat1: "human", seat2: "human" });
 
-  const handleLoadReplay = async () => {
-    try {
-      setError(null);
-      const resp = await fetch("/replays/full_game_replay.json");
-      if (!resp.ok) throw new Error(`Failed to fetch replay: ${resp.status}`);
-      const data: ReplayData = await resp.json();
-      if (data.steps.length === 0) {
-        throw new Error("No steps in replay file");
-      }
-      setReplayData(data);
-      setMode("replay");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load replay");
-    }
+  const handleStartGame = (config: GameConfig) => {
+    setGameConfig(config);
+    setMode("game");
   };
 
-  if (mode === "live") {
-    return <GamePage onBack={() => setMode("menu")} />;
+  if (mode === "config") {
+    return <ConfigPage onStart={handleStartGame} onBack={() => setMode("menu")} />;
   }
 
-  if (mode === "replay" && replayData) {
-    return <ReplayPage replayData={replayData} onBack={() => setMode("menu")} />;
+  if (mode === "game") {
+    return <GamePage gameConfig={gameConfig} onBack={() => setMode("config")} />;
   }
 
   return (
@@ -49,17 +37,14 @@ function App() {
       <h1 style={{ fontSize: "2.5rem", color: "#333", margin: 0 }}>
         Quoridor
       </h1>
-      <div style={{ display: "flex", gap: "1.5rem" }}>
-        <button onClick={() => setMode("live")} style={menuButtonStyle}>
-          ▶ Play Local Game
-        </button>
-        <button onClick={handleLoadReplay} style={menuButtonStyle}>
-          📼 Replay Full Game
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <button
+          onClick={() => setMode("config")}
+          style={menuButtonStyle}
+        >
+          Play
         </button>
       </div>
-      {error && (
-        <div style={{ color: "#dc3545", fontWeight: "bold" }}>{error}</div>
-      )}
     </div>
   );
 }

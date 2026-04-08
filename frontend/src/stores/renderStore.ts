@@ -32,7 +32,7 @@ class RenderStore {
       currentSeat: 1, // Seat 1 goes first
       stepCount: 0,
       lastAction: null,
-      actor: null,
+      actors: null,
       legalActions: undefined,
       isTerminal: false,
       result: null,
