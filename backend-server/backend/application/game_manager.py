@@ -55,11 +55,19 @@ class GameManager:
     def submit_action(self, game: Game, action: dict) -> dict:
         """Submit an action to the game engine.
 
-        Returns: {"success": bool, "error": str|None, "state": dict|None,
-                  "game_over": bool, "result": dict|None}
+        Returns: {"success": bool, "error": str|None, "reject_kind": str|None,
+                  "state": dict|None, "game_over": bool, "result": dict|None}
+
+        reject_kind is present only on failure:
+          "GAME_END"       — game is not running; no retry should be attempted
+          "INVALID_ACTION" — engine-level rejection; retry is appropriate
         """
         if game.phase != "running":
-            return {"success": False, "error": f"Game phase is {game.phase}, not running"}
+            return {
+                "success": False,
+                "error": f"Game phase is {game.phase}, not running",
+                "reject_kind": "GAME_END",
+            }
 
         # Check turn order
         state = game.engine.get_state()
@@ -67,11 +75,16 @@ class GameManager:
             return {
                 "success": False,
                 "error": f"Not your turn. Current turn: seat {state['current_player']}",
+                "reject_kind": "INVALID_ACTION",
             }
 
         result = game.engine.take_action(action)
         if not result["success"]:
-            return {"success": False, "error": result.get("reason", "Invalid action")}
+            return {
+                "success": False,
+                "error": result.get("reason", "Invalid action"),
+                "reject_kind": "INVALID_ACTION",
+            }
 
         game.step_count += 1
         game.actions.append(action)

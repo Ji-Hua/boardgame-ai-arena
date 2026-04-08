@@ -4,6 +4,11 @@ After each successful action (human or agent), the orchestrator checks
 whether the next turn belongs to an agent and triggers automatic action.
 
 Flow: Backend → Agent Service → Backend → Engine → Broadcast
+
+Retry contract (per agent-interface.md):
+  - Engine REJECT with reject_kind="GAME_END" → terminate immediately
+  - Engine REJECT with reject_kind="INVALID_ACTION" → retry (all agent categories)
+  - AdvanceCursor is called ONLY after Engine ACCEPT
 """
 
 from __future__ import annotations
@@ -18,6 +23,9 @@ from backend.application.room_manager import RoomManager, Room
 from backend.runtime.broadcast import BroadcastHub
 
 logger = logging.getLogger(__name__)
+
+# Maximum number of RequestAction retries per turn before force-ending the game.
+MAX_AGENT_RETRIES = 10
 
 
 async def maybe_trigger_agent_turn(
@@ -34,7 +42,7 @@ async def maybe_trigger_agent_turn(
     Stops when:
     - It's a human player's turn
     - The game is over
-    - An error occurs
+    - An unrecoverable error occurs (timeout, agent crash, retry limit exhausted)
     """
     while True:
         if room.status != "using" or room.current_game_id is None:
@@ -59,7 +67,7 @@ async def maybe_trigger_agent_turn(
         # Get legal actions for the agent
         legal_actions = game.engine.legal_pawn_actions()
 
-        # Request action from agent (with timeout)
+        # Request initial action from agent
         try:
             action = await agent_adapter.request_action(
                 room_id=room_id,
@@ -68,76 +76,77 @@ async def maybe_trigger_agent_turn(
                 legal_actions=legal_actions,
             )
         except (TimeoutError, RuntimeError) as e:
-            logger.error("Agent turn failed for room=%s seat=%s: %s", room_id, current_seat, e)
-            # Force-end the game on agent failure
-            result = gm.force_end(game)
-            rm.set_config(room)
+            logger.error("Agent action request failed for room=%s seat=%s: %s", room_id, current_seat, e)
+            _force_end(game, room, room_id, gm, rm)
             await hub.broadcast(room_id, {
                 "type": "game_ended",
                 "game_id": game.game_id,
-                "result": result,
+                "result": game.result,
             })
             break
 
-        # Submit agent action through the same gameplay path
-        result = gm.submit_action(game, action)
+        # Retry loop: apply contract retry semantics for all agent categories.
+        # - REJECT with reject_kind="GAME_END"       → terminate immediately
+        # - REJECT with reject_kind="INVALID_ACTION" → retry up to MAX_AGENT_RETRIES
+        # - AdvanceCursor MUST NOT be called on reject
+        accepted = False
+        retries = 0
+        while True:
+            result = gm.submit_action(game, action)
 
-        if not result["success"]:
-            # Replay agents: retry instead of force-ending
-            category = agent_adapter.get_agent_category(room_id, current_seat)
-            if category == "replay":
-                max_retries = 10
-                retries = 0
-                while not result["success"] and retries < max_retries:
-                    retries += 1
-                    logger.warning(
-                        "Replay agent action rejected (retry %d/%d) room=%s seat=%s: %s",
-                        retries, max_retries, room_id, current_seat, result.get("error"),
-                    )
-                    agent_adapter.advance_agent(room_id, current_seat)
-                    try:
-                        action = await agent_adapter.request_action(
-                            room_id=room_id,
-                            seat=current_seat,
-                            game_state=state,
-                            legal_actions=legal_actions,
-                        )
-                    except (TimeoutError, RuntimeError) as e:
-                        logger.error("Replay agent retry failed room=%s seat=%s: %s", room_id, current_seat, e)
-                        break
-                    result = gm.submit_action(game, action)
-
-                if not result["success"]:
-                    logger.error(
-                        "Replay agent exhausted retries room=%s seat=%s",
-                        room_id, current_seat,
-                    )
-                    result = gm.force_end(game)
-                    rm.set_config(room)
-                    await hub.broadcast(room_id, {
-                        "type": "game_ended",
-                        "game_id": game.game_id,
-                        "result": result,
-                    })
-                    break
-            else:
-                logger.error(
-                    "Agent action rejected for room=%s seat=%s: %s",
-                    room_id, current_seat, result.get("error"),
-                )
-                result = gm.force_end(game)
-                rm.set_config(room)
-                await hub.broadcast(room_id, {
-                    "type": "game_ended",
-                    "game_id": game.game_id,
-                    "result": result,
-                })
+            if result["success"]:
+                accepted = True
                 break
 
-        # Advance replay cursor on accepted action
+            if result.get("reject_kind") == "GAME_END":
+                logger.warning(
+                    "Agent action rejected (GAME_END) — terminating room=%s seat=%s",
+                    room_id, current_seat,
+                )
+                break
+
+            # INVALID_ACTION: retry
+            retries += 1
+            if retries > MAX_AGENT_RETRIES:
+                logger.error(
+                    "Agent retry limit (%d) exhausted for room=%s seat=%s",
+                    MAX_AGENT_RETRIES, room_id, current_seat,
+                )
+                break
+
+            logger.warning(
+                "Agent action rejected (retry %d/%d) room=%s seat=%s: %s",
+                retries, MAX_AGENT_RETRIES, room_id, current_seat, result.get("error"),
+            )
+
+            # Re-request action without advancing cursor (state is unchanged)
+            try:
+                action = await agent_adapter.request_action(
+                    room_id=room_id,
+                    seat=current_seat,
+                    game_state=state,
+                    legal_actions=legal_actions,
+                )
+            except (TimeoutError, RuntimeError) as e:
+                logger.error(
+                    "Agent retry request failed for room=%s seat=%s: %s", room_id, current_seat, e
+                )
+                break
+
+        if not accepted:
+            _force_end(game, room, room_id, gm, rm)
+            await hub.broadcast(room_id, {
+                "type": "game_ended",
+                "game_id": game.game_id,
+                "result": game.result,
+            })
+            break
+
+        # Advance cursor ONLY after Engine ACCEPT.
+        # This is a no-op for non-replay agents (service guards on hasattr "advance").
         agent_adapter.advance_agent(room_id, current_seat)
 
-        # Broadcast state update (same as human actions)
+        # Broadcast state update (same path as human actions)
         await hub.broadcast(room_id, {
             "type": "state_update",
             "game_id": game.game_id,
@@ -173,4 +182,10 @@ async def maybe_trigger_agent_turn(
         else:
             # Yield to allow other coroutines (e.g., human input) to run
             await asyncio.sleep(0)
+
+
+def _force_end(game, room, room_id: str, gm: GameManager, rm: RoomManager) -> None:
+    """Force-end the game and reset the room to config state."""
+    gm.force_end(game)
+    rm.set_config(room)
 

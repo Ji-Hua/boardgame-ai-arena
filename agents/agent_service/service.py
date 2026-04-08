@@ -11,7 +11,9 @@ from typing import Any
 from agents.agent_service.registry import AgentRegistry
 from agents.agent_service.instance_manager import AgentInstanceManager
 from agents.agent_service.agents import (
-    DummyAgent, RandomAgent, RandomAgentV2, GreedyAgent, ReplayAgent,
+    DummyAgent, RandomAgent, RandomAgentV2, GreedyAgent,
+    MinimaxAgent, MinimaxAgentSimple, MinimaxAgentMedium, MinimaxAgentHard,
+    ReplayAgent,
 )
 
 
@@ -28,6 +30,10 @@ class AgentService:
         self._registry.register(RandomAgent)
         self._registry.register(RandomAgentV2)
         self._registry.register(GreedyAgent)
+        self._registry.register(MinimaxAgent)
+        self._registry.register(MinimaxAgentSimple)
+        self._registry.register(MinimaxAgentMedium)
+        self._registry.register(MinimaxAgentHard)
         self._registry.register(ReplayAgent)
 
     def register_agent_type(self, cls: type) -> None:

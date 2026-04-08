@@ -124,6 +124,15 @@ impl PyAction {
         self.inner.target.y
     }
 
+    #[getter]
+    fn coordinate_kind(&self) -> String {
+        match self.inner.target.kind {
+            CoordinateKind::Square => "Square".to_string(),
+            CoordinateKind::Horizontal => "Horizontal".to_string(),
+            CoordinateKind::Vertical => "Vertical".to_string(),
+        }
+    }
+
     fn __repr__(&self) -> String {
         let kind = match self.inner.kind {
             ActionKind::MovePawn => "MovePawn",
@@ -157,6 +166,29 @@ pub struct PyRawState {
 
 #[pymethods]
 impl PyRawState {
+    #[new]
+    #[pyo3(signature = (p1_x, p1_y, p2_x, p2_y, walls_p1, walls_p2, h_edges, v_edges, h_heads, v_heads, current_player))]
+    fn new(
+        p1_x: usize, p1_y: usize,
+        p2_x: usize, p2_y: usize,
+        walls_p1: u8, walls_p2: u8,
+        h_edges: u128, v_edges: u128,
+        h_heads: u128, v_heads: u128,
+        current_player: PyPlayer,
+    ) -> Self {
+        PyRawState {
+            inner: RustRawState {
+                pawn_positions: [(p1_x, p1_y), (p2_x, p2_y)],
+                remaining_walls: [walls_p1, walls_p2],
+                horizontal_edges: h_edges,
+                vertical_edges: v_edges,
+                horizontal_heads: h_heads,
+                vertical_heads: v_heads,
+                current_player: current_player.inner,
+            },
+        }
+    }
+
     fn pawn_pos(&self, player: PyPlayer) -> (usize, usize) {
         self.inner.pawn_pos(player.inner)
     }
@@ -168,6 +200,26 @@ impl PyRawState {
     #[getter]
     fn current_player(&self) -> PyPlayer {
         PyPlayer { inner: self.inner.current_player }
+    }
+
+    #[getter]
+    fn horizontal_edges(&self) -> u128 {
+        self.inner.horizontal_edges
+    }
+
+    #[getter]
+    fn vertical_edges(&self) -> u128 {
+        self.inner.vertical_edges
+    }
+
+    #[getter]
+    fn horizontal_heads(&self) -> u128 {
+        self.inner.horizontal_heads
+    }
+
+    #[getter]
+    fn vertical_heads(&self) -> u128 {
+        self.inner.vertical_heads
     }
 
     fn __eq__(&self, other: &PyRawState) -> bool {

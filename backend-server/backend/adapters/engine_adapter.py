@@ -65,6 +65,12 @@ def _serialize_state(state) -> dict:
             "1": state.walls_remaining(Player.P1),
             "2": state.walls_remaining(Player.P2),
         },
+        "wall_state": {
+            "horizontal_edges": state.horizontal_edges,
+            "vertical_edges": state.vertical_edges,
+            "horizontal_heads": state.horizontal_heads,
+            "vertical_heads": state.vertical_heads,
+        },
         "game_over": False,
         "winner": None,
     }
