@@ -343,7 +343,9 @@ export const GamePage: React.FC<GamePageProps> = ({ gameConfig, onBack }) => {
             <span style={{ color: PLAYER_COLORS.P2.primary }}>▶</span>
           )}
           <div style={{ backgroundColor: PLAYER_COLORS.P2.primary, color: "white", padding: "4px 10px", borderRadius: "6px", fontWeight: "bold" }}>P2</div>
-          <span style={{ fontWeight: "bold" }}>{isSeat2Agent ? "Agent" : "Player 2"}</span>
+          <span style={{ fontWeight: "bold" }}>
+            {isSeat2Agent ? (renderState.agentNames?.[2] ?? "Agent") : "Player 2"}
+          </span>
           <span style={{ color: "#666" }}>Walls: {renderState.wallsRemaining[2]}</span>
           {!isEnded && !isSeat2Agent && (
             <button
@@ -435,7 +437,9 @@ export const GamePage: React.FC<GamePageProps> = ({ gameConfig, onBack }) => {
             <span style={{ color: PLAYER_COLORS.P1.primary }}>▶</span>
           )}
           <div style={{ backgroundColor: PLAYER_COLORS.P1.primary, color: "white", padding: "4px 10px", borderRadius: "6px", fontWeight: "bold" }}>P1</div>
-          <span style={{ fontWeight: "bold" }}>{isSeat1Agent ? "Agent" : "Player 1"}</span>
+          <span style={{ fontWeight: "bold" }}>
+            {isSeat1Agent ? (renderState.agentNames?.[1] ?? "Agent") : "Player 1"}
+          </span>
           <span style={{ color: "#666" }}>Walls: {renderState.wallsRemaining[1]}</span>
           {!isEnded && !isSeat1Agent && (
             <button

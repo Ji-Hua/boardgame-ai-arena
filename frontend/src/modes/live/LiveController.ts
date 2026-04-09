@@ -37,6 +37,9 @@ export class LiveController {
   // Per-seat actor types for rendering
   public actors: SeatActors = { 1: "human", 2: "human" };
 
+  // Per-seat agent display names (when seat is controlled by an agent)
+  public agentNames: { 1: string | null; 2: string | null } = { 1: null, 2: null };
+
   // Accumulated walls (backend GameState may not include wall positions yet)
   private walls: RenderWall[] = [];
 
@@ -92,6 +95,17 @@ export class LiveController {
     }
     this.actors = { 1: this.config.seat1, 2: this.config.seat2 };
 
+    // Fetch agent type metadata (display names) so we can show agent names in-game.
+    let agentTypeMap: Record<string, string> = {};
+    try {
+      const resp = await roomAPI.getAgentTypes();
+      for (const t of resp.agent_types) {
+        agentTypeMap[t.type_id] = t.display_name;
+      }
+    } catch (err) {
+      agentTypeMap = {};
+    }
+
     // 1. Create room
     const room = await roomAPI.createRoom();
     this.roomId = room.room_id;
@@ -109,11 +123,13 @@ export class LiveController {
       await roomAPI.createAgent(
         this.roomId, 1, this.config.agent1Type, this.config.agent1Config,
       );
+      this.agentNames[1] = agentTypeMap[this.config.agent1Type] ?? this.config.agent1Type;
     }
     if (this.config.seat2 === "agent" && this.config.agent2Type) {
       await roomAPI.createAgent(
         this.roomId, 2, this.config.agent2Type, this.config.agent2Config,
       );
+      this.agentNames[2] = agentTypeMap[this.config.agent2Type] ?? this.config.agent2Type;
     }
 
     // 5. Start game
@@ -212,6 +228,7 @@ export class LiveController {
     this.lastError = null;
     this.config = { seat1: "human", seat2: "human" };
     this.actors = { 1: "human", 2: "human" };
+    this.agentNames = { 1: null, 2: null };
   }
 
   // ── WebSocket ────────────────────────────────────────────────
@@ -316,6 +333,7 @@ export class LiveController {
       walls: this.walls,
       stepCount,
       actors: this.actors,
+      agentNames: this.agentNames,
     });
     renderStore.setState(renderState);
   }

@@ -46,6 +46,8 @@ export interface RenderState {
   lastAction: Action | null;
   /** Per-seat actor types. null for legacy compatibility. */
   actors: SeatActors | null;
+  /** Optional per-seat agent display names when a seat is controlled by an agent. */
+  agentNames?: { 1: string | null; 2: string | null } | null;
   legalActions?: Action[];
   isTerminal: boolean;
   result: RenderResult | null;

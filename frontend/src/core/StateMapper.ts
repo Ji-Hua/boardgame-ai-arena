@@ -26,6 +26,8 @@ export interface StateMapperParams {
 
   /** Per-seat actor types (null for legacy human-vs-human). */
   actors?: SeatActors | null;
+  /** Optional per-seat agent display names (when seats are agents). */
+  agentNames?: { 1: string | null; 2: string | null } | null;
 }
 
 export class StateMapper {
@@ -38,6 +40,8 @@ export class StateMapper {
    */
   static toRenderState(params: StateMapperParams): RenderState {
     const { gameState, lastAction, result, walls, stepCount, actors } = params;
+
+    const { agentNames } = params;
 
     // Backend wire format: {row: engine_x, col: engine_y}
     // RenderState convention: [engine_y, engine_x] (row=y, col=x)
@@ -65,6 +69,7 @@ export class StateMapper {
       stepCount,
       lastAction,
       actors: actors ?? null,
+      agentNames: agentNames ?? null,
       isTerminal,
       result: result ?? null,
     };
