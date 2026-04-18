@@ -1,0 +1,10 @@
+id: minimax_d3
+
+algo:
+  type: minimax
+  params:
+    depth: 3
+
+policy:
+  type: top_k
+  k: 1

@@ -7,16 +7,19 @@ from typing import Any
 
 from agents.agent_service.base_agent import BaseAgent
 from agents.agent_service.registry import AgentRegistry
+from agents.agent_service.specs.candidate import Candidate
 
 
 class AgentInstance:
     """A live agent instance bound to a room/seat."""
 
-    def __init__(self, instance_id: str, agent: BaseAgent, room_id: str, seat: int) -> None:
+    def __init__(self, instance_id: str, agent: BaseAgent, room_id: str, seat: int,
+                 candidate: Candidate | None = None) -> None:
         self.instance_id = instance_id
         self.agent = agent
         self.room_id = room_id
         self.seat = seat
+        self.candidate = candidate
         self.active = False
 
     def start(self) -> None:
@@ -41,8 +44,9 @@ class AgentInstanceManager:
     def create(self, agent_type: str, room_id: str, seat: int,
                config: dict[str, Any] | None = None) -> AgentInstance:
         instance_id = str(uuid.uuid4())
-        agent = self._registry.create(agent_type, config)
-        instance = AgentInstance(instance_id, agent, room_id, seat)
+        candidate = self._registry.create_candidate(agent_type, config)
+        agent = self._registry.create_instance(candidate)
+        instance = AgentInstance(instance_id, agent, room_id, seat, candidate=candidate)
         self._instances[instance_id] = instance
         self._binding[self._binding_key(room_id, seat)] = instance_id
         return instance

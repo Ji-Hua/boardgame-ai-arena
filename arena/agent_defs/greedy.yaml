@@ -1,0 +1,8 @@
+id: greedy
+
+algo:
+  type: greedy
+
+policy:
+  type: top_k
+  k: 1

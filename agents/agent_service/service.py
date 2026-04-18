@@ -10,9 +10,15 @@ from typing import Any
 
 from agents.agent_service.registry import AgentRegistry
 from agents.agent_service.instance_manager import AgentInstanceManager
+from agents.agent_service.specs.agent_spec import AgentSpec, ClassAgentSpec
+from agents.agent_service.specs.builtin_specs import (
+    RandomV2Spec,
+    GreedySpec,
+    MinimaxSpec,
+)
 from agents.agent_service.agents import (
-    DummyAgent, RandomAgent, RandomAgentV2, GreedyAgent,
-    MinimaxAgent, MinimaxAgentSimple, MinimaxAgentMedium, MinimaxAgentHard,
+    DummyAgent, RandomAgent,
+    MinimaxAgentSimple, MinimaxAgentMedium, MinimaxAgentHard,
     ReplayAgent,
 )
 
@@ -26,19 +32,22 @@ class AgentService:
         self._register_builtin_agents()
 
     def _register_builtin_agents(self) -> None:
-        self._registry.register(DummyAgent)
-        self._registry.register(RandomAgent)
-        self._registry.register(RandomAgentV2)
-        self._registry.register(GreedyAgent)
-        self._registry.register(MinimaxAgent)
-        self._registry.register(MinimaxAgentSimple)
-        self._registry.register(MinimaxAgentMedium)
-        self._registry.register(MinimaxAgentHard)
-        self._registry.register(ReplayAgent)
+        # Primary agents — dedicated specs with param_schema
+        self._registry.register(RandomV2Spec())
+        self._registry.register(GreedySpec())
+        self._registry.register(MinimaxSpec())
 
-    def register_agent_type(self, cls: type) -> None:
-        """Register an external agent type. The class must extend BaseAgent."""
-        self._registry.register(cls)
+        # Legacy / simple agents — wrapped via ClassAgentSpec
+        self._registry.register(ClassAgentSpec(DummyAgent, deterministic=True))
+        self._registry.register(ClassAgentSpec(RandomAgent))
+        self._registry.register(ClassAgentSpec(MinimaxAgentSimple, deterministic=True))
+        self._registry.register(ClassAgentSpec(MinimaxAgentMedium, deterministic=True))
+        self._registry.register(ClassAgentSpec(MinimaxAgentHard, deterministic=True))
+        self._registry.register(ClassAgentSpec(ReplayAgent, deterministic=True))
+
+    def register_agent_type(self, spec: AgentSpec) -> None:
+        """Register an external agent spec."""
+        self._registry.register(spec)
 
     # --- Control Plane ---
 
