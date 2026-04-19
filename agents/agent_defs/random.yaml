@@ -1,0 +1,11 @@
+id: random
+display_name: Random Agent
+category: scripted
+deterministic: false
+
+algo:
+  type: random
+
+policy:
+  type: top_k
+  k: 1

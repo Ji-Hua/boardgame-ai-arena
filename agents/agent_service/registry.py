@@ -1,7 +1,7 @@
-"""Agent Registry — spec-based agent type registry.
+"""Agent Registry — materializer-based agent type registry.
 
-Maps agent type names to AgentSpec instances. Creates agents exclusively
-through the spec path: register(spec) → create_candidate() → create_instance().
+Maps agent type names to AgentMaterializer instances. Creates agents exclusively
+through the materializer path: register(materializer) → create_candidate() → create_instance().
 """
 
 from __future__ import annotations
@@ -9,28 +9,28 @@ from __future__ import annotations
 from typing import Any
 
 from agents.agent_service.base_agent import BaseAgent
-from agents.agent_service.specs.agent_spec import AgentSpec
+from agents.agent_service.specs.agent_spec import AgentMaterializer
 from agents.agent_service.specs.candidate import Candidate
 
 
 class AgentRegistry:
-    """Registry of available agent types via AgentSpec.
+    """Registry of available agent types via AgentMaterializer.
 
-    All agent creation goes through specs — the registry never
+    All agent creation goes through materializers — the registry never
     instantiates agents directly.
     """
 
     def __init__(self) -> None:
-        self._specs: dict[str, AgentSpec] = {}
+        self._specs: dict[str, AgentMaterializer] = {}
 
-    def register(self, spec: AgentSpec) -> None:
-        """Register an AgentSpec. Keyed by spec.name."""
+    def register(self, spec: AgentMaterializer) -> None:
+        """Register an AgentMaterializer. Keyed by spec.name."""
         if not spec.name:
-            raise ValueError(f"AgentSpec {spec!r} has no name")
+            raise ValueError(f"AgentMaterializer {spec!r} has no name")
         self._specs[spec.name] = spec
 
-    def get_spec(self, agent_type: str) -> AgentSpec:
-        """Return the spec for the given type, or raise KeyError."""
+    def get_spec(self, agent_type: str) -> AgentMaterializer:
+        """Return the materializer for the given type, or raise KeyError."""
         spec = self._specs.get(agent_type)
         if spec is None:
             raise KeyError(f"Unknown agent type: {agent_type}")

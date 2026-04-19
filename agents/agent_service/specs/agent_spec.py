@@ -1,4 +1,9 @@
-"""AgentSpec — defines an agent type and how to create instances."""
+"""AgentMaterializer — agent type factory for the Agent Service.
+
+Defines how a registered agent type creates runtime instances.
+This is NOT the canonical Agent Spec (which lives in agents.agent_spec).
+The AgentMaterializer is a consumer-side factory that materializes
+Agent Spec definitions into live BaseAgent instances."""
 
 from __future__ import annotations
 
@@ -9,11 +14,15 @@ from agents.agent_service.base_agent import BaseAgent
 from agents.agent_service.specs.param_schema import ParamSchema
 
 
-class AgentSpec(ABC):
-    """Specification for an agent type.
+class AgentMaterializer(ABC):
+    """Agent type materializer for the Agent Service.
 
     Declares identity, parameter schema, capabilities, and how to
     create a concrete agent instance from validated configuration.
+
+    This is the deployment/runtime-side materialization interface,
+    not the canonical definition. The canonical Agent Spec lives
+    in ``agents.agent_spec.AgentSpec``.
     """
 
     @property
@@ -64,11 +73,11 @@ class AgentSpec(ABC):
         ...
 
 
-class ClassAgentSpec(AgentSpec):
-    """Generic spec that wraps a BaseAgent class with no configurable params.
+class ClassAgentMaterializer(AgentMaterializer):
+    """Materializer that wraps a BaseAgent class with no configurable params.
 
-    Used to bring legacy / simple agents into the spec system without
-    rewriting their logic.
+    Used to bring legacy / simple agents into the materializer system
+    without rewriting their logic.
     """
 
     def __init__(

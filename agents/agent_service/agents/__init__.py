@@ -3,13 +3,11 @@
 from agents.agent_service.agents.dummy_agent import DummyAgent
 from agents.agent_service.agents.random_agent import RandomAgent, RandomAgentV2
 from agents.agent_service.agents.greedy_agent import GreedyAgent
-from agents.agent_service.agents.minimax_agent import (
-    MinimaxAgent, MinimaxAgentSimple, MinimaxAgentMedium, MinimaxAgentHard,
-)
+from agents.agent_service.agents.minimax_agent import MinimaxAgent
 from agents.agent_service.agents.replay_agent import ReplayAgent
 
 __all__ = [
     "DummyAgent", "RandomAgent", "RandomAgentV2", "GreedyAgent",
-    "MinimaxAgent", "MinimaxAgentSimple", "MinimaxAgentMedium", "MinimaxAgentHard",
+    "MinimaxAgent",
     "ReplayAgent",
 ]

@@ -1,0 +1,13 @@
+id: random_v2
+display_name: Random Agent V2
+category: scripted
+deterministic: false
+
+algo:
+  type: random_v2
+  params:
+    threshold: 0.8
+
+policy:
+  type: top_k
+  k: 1

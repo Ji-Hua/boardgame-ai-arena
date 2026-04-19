@@ -2,51 +2,56 @@
 
 Provides the unified interface for the Backend to interact with agents.
 All agent operations (create, start, stop, get_action) go through this service.
+
+Builtin heuristic agents (greedy, minimax, random_v2 and presets) are loaded
+from YAML definitions in ``agents/agent_defs/`` (the canonical Agent Spec source).
+Non-YAML agents (dummy, random_v1, replay) are registered via
+ClassAgentMaterializer for backward compatibility.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from agents.agent_service.registry import AgentRegistry
 from agents.agent_service.instance_manager import AgentInstanceManager
-from agents.agent_service.specs.agent_spec import AgentSpec, ClassAgentSpec
-from agents.agent_service.specs.builtin_specs import (
-    RandomV2Spec,
-    GreedySpec,
-    MinimaxSpec,
-)
+from agents.agent_service.specs.agent_spec import AgentMaterializer, ClassAgentMaterializer
+from agents.agent_service.specs.yaml_agent_spec import YamlAgentMaterializer
+from agents.agent_service.yaml_loader import load_definitions_from_dir, _AGENT_BUILDERS
 from agents.agent_service.agents import (
     DummyAgent, RandomAgent,
-    MinimaxAgentSimple, MinimaxAgentMedium, MinimaxAgentHard,
     ReplayAgent,
 )
+
+# Default directory for builtin agent YAML definitions.
+_AGENT_DEFS_DIR = Path(__file__).resolve().parent.parent / "agent_defs"
 
 
 class AgentService:
     """Unified agent lifecycle and decision service."""
 
-    def __init__(self) -> None:
+    def __init__(self, agent_defs_dir: str | Path | None = None) -> None:
         self._registry = AgentRegistry()
         self._instance_mgr = AgentInstanceManager(self._registry)
+        self._agent_defs_dir = Path(agent_defs_dir) if agent_defs_dir else _AGENT_DEFS_DIR
         self._register_builtin_agents()
 
     def _register_builtin_agents(self) -> None:
-        # Primary agents — dedicated specs with param_schema
-        self._registry.register(RandomV2Spec())
-        self._registry.register(GreedySpec())
-        self._registry.register(MinimaxSpec())
+        # YAML-driven agents: only register specs whose algo_type is
+        # materializable by the Agent Service builder registry.
+        if self._agent_defs_dir.is_dir():
+            for defn in load_definitions_from_dir(self._agent_defs_dir):
+                if defn.algo_type in _AGENT_BUILDERS:
+                    self._registry.register(YamlAgentMaterializer(defn))
 
-        # Legacy / simple agents — wrapped via ClassAgentSpec
-        self._registry.register(ClassAgentSpec(DummyAgent, deterministic=True))
-        self._registry.register(ClassAgentSpec(RandomAgent))
-        self._registry.register(ClassAgentSpec(MinimaxAgentSimple, deterministic=True))
-        self._registry.register(ClassAgentSpec(MinimaxAgentMedium, deterministic=True))
-        self._registry.register(ClassAgentSpec(MinimaxAgentHard, deterministic=True))
-        self._registry.register(ClassAgentSpec(ReplayAgent, deterministic=True))
+        # Non-YAML agents — wrapped via ClassAgentMaterializer (backward compat).
+        self._registry.register(ClassAgentMaterializer(DummyAgent, deterministic=True))
+        self._registry.register(ClassAgentMaterializer(RandomAgent))
+        self._registry.register(ClassAgentMaterializer(ReplayAgent, deterministic=True))
 
-    def register_agent_type(self, spec: AgentSpec) -> None:
-        """Register an external agent spec."""
+    def register_agent_type(self, spec: AgentMaterializer) -> None:
+        """Register an external agent materializer."""
         self._registry.register(spec)
 
     # --- Control Plane ---

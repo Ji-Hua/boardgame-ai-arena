@@ -1,4 +1,7 @@
-id: minimax_d2
+id: minimax
+display_name: Minimax Agent
+category: ai
+deterministic: true
 
 algo:
   type: minimax

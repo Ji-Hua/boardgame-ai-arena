@@ -1,8 +1,0 @@
-id: random
-
-algo:
-  type: random
-
-policy:
-  type: top_k
-  k: 1

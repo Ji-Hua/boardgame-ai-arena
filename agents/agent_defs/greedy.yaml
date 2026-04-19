@@ -1,4 +1,7 @@
 id: greedy
+display_name: Greedy Agent
+category: ai
+deterministic: true
 
 algo:
   type: greedy

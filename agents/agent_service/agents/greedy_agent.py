@@ -5,16 +5,21 @@ Rule Engine, evaluates each action by simulating it and computing shortest
 path lengths for both players.  Selects the action that maximises:
 delta_opp_path - delta_own_path.
 
-Stateless: each decision depends only on the game_state provided by the
-Backend.
+Supports an optional top-k policy for controlled randomness.  When no
+policy is configured the agent is strictly deterministic (identical to
+the original implementation).
 """
 
 from __future__ import annotations
+
+import random
+from typing import Any
 
 from quoridor_engine import Action, Orientation, Player, RawState, RuleEngine
 from quoridor_engine import calculation
 
 from agents.agent_service.base_agent import BaseAgent
+from agents.agent_service.policy import Policy
 
 _ENGINE = RuleEngine.standard()
 _TOPO = _ENGINE.topology
@@ -76,6 +81,22 @@ class GreedyAgent(BaseAgent):
     display_name = "Greedy Agent"
     category = "ai"
 
+    def __init__(
+        self,
+        policy: Policy | None = None,
+        seed: int | None = None,
+    ) -> None:
+        self._policy = policy
+        self._rng = random.Random(seed) if seed is not None else None
+
+    def configure(self, config: dict[str, Any]) -> None:
+        """Accept policy and seed via configure() for runtime updates."""
+        from agents.agent_service.policy import build_policy
+        if "policy" in config:
+            self._policy = build_policy(config["policy"])
+        if "seed" in config:
+            self._rng = random.Random(int(config["seed"]))
+
     def make_action(self, game_state: dict, legal_actions: list[dict]) -> dict:
         state = _build_state(game_state)
         me = state.current_player
@@ -88,8 +109,9 @@ class GreedyAgent(BaseAgent):
         # Generate full action space (pawn + wall) via local engine.
         all_engine_actions = _ENGINE.legal_actions(state)
 
-        best_score: int | None = None
-        best_engine_action = None
+        scored_actions: list[tuple[dict, float]] = []
+        best_score: float | None = None
+        best_wire_action: dict | None = None
 
         for engine_action in all_engine_actions:
             try:
@@ -99,12 +121,21 @@ class GreedyAgent(BaseAgent):
 
             delta_my = _path_len(next_state, me) - my_before
             delta_opp = _path_len(next_state, opp) - opp_before
-            score = delta_opp - delta_my
+            score = float(delta_opp - delta_my)
+            wire_action = _engine_action_to_wire(engine_action, seat)
+
+            if self._policy is not None:
+                scored_actions.append((wire_action, score))
 
             if best_score is None or score > best_score:
                 best_score = score
-                best_engine_action = engine_action
+                best_wire_action = wire_action
 
-        if best_engine_action is not None:
-            return _engine_action_to_wire(best_engine_action, seat)
+        # Policy path: delegate selection to policy with injected RNG.
+        if self._policy is not None and self._rng is not None and scored_actions:
+            return self._policy.select(scored_actions, self._rng)
+
+        # Default path: deterministic argmax (original behavior).
+        if best_wire_action is not None:
+            return best_wire_action
         return legal_actions[0]

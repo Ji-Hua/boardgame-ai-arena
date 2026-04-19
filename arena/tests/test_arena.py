@@ -17,10 +17,10 @@ from arena.agents.loader import load_agent
 
 
 # ---------------------------------------------------------------------------
-# Agent YAML directory
+# Agent YAML directory — canonical source in agents/agent_defs/
 # ---------------------------------------------------------------------------
 
-_AGENT_DIR = Path(__file__).resolve().parent.parent / "agent_defs"
+_AGENT_DIR = Path(__file__).resolve().parent.parent.parent / "agents" / "agent_defs"
 
 
 # ---------------------------------------------------------------------------

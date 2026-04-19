@@ -6,7 +6,7 @@ results in SQLite.
 
 Usage:
     python scripts/run_arena.py [--num-games N] [--seed S] [--db PATH]
-    python scripts/run_arena.py --agent-dir arena/agent_defs
+    python scripts/run_arena.py --agent-dir agents/agent_defs
     python scripts/run_arena.py --verbose        # per-game progress
     python scripts/run_arena.py --very-verbose    # per-step progress
 """
@@ -37,7 +37,7 @@ def main() -> None:
     parser.add_argument("--num-games", type=int, default=50, help="Games per matchup (default: 50)")
     parser.add_argument("--seed", type=int, default=42, help="Base random seed (default: 42)")
     parser.add_argument("--db", type=str, default="arena_results.db", help="SQLite database path")
-    parser.add_argument("--agent-dir", type=str, default=str(_root / "arena" / "agent_defs"),
+    parser.add_argument("--agent-dir", type=str, default=str(_root / "agents" / "agent_defs"),
                         help="Directory containing YAML agent definitions")
     parser.add_argument("--verbose", action="store_true", help="Show per-game progress")
     parser.add_argument("--very-verbose", action="store_true", help="Show per-step progress")

@@ -4,8 +4,9 @@ Selects actions by exploring the game tree up to a configurable depth,
 assuming optimal play from both players.  Uses shortest-path heuristic
 for evaluation and alpha-beta pruning to reduce the search space.
 
-Stateless: each decision depends only on the game_state provided by the
-Backend.  Input state is never mutated.
+Supports an optional top-k policy for controlled randomness.  When no
+policy is configured the agent is strictly deterministic (identical to
+the original implementation).
 
 Greedy equivalence:
     MinimaxAgent(depth=1) is functionally equivalent to GreedyAgent.
@@ -16,6 +17,7 @@ Greedy equivalence:
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -23,6 +25,7 @@ from quoridor_engine import Player, RawState, RuleEngine
 from quoridor_engine import calculation
 
 from agents.agent_service.base_agent import BaseAgent
+from agents.agent_service.policy import Policy
 
 _ENGINE = RuleEngine.standard()
 _TOPO = _ENGINE.topology
@@ -176,12 +179,24 @@ class MinimaxAgent(BaseAgent):
     display_name = "Minimax Agent"
     category = "ai"
 
-    def __init__(self, depth: int = 2) -> None:
+    def __init__(
+        self,
+        depth: int = 2,
+        policy: Policy | None = None,
+        seed: int | None = None,
+    ) -> None:
         self._depth = depth
+        self._policy = policy
+        self._rng = random.Random(seed) if seed is not None else None
 
     def configure(self, config: dict[str, Any]) -> None:
         if "depth" in config:
             self._depth = int(config["depth"])
+        from agents.agent_service.policy import build_policy
+        if "policy" in config:
+            self._policy = build_policy(config["policy"])
+        if "seed" in config:
+            self._rng = random.Random(int(config["seed"]))
 
     def make_action(self, game_state: dict, legal_actions: list[dict]) -> dict:
         state = _build_state(game_state)
@@ -193,8 +208,9 @@ class MinimaxAgent(BaseAgent):
         # Generate full action space via local engine (includes walls).
         all_engine_actions = _ENGINE.legal_actions(state)
 
+        scored_actions: list[tuple[dict, float]] = []
         best_value = float("-inf")
-        best_engine_action = None
+        best_wire_action: dict | None = None
         alpha = float("-inf")
         beta = float("inf")
 
@@ -217,44 +233,23 @@ class MinimaxAgent(BaseAgent):
                 context,
             )
 
+            wire_action = _engine_action_to_wire(engine_action, seat)
+
+            if self._policy is not None:
+                scored_actions.append((wire_action, value))
+
             if value > best_value:
                 best_value = value
-                best_engine_action = engine_action
+                best_wire_action = wire_action
 
             alpha = max(alpha, best_value)
 
-        if best_engine_action is not None:
-            return _engine_action_to_wire(best_engine_action, seat)
+        # Policy path: delegate selection to policy with injected RNG.
+        if self._policy is not None and self._rng is not None and scored_actions:
+            return self._policy.select(scored_actions, self._rng)
+
+        # Default path: deterministic argmax (original behavior).
+        if best_wire_action is not None:
+            return best_wire_action
         # Fallback (should not happen in a valid game state).
         return legal_actions[0]
-
-
-# ---------------------------------------------------------------------------
-# Pre-configured difficulty presets
-# ---------------------------------------------------------------------------
-
-class MinimaxAgentSimple(MinimaxAgent):
-    """Minimax Agent — Simple (depth 2)."""
-    type_id = "minimax_simple"
-    display_name = "Minimax Agent (Simple)"
-
-    def __init__(self) -> None:
-        super().__init__(depth=2)
-
-
-class MinimaxAgentMedium(MinimaxAgent):
-    """Minimax Agent — Medium (depth 3)."""
-    type_id = "minimax_medium"
-    display_name = "Minimax Agent (Medium)"
-
-    def __init__(self) -> None:
-        super().__init__(depth=3)
-
-
-class MinimaxAgentHard(MinimaxAgent):
-    """Minimax Agent — Hard (depth 5)."""
-    type_id = "minimax_hard"
-    display_name = "Minimax Agent (Hard)"
-
-    def __init__(self) -> None:
-        super().__init__(depth=5)

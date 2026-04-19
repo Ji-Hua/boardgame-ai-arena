@@ -41,7 +41,7 @@ def main() -> None:
     parser.add_argument(
         "--agent-dir",
         type=str,
-        default=str(_root / "arena" / "agent_defs"),
+        default=str(_root / "agents" / "agent_defs"),
         help="Directory containing YAML agent definitions",
     )
     parser.add_argument(

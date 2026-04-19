@@ -1,0 +1,11 @@
+id: greedy_topk3
+display_name: "Greedy Agent (Top-K 3)"
+category: ai
+deterministic: false
+
+algo:
+  type: greedy
+
+policy:
+  type: top_k
+  k: 3

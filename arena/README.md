@@ -6,8 +6,10 @@ Quoridor agents and aggregates results into a win-rate matrix.
 ## Structure
 
 ```
+agents/
+  agent_spec.py        # Shared Agent Spec model (canonical SSOT)
+  agent_defs/          # Canonical YAML agent definitions (one file per agent)
 arena/
-  agent_defs/          # YAML agent definitions (one file per agent)
   agents/              # Core abstractions (Scorer, Policy, Agent, AgentInstance)
   experiments/         # YAML experiment definitions
   runner.py            # Game execution and match orchestration
@@ -24,7 +26,10 @@ scripts/
 
 ## Agent Definition YAML
 
-Each file in `arena/agent_defs/` defines one agent.
+Agent definitions live in `agents/agent_defs/` (the canonical source shared
+by both Arena and Agent Service). The Arena loads definitions through the
+shared `AgentSpec` model (`agents.agent_spec`) and materializes Arena-specific
+runtime objects (Scorer + Policy → Agent).
 
 **The file name (without `.yaml`) MUST equal the `id` field.**
 
@@ -41,7 +46,7 @@ Each file in `arena/agent_defs/` defines one agent.
 ### Example
 
 ```yaml
-# arena/agent_defs/minimax_d3.yaml
+# agents/agent_defs/minimax_d3.yaml
 id: minimax_d3
 
 algo:
@@ -59,9 +64,10 @@ policy:
 Each agent follows the pipeline:
 
 ```
-Scorer (evaluate all legal actions)
-  → Policy (select one action from scored candidates)
-    → AgentInstance (runtime wrapper with per-game RNG)
+AgentSpec (canonical definition, pure data)
+  → Scorer (evaluate all legal actions)
+    → Policy (select one action from scored candidates)
+      → AgentInstance (runtime wrapper with per-game RNG)
 ```
 
 - **Scorer** enumerates all legal actions and assigns scores.
