@@ -6,7 +6,7 @@ results in SQLite.
 
 Usage:
     python scripts/run_arena.py [--num-games N] [--seed S] [--db PATH]
-    python scripts/run_arena.py --agent-dir agents/agent_defs
+    python scripts/run_arena.py --agent-dir agent_system/definition/agent_defs
     python scripts/run_arena.py --verbose        # per-game progress
     python scripts/run_arena.py --very-verbose    # per-step progress
 """
@@ -24,12 +24,12 @@ _root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_root))
 sys.path.insert(0, str(_root / "backend-server"))
 
-from arena.agents.loader import load_agents_from_dir
-from arena.agents.core import AgentInstance
+from agent_system.evaluation.arena.agents.loader import load_agents_from_dir
+from agent_system.evaluation.arena.agents.core import AgentInstance
 
-from arena.runner import ArenaRunner, play_single_game, VERBOSITY_QUIET, VERBOSITY_NORMAL, VERBOSITY_VERBOSE
-from arena.db import init_db, insert_game, fetch_all_games
-from arena.aggregator import compute_win_rate_matrix, format_matrix_text, format_pairwise_text
+from agent_system.evaluation.arena.runner import ArenaRunner, play_single_game, VERBOSITY_QUIET, VERBOSITY_NORMAL, VERBOSITY_VERBOSE
+from agent_system.evaluation.arena.db import init_db, insert_game, fetch_all_games
+from agent_system.evaluation.arena.aggregator import compute_win_rate_matrix, format_matrix_text, format_pairwise_text
 
 
 def main() -> None:
@@ -37,7 +37,7 @@ def main() -> None:
     parser.add_argument("--num-games", type=int, default=50, help="Games per matchup (default: 50)")
     parser.add_argument("--seed", type=int, default=42, help="Base random seed (default: 42)")
     parser.add_argument("--db", type=str, default="arena_results.db", help="SQLite database path")
-    parser.add_argument("--agent-dir", type=str, default=str(_root / "agents" / "agent_defs"),
+    parser.add_argument("--agent-dir", type=str, default=str(_root / "agent_system" / "definition" / "agent_defs"),
                         help="Directory containing YAML agent definitions")
     parser.add_argument("--verbose", action="store_true", help="Show per-game progress")
     parser.add_argument("--very-verbose", action="store_true", help="Show per-step progress")
@@ -70,7 +70,7 @@ def main() -> None:
     conn = init_db(db_path)
 
     # Run tournament — execute each game once, store records, aggregate
-    from arena.models import MatchResult
+    from agent_system.evaluation.arena.models import MatchResult
 
     pair_index = 0
     num_games = args.num_games

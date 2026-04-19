@@ -5,10 +5,10 @@ Loads agent definitions and an experiment YAML, then executes the
 specified matchups via ArenaRunner.
 
 Usage:
-    python scripts/run_experiment.py arena/experiments/basic.yaml
-    python scripts/run_experiment.py arena/experiments/basic.yaml --verbose
-    python scripts/run_experiment.py arena/experiments/basic.yaml --very-verbose
-    python scripts/run_experiment.py arena/experiments/basic.yaml --seed 0 --db results.db
+    python scripts/run_experiment.py agent_system/evaluation/arena/experiments/basic.yaml
+    python scripts/run_experiment.py agent_system/evaluation/arena/experiments/basic.yaml --verbose
+    python scripts/run_experiment.py agent_system/evaluation/arena/experiments/basic.yaml --very-verbose
+    python scripts/run_experiment.py agent_system/evaluation/arena/experiments/basic.yaml --seed 0 --db results.db
 """
 
 from __future__ import annotations
@@ -23,12 +23,12 @@ _root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_root))
 sys.path.insert(0, str(_root / "backend-server"))
 
-from arena.agents.loader import load_agents_from_dir
-from arena.experiment_loader import load_experiment
-from arena.experiment_runner import run_experiment
-from arena.runner import VERBOSITY_QUIET, VERBOSITY_NORMAL, VERBOSITY_VERBOSE
-from arena.db import init_db, insert_game, fetch_all_games
-from arena.aggregator import compute_win_rate_matrix, format_matrix_text, format_pairwise_text
+from agent_system.evaluation.arena.agents.loader import load_agents_from_dir
+from agent_system.evaluation.arena.experiment_loader import load_experiment
+from agent_system.evaluation.arena.experiment_runner import run_experiment
+from agent_system.evaluation.arena.runner import VERBOSITY_QUIET, VERBOSITY_NORMAL, VERBOSITY_VERBOSE
+from agent_system.evaluation.arena.db import init_db, insert_game, fetch_all_games
+from agent_system.evaluation.arena.aggregator import compute_win_rate_matrix, format_matrix_text, format_pairwise_text
 
 
 def main() -> None:
@@ -41,7 +41,7 @@ def main() -> None:
     parser.add_argument(
         "--agent-dir",
         type=str,
-        default=str(_root / "agents" / "agent_defs"),
+        default=str(_root / "agent_system" / "definition" / "agent_defs"),
         help="Directory containing YAML agent definitions",
     )
     parser.add_argument(

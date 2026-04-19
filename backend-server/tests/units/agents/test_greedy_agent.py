@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from agents.agent_service.agents.greedy_agent import GreedyAgent
+from agent_system.runtime.service.agents.greedy_agent import GreedyAgent
 
 # ---------------------------------------------------------------------------
 # Shared test fixtures

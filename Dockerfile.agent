@@ -24,10 +24,10 @@ RUN pip install --no-cache-dir /tmp/wheels/*.whl && rm -rf /tmp/wheels
 # Install Python deps
 RUN pip install --no-cache-dir fastapi "uvicorn[standard]" pydantic pyyaml
 
-# Copy agent service source
-# The agents/ directory is the top-level package (imports: agents.agent_service.*)
-COPY agents/ /app/agents/
+# Copy agent system source
+# The agent_system/ directory is the top-level package (imports: agent_system.runtime.service.*)
+COPY agent_system/ /app/agent_system/
 
 EXPOSE 8090
 
-CMD ["uvicorn", "agents.agent_service.server:app", "--host", "0.0.0.0", "--port", "8090"]
+CMD ["uvicorn", "agent_system.runtime.service.server:app", "--host", "0.0.0.0", "--port", "8090"]
