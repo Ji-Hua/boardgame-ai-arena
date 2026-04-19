@@ -1,0 +1,13 @@
+id: minimax_simple
+display_name: "Minimax Agent (Simple)"
+category: ai
+deterministic: true
+
+algo:
+  type: minimax
+  params:
+    depth: 2
+
+policy:
+  type: top_k
+  k: 1

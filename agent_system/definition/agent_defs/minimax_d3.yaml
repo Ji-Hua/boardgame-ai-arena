@@ -1,0 +1,13 @@
+id: minimax_d3
+display_name: "Minimax Agent (Depth 3)"
+category: ai
+deterministic: true
+
+algo:
+  type: minimax
+  params:
+    depth: 3
+
+policy:
+  type: top_k
+  k: 1

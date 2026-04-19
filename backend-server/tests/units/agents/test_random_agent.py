@@ -19,7 +19,7 @@ import random
 
 import pytest
 
-from agents.agent_service.agents.random_agent import RandomAgent, RandomAgentV2
+from agent_system.runtime.service.agents.random_agent import RandomAgent, RandomAgentV2
 
 # ---------------------------------------------------------------------------
 # Shared test fixtures

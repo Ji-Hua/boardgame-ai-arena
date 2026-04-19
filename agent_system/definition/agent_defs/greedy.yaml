@@ -1,0 +1,11 @@
+id: greedy
+display_name: Greedy Agent
+category: ai
+deterministic: true
+
+algo:
+  type: greedy
+
+policy:
+  type: top_k
+  k: 1

@@ -1,0 +1,13 @@
+id: minimax_hard
+display_name: "Minimax Agent (Hard)"
+category: ai
+deterministic: true
+
+algo:
+  type: minimax
+  params:
+    depth: 5
+
+policy:
+  type: top_k
+  k: 1
