@@ -1,0 +1,82 @@
+# CNN DQN training — 5000 episodes, mixed opponent (random_legal 80% / minimax_d1 20%).
+#
+# Based on dqn_cnn_distance_delta_w004_random_2k_001 — all CNN/DDQN/reward parameters
+# preserved; only episodes and opponent policy changed.
+#
+# Run with:
+#   PYTHONPATH=. PYTHONUNBUFFERED=1 uv run python -u scripts/train_dqn.py \
+#     --config agent_system/training/configs/dqn/cnn_mixed_random80_minimaxd1_5k_001.yaml \
+#     2>&1 | tee agent_system/training/artifacts/dqn/cnn_mixed_random80_minimaxd1_5k_001/train.log
+
+# --- episode budget ---
+episodes: 5000
+max_steps_per_episode: 3000
+
+# --- replay buffer ---
+buffer_capacity: 100000
+warmup_size: 5000
+batch_size: 128
+
+# --- optimizer ---
+lr: 1.0e-4
+gamma: 0.95
+grad_clip_norm: 10.0
+
+# --- exploration ---
+epsilon_start: 1.0
+epsilon_end: 0.05
+epsilon_decay_steps: 200000
+
+# --- target network ---
+target_sync_interval: 200
+
+# --- checkpointing ---
+checkpoint_dir: agent_system/training/artifacts/dqn/cnn_mixed_random80_minimaxd1_5k_001/checkpoints
+checkpoint_interval: 500
+agent_id: dqn_cnn_mixed_random80_minimaxd1_5k_001
+
+# --- training opponent ---
+# Mixed policy: one opponent sampled per episode by relative weight (normalized internally).
+train_opponent:
+  type: mixed
+  opponents:
+    - name: random_legal
+      type: random_legal
+      weight: 0.8
+    - name: minimax_d1
+      type: minimax
+      depth: 1
+      weight: 0.2
+
+# --- evaluation ---
+# Evaluated against multiple opponents at each eval interval and at the end.
+evaluation:
+  interval: 500
+  games_per_opponent: 200
+  opponents:
+    - name: dummy
+      type: dummy
+    - name: random_legal
+      type: random_legal
+    - name: minimax_d1
+      type: minimax
+      depth: 1
+    - name: minimax_d2
+      type: minimax
+      depth: 2
+
+# --- observation / model ---
+obs_version: v1          # unused when model_arch=cnn
+model_arch: cnn
+cnn_channels: [32, 64, 64]
+algorithm: double_dqn
+
+# --- reward ---
+reward_mode: distance_delta
+distance_reward_weight: 0.04
+distance_delta_clip: 1.0
+
+# --- misc ---
+seed: 42
+log_interval: 100
+device: auto

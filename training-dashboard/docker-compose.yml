@@ -1,0 +1,30 @@
+# Training Dashboard — Docker Compose
+#
+# Usage:
+#   cd training-dashboard
+#   docker compose up --build
+#
+# Frontend:  http://localhost:8741
+# Backend:   http://localhost:8740/health
+#
+# Artifact volumes are mounted read-only from the host.
+# Override TRAINING_DASHBOARD_ARTIFACT_ROOTS if your artifacts live elsewhere.
+
+services:
+  training-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8740:8740"
+      - "8741:8741"
+    volumes:
+      # Mount training artifacts read-only.
+      # The host path is relative to this file (training-dashboard/).
+      - ../agent_system/training/artifacts:/data/training_artifacts:ro
+    environment:
+      # Colon-separated list of container paths to scan for training runs.
+      # DQN artifacts are nested under /dqn — list both so the backend
+      # sees individual run directories whichever layout is present.
+      TRAINING_DASHBOARD_ARTIFACT_ROOTS: "/data/training_artifacts/dqn:/data/training_artifacts"
+    restart: unless-stopped

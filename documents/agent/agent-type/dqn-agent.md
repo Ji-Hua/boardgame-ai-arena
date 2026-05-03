@@ -2,14 +2,18 @@
 
 Author: Ji Hua
 Created Date: 2026-04-25
-Last Modified: 2026-04-25
-Current Version: 1
+Last Modified: 2026-04-26
+Current Version: 2
 Document Type: Design
 Document Subtype: DQN Agent Target-State Blueprint
-Document Status: Draft
+Document Status: Active
 Document Authority Scope: Agent System / Training System
 Document Purpose:
 This document defines the intended completed state of the first DQN-based trainable agent capability in the Quoridor RL project. It describes what the system should be able to do after the DQN feature is implemented. It is a target-state blueprint only. It does not define detailed implementation tasks, file-level plans, or phased migration steps.
+
+Changelog:
+- v2 (2026-04-26): Added Sections 26-28 — DQN v0 training semantics, stabilized baseline configuration, and Phase 12C baseline results. DQN v0 is now complete.
+- v1 (2026-04-25): Initial target-state blueprint.
 
 ---
 
@@ -580,3 +584,95 @@ Its central contribution is the first complete trainable-agent loop:
 Environment -> Experience -> Bellman Update -> Checkpoint -> Arena Evaluation -> Runtime Agent
 
 Once this loop exists, the project can begin making real progress toward stronger RL agents, PPO, MCTS, and eventually AlphaZero-style systems.
+
+---
+
+## 26. DQN v0 Training Semantics
+
+*Added v2, 2026-04-26. Documents the implemented and validated deferred-push transition semantics required for correct DQN training.*
+
+### Deferred-Push Pattern
+
+The observation encoder (`dqn_obs_v1`) is **current-player-centric**: it always encodes the board from the perspective of whoever is to move next. This creates a semantic hazard: after the learner acts and the opponent responds, a naive encoding of the resulting state would produce the board from the opponent's view, not the learner's.
+
+The correct transition pattern is:
+
+```
+learner_obs  →  learner_action  →  opponent response  →  learner_next_obs  →  terminal / reward
+```
+
+`learner_next_obs` must be re-encoded from the **learner's perspective** after the opponent has moved. This is implemented as a **deferred push**: the replay buffer transition is not pushed immediately after the learner's action; it is deferred until the opponent responds (or the episode terminates), at which point `next_obs` and `next_legal_mask` are both computed from the learner's view.
+
+### Required Invariants
+
+- All replay buffer transitions must be **learner-centric**.
+- `next_obs` must be encoded from the **learner's** perspective, not the perspective of the player to move after the learner.
+- `next_legal_mask` must correspond to the **learner's** next decision state.
+- Opponent-only actions must **not** be stored as learner transitions.
+- When the opponent wins (terminal state after opponent's move), the learner receives reward **= −1**.
+- When the learner wins (terminal state after learner's move), the learner receives reward **= +1**.
+- Non-terminal steps produce reward **= 0**.
+- Legal action masking is **mandatory** during epsilon-greedy exploration (training) and greedy selection (evaluation). Never select over all 209 actions without masking.
+
+### Known Bugs Fixed in Phase 8
+
+1. **Missing negative terminal reward**: opponent wins produced reward 0 for the learner instead of −1. Fixed via deferred-push terminal handling.
+2. **Wrong perspective on next_obs**: `next_obs` was encoded from the opponent's current-player perspective. Fixed by re-encoding from the learner's fixed perspective after opponent response.
+
+---
+
+## 27. DQN v0 Stabilized Baseline Configuration
+
+*Added v2, 2026-04-26. Records hyperparameters validated through Phases 12A–12C.*
+
+The following configuration is the recommended vanilla DQN baseline. It eliminates Q-value divergence at the 5000-episode scale and achieves stable learning.
+
+| Hyperparameter | Recommended Value | Notes |
+|---|---|---|
+| `lr` | `1e-4` | 1e-3 caused catastrophic divergence (Phase 11) |
+| `gamma` | `0.95` | 0.99 worsened divergence in Phase 11 |
+| `grad_clip_norm` | `10.0` | Required; prevents Q-value explosion |
+| `batch_size` | `128` | Fastest on RTX 3080 Ti; larger batches slower |
+| `buffer_capacity` | `100000` | For 5000-episode runs |
+| `warmup_size` | `5000` | Fill buffer before gradient updates begin |
+| `epsilon_start` | `1.0` | Full random exploration at start |
+| `epsilon_end` | `0.05` | 5% minimum exploration |
+| `epsilon_decay_steps` | `250000` | For 5000-episode runs |
+| `target_sync_interval` | `1000` | **Stable default**: best final performance without divergence |
+| `target_sync_interval` | `2000` | **High-peak experimental**: best peak 17% but some post-peak decline |
+| `eval_interval` | `500` | |
+| `eval_games` | `100` | vs `random_legal` |
+| `device` | `auto` | Auto-selects CUDA |
+| `obs_version` | `dqn_obs_v1` | 292 features |
+
+**Do not use `target_sync_interval=200`.** The Phase 12B run with sync=200 diverged at ep3200 and collapsed to 0% win rate at ep4500.
+
+---
+
+## 28. DQN v0 Baseline Results
+
+*Added v2, 2026-04-26. Records the final Phase 12C baseline outcomes.*
+
+### Summary
+
+| Checkpoint | Path | Win rate vs random_legal | Episode | `target_sync_interval` |
+|---|---|---:|---:|---:|
+| Peak | `long_train_005_sync2000/checkpoints/ep03500_step1765553.pt` | **17%** | 3500 | 2000 |
+| Stable final | `long_train_004_sync1000/checkpoints/ep05000_step2678737.pt` | **11%** | 5000 | 1000 |
+| (Superseded) Phase 12B | `long_train_002/checkpoints/ep02500_step1277239.pt` | 11% | 2500 | 200 |
+
+Canonical copies: `agent_system/training/artifacts/dqn/baselines/dqn_v0_peak.pt` and `dqn_v0_stable.pt`.
+
+### Key Findings from Phase 12C
+
+- Illegal action count: **0** in all major long runs (Phases 9, 12B, 12C).
+- All three Phase 12C ablation runs (sync=500/1000/2000) completed 5000 episodes with **no divergence**, proving that increasing `target_sync_interval` from 200 fully eliminates the catastrophic Q-value divergence observed in Phase 12B.
+- sync2000 achieved the highest single-evaluation score (17% at ep3500) but showed post-peak decline (9% at ep5000), likely due to overestimation bias accumulating over too-stale targets.
+- sync1000 showed the most stable late-stage behavior: consistent improvement to 11% at ep5000 with avg_loss=0.0008.
+- sync500 was the weakest (8% peak) but remained stable.
+
+### Interpretation
+
+The 17% peak is meaningful evidence of learning: without semantic bug fixes (Phase 8), win rate was effectively 0%. The agent clearly learns something. However, 17% against a fully random opponent is still weak; a simple Greedy agent would achieve much higher.
+
+The next priority is **Double DQN** to address overestimation bias, with `target_sync_interval=1000` as the starting configuration.

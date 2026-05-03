@@ -1,0 +1,61 @@
+# Smoke / quick-validation training run (300 episodes).
+# Mirrors the settings used by quick_train.sh.
+#
+# Run with:
+#   PYTHONPATH=. PYTHONUNBUFFERED=1 uv run python -u scripts/train_dqn.py \
+#     --config agent_system/training/configs/dqn/stabilization_smoke_001.yaml
+
+# --- episode budget ---
+episodes: 300
+max_steps_per_episode: 3000
+
+# --- replay buffer ---
+buffer_capacity: 50000
+warmup_size: 5000
+batch_size: 128
+
+# --- optimizer ---
+lr: 1.0e-4
+gamma: 0.95
+grad_clip_norm: 10.0
+
+# --- exploration ---
+epsilon_start: 1.0
+epsilon_end: 0.05
+epsilon_decay_steps: 30000
+
+# --- target network ---
+target_sync_interval: 200
+
+# --- checkpointing ---
+checkpoint_dir: agent_system/training/artifacts/dqn/stabilization_smoke_001/checkpoints
+checkpoint_interval: 100
+agent_id: stabilization_smoke_001
+
+# --- training opponent ---
+train_opponent:
+  type: random_legal
+
+# --- evaluation ---
+evaluation:
+  interval: 100
+  games_per_opponent: 50
+  opponents:
+    - name: random_legal
+      type: random_legal
+    - name: dummy
+      type: dummy
+
+# --- observation / model ---
+obs_version: v1
+model_arch: mlp
+hidden_layers: [256, 256]
+algorithm: dqn
+
+# --- reward ---
+reward_mode: terminal
+
+# --- reproducibility / misc ---
+seed: 42
+log_interval: 25
+device: auto
