@@ -22,5 +22,9 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 8741,
     strictPort: true,
+    proxy: {
+      '/api': { target: 'http://localhost:8740', changeOrigin: true },
+      '/health': { target: 'http://localhost:8740', changeOrigin: true },
+    },
   },
 })

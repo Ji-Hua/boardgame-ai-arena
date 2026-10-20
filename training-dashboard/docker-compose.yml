@@ -27,4 +27,12 @@ services:
       # DQN artifacts are nested under /dqn — list both so the backend
       # sees individual run directories whichever layout is present.
       TRAINING_DASHBOARD_ARTIFACT_ROOTS: "/data/training_artifacts/dqn:/data/training_artifacts"
+    init: true
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8740/health', timeout=3); urllib.request.urlopen('http://localhost:8741/', timeout=3)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped

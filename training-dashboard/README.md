@@ -58,6 +58,22 @@ docker compose logs -f     # tail logs
 docker compose down        # stop and remove
 ```
 
+#### Deployment checks
+
+The image builds the frontend once (`npm run build`) and serves the generated
+assets with `npm run preview`. Both preview and the development server proxy
+`/api` and `/health` to the backend. Source changes require rebuilding the image.
+
+```bash
+docker compose ps
+curl -fsS http://localhost:8741/health
+curl -fsS http://localhost:8741/api/summary
+```
+
+Compose checks both backend and frontend health. The container uses an init
+process, a 15-second stop grace period, and `restart: unless-stopped` so it
+returns after a host reboot unless explicitly stopped.
+
 #### Volume mapping
 
 The compose file mounts the training artifact directory read-only into the container:

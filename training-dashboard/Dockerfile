@@ -24,6 +24,9 @@ COPY backend/ ./backend/
 COPY backend_entry.py .
 COPY frontend/ ./frontend/
 
+# Build static frontend assets for the deployed service.
+RUN cd frontend && npm run build
+
 # ---------- Entrypoint ----------
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
