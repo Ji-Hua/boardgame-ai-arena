@@ -38,6 +38,9 @@ def build_scorer(algo_type: str, algo_params: dict[str, Any]) -> Scorer:
 
     Params are passed opaquely to the Scorer constructor.
     """
+    if algo_type == "dqn":
+        from agent_system.evaluation.arena.agents.dqn_scorer import DQNScorer
+        return DQNScorer(**algo_params)
     cls = _SCORER_REGISTRY.get(algo_type)
     if cls is None:
         raise ValueError(

@@ -2,15 +2,17 @@ import React, { useState } from 'react'
 import { RunListView } from './views/RunListView'
 import { RunDetailView } from './views/RunDetailView'
 import { CompareView } from './views/CompareView'
+import { ArenaView } from './views/ArenaView'
 import './App.css'
 
 type View =
   | { kind: 'list' }
   | { kind: 'detail'; runId: string }
   | { kind: 'compare' }
+  | { kind: 'arena' }
 
 export default function App() {
-  const [view, setView] = useState<View>({ kind: 'list' })
+  const [view, setView] = useState<View>({ kind: window.location.hash === '#arena' ? 'arena' : 'list' })
 
   return (
     <div className="app">
@@ -19,6 +21,12 @@ export default function App() {
           Quoridor Training Dashboard
         </div>
         <nav className="header-nav">
+          <button
+            className={view.kind === 'arena' ? 'active' : ''}
+            onClick={() => { window.location.hash = 'arena'; setView({ kind: 'arena' }) }}
+          >
+            Arena
+          </button>
           <button
             className={view.kind === 'list' ? 'active' : ''}
             onClick={() => setView({ kind: 'list' })}
@@ -36,6 +44,7 @@ export default function App() {
       </header>
 
       <main className="app-main">
+        {view.kind === 'arena' && <ArenaView />}
         {view.kind === 'list' && (
           <RunListView onSelectRun={runId => setView({ kind: 'detail', runId })} />
         )}

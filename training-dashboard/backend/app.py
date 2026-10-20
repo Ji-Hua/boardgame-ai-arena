@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import dataclasses
+import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -67,6 +69,42 @@ def create_app() -> FastAPI:
             "artifact_roots": roots,
             "read_only": True,
         }
+
+    def data_json(relative: str) -> dict[str, Any]:
+        root = Path(os.environ.get("QUORIDOR_DATA_ROOT", "/data/quoridor")).resolve()
+        path = (root / relative).resolve()
+        if not path.is_relative_to(root):
+            raise HTTPException(status_code=400, detail="Invalid data path")
+        try:
+            return json.loads(path.read_text())
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="No benchmark data available yet")
+        except (OSError, ValueError):
+            raise HTTPException(status_code=503, detail="Benchmark data unavailable")
+
+    @app.get("/api/arena/latest")
+    def latest_matrix() -> dict[str, Any]:
+        run_id = data_json("arena/latest.json")["run_id"]
+        if not isinstance(run_id, str) or not run_id.replace("-", "").replace("_", "").isalnum():
+            raise HTTPException(status_code=400, detail="Invalid run ID")
+        return data_json(f"arena/{run_id}/report.json")
+
+    @app.get("/api/arena/runs/{run_id}/manifest")
+    def matrix_manifest(run_id: str) -> dict[str, Any]:
+        if not run_id.replace("-", "").replace("_", "").isalnum():
+            raise HTTPException(status_code=400, detail="Invalid run ID")
+        return data_json(f"arena/{run_id}/manifest.json")
+
+    @app.get("/api/models")
+    def model_catalog() -> dict[str, Any]:
+        catalog = data_json("catalog.json")
+        try:
+            registry = data_json("registry.json")
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            registry = {"models": []}
+        return {"models": catalog["models"], "registry": registry["models"]}
 
     @app.get("/api/runs")
     def list_runs() -> dict[str, Any]:
