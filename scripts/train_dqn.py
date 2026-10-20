@@ -20,10 +20,12 @@ For a real training run, increase --episodes and --buffer-capacity.
 from __future__ import annotations
 
 import argparse
+import builtins as _builtins
 import json
 import random
 import sys
 import time
+from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -67,6 +69,15 @@ from agent_system.training.dqn.opponent import MixedOpponent, build_mixed_oppone
 from agent_system.training.dqn.replay_buffer import ReplayBuffer
 from agent_system.training.dqn.reward import RewardConfig, RewardBreakdown, compute_reward_breakdown, compute_terminal_reward
 from agent_system.training.dqn.trainer import TrainStepResult, sync_target_network, train_step
+
+
+def print(*args, **kwargs):
+    """Module-local print with timestamp prefix for training logs.
+
+    Timestamp format: yy-mm-dd hh:mm:ss
+    """
+    ts = datetime.now().strftime("%y-%m-%d %H:%M:%S")
+    _builtins.print(ts, *args, **kwargs)
 
 
 # ---------------------------------------------------------------------------

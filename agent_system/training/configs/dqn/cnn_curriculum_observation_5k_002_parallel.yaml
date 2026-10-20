@@ -1,4 +1,4 @@
-# CNN DQN training — 2000-episode curriculum observation run.
+# CNN DQN training — 5000-episode curriculum observation run.
 #
 # Purpose: Short run to validate the full training system end-to-end:
 #   - YAML config loading
@@ -8,18 +8,20 @@
 #   - Sampled offline evaluation replays for dashboard review
 #
 # Curriculum:
-#   Phase 1 (ep    1-500):  random_legal 80% / minimax_d1 20%
-#   Phase 2 (ep  501-1000): random_legal 40% / minimax_d1 60%
-#   Phase 3 (ep 1001-1500): minimax_d1 only
-#   Phase 4 (ep 1501-2000): minimax_d1 80% / minimax_d2 20%
+#   Phase 1 (ep    1-1000): random_legal 100% / minimax_d1 0%
+#   Phase 2 (ep 1001-2000): random_legal 80% / minimax_d1 20%
+#   Phase 3 (ep 2001-3000): random_legal 60% / minimax_d1 40%
+#   Phase 4 (ep 3001-4000): random_legal 40% / minimax_d1 60%
+#   Phase 5 (ep 4001-5000): random_legal 20% / minimax_d1 80%
+#   Phase 6 (ep 5001+):     random_legal 0% / minimax_d1 100% (won't execute when episodes=5000)
 #
 # All CNN / DDQN / reward parameters are identical to
 # cnn_curriculum_random_to_minimax_5k_001.yaml for apples-to-apples comparison.
 #
 # Run with:
 #   PYTHONPATH=. PYTHONUNBUFFERED=1 uv run python -u scripts/train_dqn.py \
-#     --config agent_system/training/configs/dqn/cnn_curriculum_observation_2k_002.yaml \
-#     2>&1 | tee agent_system/training/artifacts/dqn/cnn_curriculum_observation_2k_002/train.log
+#     --config agent_system/training/configs/dqn/cnn_curriculum_observation_5k_002_parallel.yaml \
+#     2>&1 | tee agent_system/training/artifacts/dqn/cnn_curriculum_observation_5k_002_parallel/train.log
 
 # --- episode budget ---
 episodes: 5000
@@ -44,14 +46,14 @@ epsilon_decay_steps: 200000
 target_sync_interval: 200
 
 # --- checkpointing ---
-checkpoint_dir: agent_system/training/artifacts/dqn/cnn_curriculum_observation_2k_001/checkpoints
+checkpoint_dir: agent_system/training/artifacts/dqn/cnn_curriculum_observation_5k_002_parallel/checkpoints
 checkpoint_interval: 500
-agent_id: dqn_cnn_curriculum_observation_2k_001
+agent_id: dqn_cnn_curriculum_observation_5k_002_parallel
 
 # --- episode-based curriculum schedule ---
 train_opponent_schedule:
   - from_episode: 1
-    to_episode: 500
+    to_episode: 1000
     opponent:
       type: mixed
       opponents:
@@ -59,48 +61,47 @@ train_opponent_schedule:
           type: random_legal
           weight: 1.0
 
-  - from_episode: 501
-    to_episode: 1000
-    opponent:
-      type: mixed
-      opponents:
-        - name: random_legal
-          type: random_legal
-          weight: 0.8
-        - name: minimax_d1
-          type: minimax
-          depth: 1
-          weight: 0.2
-
   - from_episode: 1001
-    to_episode: 1500
-    opponent:
-      type: mixed
-      opponents:
-        - name: random_legal
-          type: random_legal
-          weight: 0.6
-        - name: minimax_d1
-          type: minimax
-          depth: 1
-          weight: 0.4
-
-
-  - from_episode: 1501
     to_episode: 2000
     opponent:
       type: mixed
       opponents:
         - name: random_legal
           type: random_legal
+          weight: 0.8
+        - name: minimax_d1
+          type: minimax
+          depth: 1
+          weight: 0.2
+
+  - from_episode: 2001
+    to_episode: 3000
+    opponent:
+      type: mixed
+      opponents:
+        - name: random_legal
+          type: random_legal
+          weight: 0.6
+        - name: minimax_d1
+          type: minimax
+          depth: 1
+          weight: 0.4
+
+  - from_episode: 3001
+    to_episode: 4000
+    opponent:
+      type: mixed
+      opponents:
+        - name: random_legal
+          type: random_legal
           weight: 0.4
         - name: minimax_d1
           type: minimax
           depth: 1
           weight: 0.6
-  
-  - from_episode: 2001
-    to_episode: 2500
+
+  - from_episode: 4001
+    to_episode: 5000
     opponent:
       type: mixed
       opponents:
@@ -111,9 +112,8 @@ train_opponent_schedule:
           type: minimax
           depth: 1
           weight: 0.8
-  
-  - from_episode: 2501
-    to_episode: 5000
+
+  - from_episode: 5001
     opponent:
       type: minimax
       depth: 1
@@ -150,3 +150,11 @@ distance_delta_clip: 1.0
 
 # --- misc ---
 seed: 42
+log_interval: 100
+
+parallel_rollout:
+  enabled: true
+  num_workers: 4
+  batch_transitions_per_worker: 256
+  queue_maxsize: 8
+  start_method: spawn
