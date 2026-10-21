@@ -7,6 +7,7 @@ the registry/instance-manager plumbing.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from agent_system.runtime.service.base_agent import BaseAgent
@@ -47,7 +48,14 @@ class YamlAgentMaterializer(AgentMaterializer):
 
     @property
     def param_schema(self) -> ParamSchema:
-        return _PARAM_SCHEMAS.get(self._defn.algo_type, ParamSchema())
+        schema = _PARAM_SCHEMAS.get(self._defn.algo_type, ParamSchema())
+        # Candidate validation happens before construction. Defaults must come
+        # from this definition, or depth=1/3/5 presets silently become depth=2.
+        params = self._defn.algo_params
+        return ParamSchema({
+            key: replace(definition, default=definition.validate(params.get(key, definition.default)))
+            for key, definition in schema.definitions.items()
+        })
 
     @property
     def deterministic(self) -> bool:

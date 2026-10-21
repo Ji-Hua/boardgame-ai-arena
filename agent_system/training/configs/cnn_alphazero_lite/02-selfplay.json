@@ -1,0 +1,46 @@
+{
+  "output": "/home/jihua/quoridor-data/experiments/cnn-alphazero-lite-20261021/02-selfplay",
+  "book_manifest": "/home/jihua/quoridor-data/arena/matrix-20261020-v2/manifest.json",
+  "hypothesis": "Test whether 2000 MCTS self-play games improve both the actor alone and its search-guided play; fixed final checkpoint, no heldout selection.",
+  "training": {
+    "agent_id": "cnn_az_selfplay",
+    "model_arch": "cnn",
+    "device": "cuda",
+    "seed": 42,
+    "episodes": 2000,
+    "lr": 2e-05,
+    "batch_size": 256,
+    "grad_clip_norm": 1.0,
+    "checkpoint_dir": "/home/jihua/quoridor-data/experiments/cnn-alphazero-lite-20261021/02-selfplay/checkpoints"
+  },
+  "alphazero": {
+    "phase": "selfplay",
+    "parent_checkpoint": "/home/jihua/quoridor-data/experiments/cnn-alphazero-lite-20261021/01-calibration/checkpoints/ep01024.pt",
+    "parent_sha256": "2b82d2d8a8e2d7a80255321c2b798a8f47cc0f45935982a76a18a649ce516fb5",
+    "batch_seed": 4201,
+    "rollout_seed": 2026102702,
+    "games_per_batch": 32,
+    "random_prefix_max": 24,
+    "max_plies": 160,
+    "calibration_temperature": 0.8,
+    "calibration_lr": 0.0001,
+    "calibration_epochs": 16,
+    "search": {
+      "simulations": 50,
+      "c_puct": 1.5,
+      "max_depth": 128,
+      "dirichlet_alpha": 0.15,
+      "noise_fraction": 0.25
+    },
+    "temperature_plies": 24,
+    "updates_per_batch": 64,
+    "replay_capacity": 64000,
+    "weight_decay": 0.0001,
+    "value_weight": 1.0,
+    "checkpoint_episodes": [
+      512,
+      1024,
+      2000
+    ]
+  }
+}

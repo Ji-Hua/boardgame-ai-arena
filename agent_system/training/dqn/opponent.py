@@ -165,6 +165,17 @@ class PawnRandomOpponent(TrainingOpponent):
 # MinimaxOpponent
 # ---------------------------------------------------------------------------
 
+class GreedyOpponent(TrainingOpponent):
+    """The exact runtime Greedy scorer, including engine-order tie breaking."""
+
+    def select_action_id(self, engine, state, legal_ids, rng):
+        from agent_system.runtime.service.agents.greedy_agent import score_position
+        from agent_system.training.dqn.action_space import encode_engine_action
+        candidates = score_position(state)
+        chosen = max(candidates, key=lambda candidate: candidate["score"])
+        return encode_engine_action(chosen["action"])
+
+
 class MinimaxOpponent(TrainingOpponent):
     """Minimax opponent with alpha-beta pruning at a fixed depth.
 
@@ -257,7 +268,7 @@ class MinimaxOpponent(TrainingOpponent):
 # Factory
 # ---------------------------------------------------------------------------
 
-_VALID_OPPONENT_TYPES = ("random_legal", "minimax", "dummy", "pawn_random")
+_VALID_OPPONENT_TYPES = ("random_legal", "minimax", "dummy", "pawn_random", "greedy")
 
 
 def build_opponent(
@@ -278,6 +289,8 @@ def build_opponent(
         ValueError: If ``opponent_type`` is not a known type.
         ValueError: If ``minimax_depth < 1`` for minimax.
     """
+    if opponent_type == "greedy":
+        return GreedyOpponent()
     if opponent_type == "random_legal":
         return RandomLegalOpponent()
     if opponent_type == "minimax":

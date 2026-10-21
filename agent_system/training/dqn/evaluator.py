@@ -47,7 +47,7 @@ from agent_system.training.dqn.action_space import (
     legal_action_mask as _legal_action_mask,
 )
 from agent_system.training.dqn.checkpoint import DQNCheckpoint, load_checkpoint
-from agent_system.training.dqn.model import QNetwork, select_greedy_action
+from agent_system.training.dqn.model import QNetwork, select_greedy_action, network_outputs, select_policy_action
 from agent_system.training.dqn.observation import encode_observation
 
 
@@ -136,8 +136,8 @@ class DQNCheckpointAgent:
         """
         obs_tensor = torch.tensor(observation, dtype=torch.float32)
         with torch.no_grad():
-            q_values = self._network(obs_tensor)
-        return select_greedy_action(q_values, legal_action_mask)
+            q_values, type_q = network_outputs(self._network, obs_tensor)
+        return select_policy_action(q_values, legal_action_mask, type_q=type_q)
 
     @property
     def checkpoint_id(self) -> str:

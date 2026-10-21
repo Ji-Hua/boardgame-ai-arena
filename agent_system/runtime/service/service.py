@@ -12,6 +12,7 @@ ClassAgentMaterializer for backward compatibility.
 from __future__ import annotations
 
 from pathlib import Path
+import os
 from typing import Any
 
 from agent_system.runtime.service.registry import AgentRegistry
@@ -34,7 +35,9 @@ class AgentService:
     def __init__(self, agent_defs_dir: str | Path | None = None) -> None:
         self._registry = AgentRegistry()
         self._instance_mgr = AgentInstanceManager(self._registry)
-        self._agent_defs_dir = Path(agent_defs_dir) if agent_defs_dir else _AGENT_DEFS_DIR
+        self._agent_defs_dir = Path(
+            agent_defs_dir or os.environ.get("QUORIDOR_AGENT_DEFS_DIR") or _AGENT_DEFS_DIR
+        )
         self._register_builtin_agents()
 
     def _register_builtin_agents(self) -> None:

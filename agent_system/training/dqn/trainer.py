@@ -41,7 +41,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from agent_system.training.dqn.model import QNetwork
+from agent_system.training.dqn.model import QNetwork, network_outputs, policy_argmax
 
 # Sentinel for masking illegal Q-values before max.
 _NEG_INF: float = -math.inf
@@ -100,6 +100,7 @@ class TrainStepResult:
     done_count: int = 0
     # Gradient norm before clipping (None if clipping was not applied)
     grad_norm: float | None = None
+    demonstration_loss: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +136,8 @@ def train_step(
     gamma: float = 0.99,
     grad_clip_norm: float | None = None,
     algorithm: str = "dqn",
+    demonstration_batch: dict[str, torch.Tensor] | None = None,
+    demonstration_weight: float = 1.0,
 ) -> TrainStepResult:
     """Perform one minibatch Bellman update on *online_net*.
 
@@ -201,7 +204,7 @@ def train_step(
 
     # ---- Online Q for chosen actions ----
     online_net.train()
-    q_all_online = online_net(obs)                              # (B, action_count)
+    q_all_online, type_q = network_outputs(online_net, obs)
     q_taken = q_all_online.gather(1, action.unsqueeze(1)).squeeze(1)  # (B,)
 
     # ---- Target Q for next state ----
@@ -210,9 +213,8 @@ def train_step(
 
         if algorithm == "double_dqn":
             # --- Double DQN: online net selects next action ---
-            q_online_next = online_net(next_obs)               # (B, action_count)
-            q_online_next_masked = q_online_next.masked_fill(illegal, _NEG_INF)
-            next_action = q_online_next_masked.argmax(dim=1)   # (B,)  int64
+            q_online_next, next_type_q = network_outputs(online_net, next_obs)
+            next_action = policy_argmax(q_online_next, next_mask, next_type_q)
 
             # --- Target net evaluates the online-selected action ---
             q_all_target = target_net(next_obs)                # (B, action_count)
@@ -221,9 +223,13 @@ def train_step(
             ).squeeze(1)                                       # (B,)
         else:
             # --- Vanilla DQN: target net selects and evaluates ---
-            q_all_target = target_net(next_obs)                # (B, action_count)
-            q_all_target_masked = q_all_target.masked_fill(illegal, _NEG_INF)
-            max_next_q = q_all_target_masked.max(dim=1).values # (B,)
+            q_all_target, target_type_q = network_outputs(target_net, next_obs)
+            if target_type_q is None:
+                q_all_target_masked = q_all_target.masked_fill(illegal, _NEG_INF)
+                max_next_q = q_all_target_masked.max(dim=1).values
+            else:
+                next_action = policy_argmax(q_all_target, next_mask, target_type_q)
+                max_next_q = q_all_target.gather(1, next_action[:, None]).squeeze(1)
 
         # For terminal transitions (done=1), bootstrap must be zero.
         # Use torch.where to avoid -inf * 0 = NaN when next_mask is all-False.
@@ -234,6 +240,19 @@ def train_step(
 
     # ---- Huber loss ----
     loss = nn.functional.smooth_l1_loss(q_taken, target_q)
+    if type_q is not None:
+        type_taken = type_q.gather(1, (action >= 81).long()[:, None]).squeeze(1)
+        loss = .5 * (loss + nn.functional.smooth_l1_loss(type_taken, target_q))
+    demonstration_loss = q_taken.new_zeros(())
+    if demonstration_batch is not None:
+        if demonstration_weight < 0:
+            raise ValueError("demonstration_weight must be nonnegative")
+        from .demonstrations import demonstration_objectives
+        demo = demonstration_batch
+        demo_q, demo_type_q = network_outputs(online_net, demo["obs"])
+        demo_mc, demo_margin = demonstration_objectives(demo_q, demo_type_q, demo)
+        demonstration_loss = demo_mc + demo_margin
+        loss = loss + demonstration_weight * demonstration_loss
 
     # ---- TD errors for diagnostics (before gradient update) ----
     td_errors = (q_taken - target_q).detach()
@@ -266,4 +285,5 @@ def train_step(
         reward_max=float(reward.max().item()),
         done_count=int(done.sum().item()),
         grad_norm=grad_norm,
+        demonstration_loss=float(demonstration_loss.detach().item()),
     )

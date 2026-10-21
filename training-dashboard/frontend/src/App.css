@@ -457,3 +457,30 @@ th.sort-desc::after { content: ' ↓'; }
   z-index: 1000;
   white-space: nowrap;
 }
+
+/* Arena */
+.arena-view { --text-muted: #9a9db3; }
+.arena-view a { color: #83b7ff; text-underline-offset: 3px; }
+.arena-heading { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 22px; }
+.arena-heading h2 { margin-bottom: 4px; }
+.arena-heading p, .arena-hint { color: var(--text-muted); }
+.arena-links { display: flex; gap: 20px; align-items: center; }
+.arena-note, .arena-detail { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; line-height: 1.8; }
+.arena-note { border-left: 3px solid var(--accent); }
+.arena-hint { margin: 8px 0 12px; }
+.arena-matrix { margin-top: 12px; min-width: 880px; }
+.arena-matrix th:first-child { min-width: 190px; }
+.arena-matrix td { padding: 3px; text-align: center; }
+.arena-matrix thead th { text-align: center; }
+.arena-matrix button { width: 100%; min-width: 60px; padding: 6px; color: #f0f1f7; border: 1px solid transparent; }
+.arena-matrix button:hover, .arena-matrix button.selected { border-color: #91c0ff; }
+.arena-matrix small { display: block; font-size: 10px; opacity: .8; }
+.arena-detail { margin-top: 16px; }
+.arena-detail p { margin-top: 6px; }
+.arena-detail .mono { overflow-wrap: anywhere; white-space: normal; }
+.arena-detail summary { cursor: pointer; color: var(--accent); }
+@media (max-width: 720px) {
+  .app-header { height: auto; min-height: var(--header-h); flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
+  .header-title { width: 100%; }
+  .app-main { padding: 16px; }
+}

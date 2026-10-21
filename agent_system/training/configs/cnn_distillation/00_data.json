@@ -1,0 +1,10 @@
+{
+  "output": "/home/jihua/quoridor-data/experiments/cnn-distillation-20261020/shared-data",
+  "episodes": 2000,
+  "seed": 2026102401,
+  "workers": 6,
+  "max_plies": 3000,
+  "random_prefix_max": 24,
+  "exploration": 0.2,
+  "random_pawn_probability": 0.7
+}

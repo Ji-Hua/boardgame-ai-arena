@@ -2,8 +2,8 @@
 
 Author: Ji Hua  
 Created Date: 2026-04-08  
-Last Modified: 2026-04-08  
-Current Version: 1  
+Last Modified: 2026-10-20
+Current Version: 2
 
 Document Type: Implementation  
 Document Subtype: Agent  
@@ -241,7 +241,46 @@ Effective complexity is reduced but still depends heavily on action ordering.
 
 ---
 
+# 13. Decision Analysis
+
+`minimax_agent.score_position(state, depth, observer=None)` is the serving root search,
+also consumed by Decision Lab. Root candidates share alpha exactly as in serving.
+It returns the original scores and order plus conservative `exact`, `upper`, or
+`lower` classifications. A pruned inferior root candidate's returned score can
+differ from its true depth-limited value. Sorting those returns does not produce an
+exact ranking of all actions.
+
+`minimax_agent.inspect_branch(state, action, depth, observer=None)` searches one
+candidate from a fresh `[-∞, +∞]` window, yielding its exact value at the chosen depth.
+This remains a heuristic search horizon, not a game-theoretic solution of Quoridor.
+
+`SearchContext.observer` is optional. Its `root_action`, `enter`, `edge`, and `exit`
+events expose the actual recursion, original alpha/beta windows, leaf values, and
+unvisited direct children after a cutoff. With no observer, no trace is created.
+Decision Lab derives the principal variation from these events. The serving policy
+and engine action ordering remain unchanged.
+
+Depth counts half-moves: depth 2 contains the agent move and one opponent reply.
+All values use the root player's perspective. Non-terminal leaves use
+`distance(opponent) - distance(self)`; terminal leaves use `+∞` or `-∞`.
+Depth 1 and Greedy have equivalent ordering among non-terminal results, but differ
+in terminal treatment and in the numeric baseline.
+
+The analysis component caps search resources and refuses to emit an incomplete
+recommendation. Its separate trace-storage cap only limits what is displayed.
+The trace distinguishes pruned branches from visited nodes omitted from storage.
+The legacy runtime `SearchContext.nodes` includes an extra root-candidate increment;
+Decision Lab's `stats.nodes` counts actual recursive `enter` events.
+
+See [analysis contract](../analysis/decision-analysis-interface.md).
+
+---
+
 # Changelog
+
+Version 2 (2026-10-20)
+- Added shared scoring and full-window branch-inspection entries with opt-in search events.
+- Defined exact values versus fail-soft bounds, trace limits, and depth/terminal semantics.
 
 Version 1 (2026-04-08)
 - Initial Minimax Agent implementation document

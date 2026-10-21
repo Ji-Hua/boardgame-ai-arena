@@ -166,6 +166,11 @@ def _build_random_v2(params: dict, policy: Policy | None, seed: int | None) -> B
     return RandomAgentV2(threshold=params.get("threshold", 0.8))
 
 
+def _build_random_scorer(params: dict, policy: Policy | None, seed: int | None) -> BaseAgent:
+    from agent_system.runtime.service.agents.constant_scorer_agent import ConstantScorerAgent
+    return ConstantScorerAgent(policy=policy, seed=seed)
+
+
 def _build_greedy(params: dict, policy: Policy | None, seed: int | None) -> BaseAgent:
     from agent_system.runtime.service.agents.greedy_agent import GreedyAgent
     return GreedyAgent(policy=policy, seed=seed)
@@ -180,7 +185,17 @@ def _build_minimax(params: dict, policy: Policy | None, seed: int | None) -> Bas
     )
 
 
+def _build_dqn(params: dict, policy: Policy | None, seed: int | None) -> BaseAgent:
+    from agent_system.runtime.service.agents.dqn_agent import DQNAgent
+    return DQNAgent(
+        checkpoint=params["checkpoint"], sha256=params["sha256"],
+        device=params.get("device", "cpu"), policy=policy, seed=seed,
+    )
+
+
 _AGENT_BUILDERS: dict[str, Any] = {
+    "random": _build_random_scorer,
+    "dqn": _build_dqn,
     "random_v2": _build_random_v2,
     "greedy": _build_greedy,
     "minimax": _build_minimax,

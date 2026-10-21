@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Quoridor · Decision Lab</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231c6c59'/%3E%3Cpath d='M9 8h14v14H9zM19 19l6 7' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Quoridor</a><h1>Decision Lab</h1>
+    <div class="header-actions"><span id="connection" class="connection">连接引擎…</span><button id="export-button" class="button quiet">数据 / JSON</button></div>
+  </header>
+  <main>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <div class="workspace">
+      <aside class="setup-panel">
+        <section class="agent-input" aria-label="Agent 配置">
+        <h2 class="section-label">Agent</h2>
+        <div class="segmented" id="algorithm-tabs" aria-label="选择算法"><button data-algorithm="greedy" class="active" aria-pressed="true">Greedy</button><button data-algorithm="minimax" aria-pressed="false">Minimax</button><button data-algorithm="dqn" aria-pressed="false">神经网络</button></div>
+        <p id="algorithm-description" class="muted small"></p>
+        <div id="model-control" hidden><label class="field-label" for="model-select">Checkpoint</label><select id="model-select"></select><div id="model-meta" class="small muted"></div></div>
+        <div id="depth-control" hidden><div class="field-label">搜索深度 <span>ply</span></div><div class="depth-buttons" aria-label="Minimax 搜索深度"><button data-depth="1">1</button><button data-depth="2" class="active">2</button><button data-depth="3">3</button></div></div>
+        <dl class="config"><dt>Policy</dt><dd>top_k · k=1</dd><dt>同分规则</dt><dd id="tie-policy">引擎顺序优先</dd></dl>
+        <button id="analyze-button" class="button primary wide">运行分析</button>
+        <button id="compare-button" class="button secondary wide">对比 Greedy / Minimax D1–3</button>
+        </section>
+        <section class="position-input" aria-label="局面输入">
+        <h2 class="section-label">局面输入</h2>
+        <label class="field-label" for="presets">预设</label><select id="presets"><option value="">自定义局面</option></select>
+        <button id="import-button" class="button secondary wide">导入局面 JSON</button>
+        <button id="edit-button" class="button secondary wide" aria-pressed="false">编辑棋盘</button>
+        <div id="editor" hidden>
+          <p class="small muted">点击格子放置棋子，点击交叉点放墙；点击已有墙删除。</p>
+          <div class="edit-tools"><button data-tool="p1" class="active">放置 P1</button><button data-tool="p2">放置 P2</button><button data-tool="horizontal">横墙</button><button data-tool="vertical">竖墙</button></div>
+          <label class="field-label" for="turn-select">当前行动方</label><select id="turn-select"><option value="1">P1 · 向上到第 9 行</option><option value="2">P2 · 向下到第 1 行</option></select>
+          <p class="small muted">校验几何、库存与通路，不验证历史可达性。</p>
+        </div>
+        <div class="utility-row"><button id="undo-button" class="text-button" disabled>撤销</button><button id="reset-button" class="text-button">重置</button></div>
+        </section>
+      </aside>
+      <section class="board-panel" aria-label="棋盘与局面">
+        <div class="board-heading"><div><span class="section-label">当前局面</span><h2 id="position-title">标准开局</h2></div><span id="turn-badge" class="pill">P1 行动 ↑</span></div>
+        <div class="player-strip"><div><i class="player-dot p1"></i><strong>P1</strong><span id="p1-stock">10 面墙</span></div><div><i class="player-dot p2"></i><strong>P2</strong><span id="p2-stock">10 面墙</span></div></div>
+        <div id="board" class="board" aria-label="Quoridor 棋盘"></div>
+        <div class="board-footer"><label><input id="paths-toggle" type="checkbox" checked> 最短通路</label><button id="root-button" class="text-button" hidden>返回根局面</button></div>
+        <p class="board-note">距离启发式忽略对方棋子；走子和跳跃合法性由规则引擎判定。</p>
+        <div class="map-controls"><span class="field-label">动作评分图</span><div id="map-tabs" class="segmented compact"><button data-map="pawn" class="active">走子</button><button data-map="horizontal">横墙</button><button data-map="vertical">竖墙</button></div></div>
+        <div class="legend"><span><i class="legend-low"></i> 较低</span><div class="gradient"></div><span>较高 <i class="legend-high"></i></span><span class="legend-recommended">◇ 算法选择</span></div>
+        <div id="summary" class="summary"><span>正在读取局面…</span></div>
+        <section id="comparison" class="comparison" hidden><div class="comparison-heading"><h3>Agent 对比</h3><button id="close-comparison" class="text-button" aria-label="关闭比较">×</button></div><p class="small muted">启发式评分、Q 值和策略 logit 的定义或尺度不同，数值不可直接比较。</p><div id="comparison-results"></div></section>
+      </section>
+      <section class="evidence-panel" aria-label="分析结果">
+        <h2 class="section-label">分析结果</h2>
+        <div id="decision" class="decision"><p class="muted">无分析结果</p></div>
+        <div class="candidate-heading"><h3>候选动作 <span id="candidate-count"></span></h3><select id="candidate-filter" aria-label="筛选候选动作"><option value="all">全部类型</option><option value="pawn">走子</option><option value="horizontal">横墙</option><option value="vertical">竖墙</option></select></div>
+        <p id="bounds-note" class="small muted">同分时保留规则引擎中的第一个动作。</p>
+        <div class="candidate-table"><div class="candidate-table-head"><span id="candidate-order-label" title="规则引擎顺序，从 0 开始">序号</span><span>动作</span><span>返回值</span><span>性质</span></div><div id="candidates" class="candidate-rows"></div></div>
+        <div id="branch-panel" class="branch-panel"></div>
+      </section>
+    </div>
+    <section id="neural-panel" class="neural-panel" aria-label="网络诊断" hidden></section>
+    <footer class="footer"><span>Agent System / Decision Analysis</span><span>source <code id="source-version">…</code></span></footer>
+  </main>
+  <dialog id="import-dialog"><div class="dialog-heading"><h2>导入局面</h2><button id="close-import" class="text-button" aria-label="关闭导入">×</button></div><p class="muted small">接受 Position JSON 或含 position 字段的分析 JSON。</p><label for="import-text" class="field-label">Position</label><textarea id="import-text" rows="12" spellcheck="false" placeholder='{"pawns":[[4,0],[4,8]],"walls_remaining":[10,10],"walls":[],"turn":1}'></textarea><p id="import-error" class="error-text" role="alert"></p><div class="dialog-actions"><button id="import-example" class="button secondary">填入当前局面</button><button id="confirm-import" class="button primary">验证并导入</button></div></dialog>
+  <dialog id="export-dialog"><div class="dialog-heading"><h2>分析数据</h2><button id="close-export" class="text-button" aria-label="关闭数据">×</button></div><label for="data-scope" class="field-label">数据对象</label><select id="data-scope"><option value="case">完整分析记录</option><option value="position">Position · 根局面</option><option value="agent_spec">Agent Spec · 参数</option><option value="candidates">Candidates · 根搜索候选</option><option value="analysis">Analysis · 根搜索结果</option><option value="inspected_branch">Branch · 当前检查分支</option><option value="neural">Neural · 网络诊断</option><option value="neural_tensor">Tensor · 当前激活或权重切片</option><option value="neural_search">PUCT · 搜索诊断</option><option value="comparison">Comparison · 对比结果</option><option value="provenance">Provenance · 源码与引擎指纹</option></select><label for="export-text" class="field-label">JSON</label><textarea id="export-text" rows="16" readonly spellcheck="false"></textarea><p id="export-status" class="small muted"></p><div class="dialog-actions"><button id="select-export" class="button secondary">全选 JSON</button><button id="download-case" class="button primary">下载 JSON</button></div></dialog>
+  <script type="module" src="/assets/app.js"></script>
+</body>
+</html>

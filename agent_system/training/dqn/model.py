@@ -202,19 +202,28 @@ class CNNQNetwork(nn.Module):
         cnn_channels: list[int] | None = None,
         action_count: int = ACTION_COUNT,
         dense_width: int = 256,
+        activation: str = "relu",
+        hierarchical: bool = False,
+        value_head: bool = False,
     ) -> None:
         super().__init__()
         self.in_channels = in_channels
         self.cnn_channels: list[int] = list(cnn_channels or CNN_DEFAULT_CHANNELS)
         self.action_count = action_count
         self.dense_width = dense_width
+        if activation not in {"relu", "leaky_relu"}:
+            raise ValueError(f"Unsupported CNN activation: {activation}")
+        self.activation = activation
+        self.hierarchical = hierarchical
+        def nonlinearity():
+            return nn.ReLU() if activation == "relu" else nn.LeakyReLU(0.01)
 
         # Convolutional layers
         conv_layers: list[nn.Module] = []
         ch = in_channels
         for out_ch in self.cnn_channels:
             conv_layers.append(nn.Conv2d(ch, out_ch, kernel_size=3, padding=1))
-            conv_layers.append(nn.ReLU())
+            conv_layers.append(nonlinearity())
             ch = out_ch
         self.conv = nn.Sequential(*conv_layers)
 
@@ -222,9 +231,26 @@ class CNNQNetwork(nn.Module):
         flat_size = ch * _CNN_BOARD_SIZE * _CNN_BOARD_SIZE
         self.head = nn.Sequential(
             nn.Linear(flat_size, dense_width),
-            nn.ReLU(),
+            nonlinearity(),
             nn.Linear(dense_width, action_count),
         )
+        self.action_type_head = nn.Linear(dense_width, 2) if hierarchical else None
+        # Optional outcome head; the existing actor's parameter names stay intact.
+        self.value_head = nn.Linear(dense_width, 1) if value_head else None
+        if self.value_head is not None:
+            nn.init.zeros_(self.value_head.weight)
+            nn.init.zeros_(self.value_head.bias)
+
+    def forward_policy_value(self, obs: torch.Tensor):
+        """Policy logits and bounded outcome from the observation player's view."""
+        if self.value_head is None:
+            raise ValueError("Checkpoint has no value head")
+        single = obs.dim() == 3
+        x = obs.unsqueeze(0) if single else obs
+        hidden = self.head[1](self.head[0](self.conv(x).flatten(1)))
+        policy = self.head[2](hidden)
+        value = self.value_head(hidden).squeeze(-1).tanh()
+        return (policy[0], value[0]) if single else (policy, value)
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         """Compute Q-values for a single observation or a batch.
@@ -239,15 +265,22 @@ class CNNQNetwork(nn.Module):
         -------
         torch.Tensor of shape ``(action_count,)`` or ``(batch, action_count)``.
         """
+        return self.forward_heads(obs)[0]
+
+    def forward_heads(self, obs: torch.Tensor):
+        """Raw action Q and optional [pawn, wall] Q; neither is a probability."""
         single = obs.dim() == 3
         if single:
             obs = obs.unsqueeze(0)          # → (1, C, 9, 9)
         x = self.conv(obs)                  # → (B, cnn_channels[-1], 9, 9)
         x = x.flatten(1)                    # → (B, cnn_channels[-1]*81)
-        q = self.head(x)                    # → (B, action_count)
+        hidden = self.head[1](self.head[0](x))
+        q = self.head[2](hidden)
+        type_q = self.action_type_head(hidden) if self.action_type_head is not None else None
         if single:
             q = q.squeeze(0)                # → (action_count,)
-        return q
+            type_q = type_q.squeeze(0) if type_q is not None else None
+        return q, type_q
 
     def parameter_count(self) -> int:
         """Total number of trainable parameters."""
@@ -269,6 +302,8 @@ def build_q_network(
     in_channels: int = 7,
     cnn_channels: list[int] | None = None,
     dense_width: int = 256,
+    cnn_activation: str = "relu",
+    cnn_hierarchical: bool = False,
 ) -> "QNetwork | CNNQNetwork":
     """Construct a Q-network for the requested architecture.
 
@@ -309,10 +344,43 @@ def build_q_network(
             cnn_channels=cnn_channels,
             action_count=action_count,
             dense_width=dense_width,
+            activation=cnn_activation,
+            hierarchical=cnn_hierarchical,
         )
     raise ValueError(
         f"Unknown model_arch '{model_arch}'. Expected 'mlp' or 'cnn'."
     )
+
+
+def network_outputs(network, obs):
+    return network.forward_heads(obs) if isinstance(network, CNNQNetwork) else (network(obs), None)
+
+
+def route_mask(type_q, legal_mask):
+    """Choose one available category before comparing individual action Qs."""
+    available = torch.stack((legal_mask[..., :81].any(-1), legal_mask[..., 81:].any(-1)), -1)
+    chosen_type = type_q.masked_fill(~available, -torch.inf).argmax(-1)
+    groups = (torch.arange(legal_mask.shape[-1], device=legal_mask.device) >= 81).long()
+    routed = legal_mask & (groups == chosen_type.unsqueeze(-1))
+    return routed, available, chosen_type
+
+
+def policy_argmax(q, mask, type_q=None):
+    allowed = route_mask(type_q, mask)[0] if type_q is not None else mask
+    return q.masked_fill(~allowed, -torch.inf).argmax(-1)
+
+
+def select_policy_action(q, mask, *, type_q=None, epsilon=0., rng=None):
+    if type_q is None:
+        return select_epsilon_greedy_action(q, mask, epsilon=epsilon, rng=rng)
+    _validate_mask(mask)
+    rng = rng or _random.Random()
+    if rng.random() < epsilon:
+        # Uniform over available categories, then uniform within that category.
+        # A category with 128 actions gets the same probability as one with 3.
+        groups = [[i for i, valid in enumerate(mask) if valid and (i >= 81) == kind] for kind in (False, True)]
+        return rng.choice(rng.choice([group for group in groups if group]))
+    return int(policy_argmax(q, torch.as_tensor(mask, dtype=torch.bool, device=q.device), type_q))
 
 
 # ---------------------------------------------------------------------------
@@ -442,9 +510,9 @@ class DQNPolicy:
         """
         obs_tensor = torch.tensor(observation, dtype=torch.float32, device=self._device)
         with torch.no_grad():
-            q_values = self._network(obs_tensor)
+            q_values, type_q = network_outputs(self._network, obs_tensor)
 
-        return select_epsilon_greedy_action(q_values, mask, epsilon=epsilon, rng=rng)
+        return select_policy_action(q_values, mask, type_q=type_q, epsilon=epsilon, rng=rng)
 
     @property
     def network(self) -> QNetwork:

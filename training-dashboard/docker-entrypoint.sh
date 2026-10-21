@@ -23,7 +23,7 @@ BACKEND_PID=$!
 # ---- Frontend ----
 echo "[training-dashboard] Starting frontend..."
 cd /app/frontend
-npm run dev &
+npm run preview &
 FRONTEND_PID=$!
 
 echo "[training-dashboard] Backend  PID: $BACKEND_PID"
@@ -40,8 +40,8 @@ trap _shutdown SIGTERM SIGINT
 
 # ---- Wait for either process to exit ----
 # wait -n exits as soon as any child changes state.
-wait -n
-EXIT_CODE=$?
+EXIT_CODE=0
+wait -n || EXIT_CODE=$?
 echo "[training-dashboard] A process exited with code $EXIT_CODE. Stopping container."
 kill "$BACKEND_PID" "$FRONTEND_PID" 2>/dev/null || true
 exit $EXIT_CODE
