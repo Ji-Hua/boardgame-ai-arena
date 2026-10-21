@@ -4,19 +4,27 @@ Public API:
     sync_target_network(online, target) -> None
         Hard-copy all parameters from online network to target network.
 
-    train_step(online_net, target_net, optimizer, batch, gamma) -> TrainStepResult
+    train_step(online_net, target_net, optimizer, batch, gamma,
+               grad_clip_norm, algorithm) -> TrainStepResult
         One minibatch Bellman update on the online network.
 
     TrainStepResult
         Dataclass with loss and diagnostic scalars.
 
-Bellman target:
+Algorithm modes
+---------------
+``algorithm="dqn"`` (default) — Vanilla DQN Bellman target:
     target[i] = reward[i] + gamma * max_{legal j} Q_target(next_obs[i])[j]  if not done[i]
     target[i] = reward[i]                                                      if done[i]
 
-Illegal next actions are excluded by setting their Q-values to -inf before
-taking the max.  This guarantees the Bellman bootstrap is computed only over
-the legal next-action set.
+``algorithm="double_dqn"`` — Double DQN Bellman target:
+    next_action[i] = argmax_{legal j} Q_online(next_obs[i])[j]
+    target[i] = reward[i] + gamma * Q_target(next_obs[i])[next_action[i]]  if not done[i]
+    target[i] = reward[i]                                                    if done[i]
+
+In both modes:
+- Illegal next actions are excluded from argmax via -inf masking.
+- done=True disables bootstrap (avoids -inf*0=NaN corner cases).
 
 Loss:
     Smooth L1 / Huber loss between Q_online(obs)[action] and target.
@@ -37,6 +45,9 @@ from agent_system.training.dqn.model import QNetwork
 
 # Sentinel for masking illegal Q-values before max.
 _NEG_INF: float = -math.inf
+
+# Supported algorithm mode strings.
+_VALID_ALGORITHMS: frozenset[str] = frozenset({"dqn", "double_dqn"})
 
 # ---------------------------------------------------------------------------
 # Training diagnostics
@@ -87,6 +98,8 @@ class TrainStepResult:
     reward_max: float = 0.0
     # Terminal transition count
     done_count: int = 0
+    # Gradient norm before clipping (None if clipping was not applied)
+    grad_norm: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +133,8 @@ def train_step(
     optimizer: optim.Optimizer,
     batch: dict[str, torch.Tensor],
     gamma: float = 0.99,
+    grad_clip_norm: float | None = None,
+    algorithm: str = "dqn",
 ) -> TrainStepResult:
     """Perform one minibatch Bellman update on *online_net*.
 
@@ -136,6 +151,12 @@ def train_step(
         ``obs``, ``action``, ``reward``, ``next_obs``, ``done``, ``next_mask``.
     gamma:
         Discount factor.  Default 0.99.
+    grad_clip_norm:
+        If not None and > 0, clips gradient norm to this value before the
+        optimizer step.  Returns the pre-clip norm in TrainStepResult.
+    algorithm:
+        ``"dqn"`` (default) or ``"double_dqn"``.
+        Controls how the Bellman bootstrap action is selected.
 
     Returns
     -------
@@ -143,15 +164,34 @@ def train_step(
 
     Algorithm
     ---------
+    Common:
     1. Q_online(obs) → shape (B, action_count)
     2. q_taken = Q_online(obs)[b, action[b]]  → shape (B,)
+
+    DQN (algorithm="dqn"):
     3. Q_target(next_obs) → shape (B, action_count)   [no_grad]
     4. Mask illegal next actions: Q_target[~next_mask] = -inf
     5. max_next_q = max_j Q_target(next_obs)[b, j]   → shape (B,)
-    6. target = reward + gamma * max_next_q * (1 - done)
-    7. loss = SmoothL1(q_taken, target.detach())
-    8. optimizer.zero_grad(); loss.backward(); optimizer.step()
+
+    Double DQN (algorithm="double_dqn"):
+    3. Q_online(next_obs) → shape (B, action_count)   [no_grad]
+    4. Mask illegal next actions: Q_online_next[~next_mask] = -inf
+    5. next_action = argmax_j Q_online_next[b, j]     → shape (B,)  int64
+    6. Q_target(next_obs) → shape (B, action_count)   [no_grad]
+    7. max_next_q = Q_target[b, next_action[b]]       → shape (B,)
+
+    Both:
+    N-1. max_next_q_bootstrap = 0 if done else max_next_q  (avoids -inf*0=NaN)
+    N.   target_q = reward + gamma * max_next_q_bootstrap
+    N+1. loss = SmoothL1(q_taken, target_q.detach())
+    N+2. optimizer.zero_grad(); loss.backward(); [clip]; optimizer.step()
     """
+    if algorithm not in _VALID_ALGORITHMS:
+        raise ValueError(
+            f"Unknown algorithm '{algorithm}'. "
+            f"Expected one of: {sorted(_VALID_ALGORITHMS)}"
+        )
+
     obs = batch["obs"]                  # (B, obs_size)
     action = batch["action"]            # (B,)  int64
     reward = batch["reward"]            # (B,)  float32
@@ -166,14 +206,27 @@ def train_step(
 
     # ---- Target Q for next state ----
     with torch.no_grad():
-        q_all_target = target_net(next_obs)                    # (B, action_count)
-        # Mask illegal next actions: set Q to -inf where mask is False.
         illegal = ~next_mask                                   # (B, action_count)
-        q_all_target = q_all_target.masked_fill(illegal, _NEG_INF)
-        max_next_q = q_all_target.max(dim=1).values            # (B,)
-        # For terminal transitions (done=1), max_next_q must not contribute.
-        # Use torch.where to avoid -inf * 0 = NaN when next_mask is all-False
-        # at terminal states.
+
+        if algorithm == "double_dqn":
+            # --- Double DQN: online net selects next action ---
+            q_online_next = online_net(next_obs)               # (B, action_count)
+            q_online_next_masked = q_online_next.masked_fill(illegal, _NEG_INF)
+            next_action = q_online_next_masked.argmax(dim=1)   # (B,)  int64
+
+            # --- Target net evaluates the online-selected action ---
+            q_all_target = target_net(next_obs)                # (B, action_count)
+            max_next_q = q_all_target.gather(
+                1, next_action.unsqueeze(1)
+            ).squeeze(1)                                       # (B,)
+        else:
+            # --- Vanilla DQN: target net selects and evaluates ---
+            q_all_target = target_net(next_obs)                # (B, action_count)
+            q_all_target_masked = q_all_target.masked_fill(illegal, _NEG_INF)
+            max_next_q = q_all_target_masked.max(dim=1).values # (B,)
+
+        # For terminal transitions (done=1), bootstrap must be zero.
+        # Use torch.where to avoid -inf * 0 = NaN when next_mask is all-False.
         max_next_q_bootstrap = torch.where(
             done.bool(), torch.zeros_like(max_next_q), max_next_q
         )
@@ -188,6 +241,11 @@ def train_step(
     # ---- Gradient update ----
     optimizer.zero_grad()
     loss.backward()
+    grad_norm: float | None = None
+    if grad_clip_norm is not None and grad_clip_norm > 0.0:
+        grad_norm = float(
+            torch.nn.utils.clip_grad_norm_(online_net.parameters(), grad_clip_norm).item()
+        )
     optimizer.step()
 
     return TrainStepResult(
@@ -207,4 +265,5 @@ def train_step(
         reward_mean=float(reward.mean().item()),
         reward_max=float(reward.max().item()),
         done_count=int(done.sum().item()),
+        grad_norm=grad_norm,
     )

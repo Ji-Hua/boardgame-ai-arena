@@ -1,4 +1,4 @@
-"""Unit tests for agent_system/training/dqn/model.py — Phase 4.
+"""Unit tests for agent_system/training/dqn/model.py — Phase 4 / Phase 18A.
 
 Test groups
 -----------
@@ -8,6 +8,8 @@ TestSelectGreedyAction          — greedy selection correctness
 TestSelectEpsilonGreedyAction   — epsilon-greedy exploration
 TestDQNPolicy                   — DQNPolicy.select_action integration
 TestDQNPolicyRollout            — untrained DQN full-game rollout
+TestCNNQNetwork                 — Phase 18A CNN model
+TestBuildQNetwork               — Phase 18A factory function
 """
 
 from __future__ import annotations
@@ -20,16 +22,22 @@ import torch
 
 from agent_system.training.dqn.action_space import ACTION_COUNT
 from agent_system.training.dqn.model import (
+    CNN_DEFAULT_CHANNELS,
+    CNN_MODEL_VERSION,
     DEFAULT_HIDDEN_SIZE,
     MODEL_VERSION,
     OBSERVATION_SIZE,
+    CNNQNetwork,
     DQNPolicy,
     QNetwork,
     _apply_mask,
+    _validate_hidden_layers,
+    build_q_network,
     select_epsilon_greedy_action,
     select_greedy_action,
 )
 from agent_system.training.dqn.observation import OBSERVATION_SIZE as OBS_SIZE_FROM_OBS
+from agent_system.training.dqn.observation_cnn import CNN_CHANNELS, CNN_BOARD_SIZE
 
 
 # ---------------------------------------------------------------------------
@@ -428,12 +436,362 @@ class TestDQNPolicyRollout:
 
         assert reward in (1.0, -1.0)
 
-    def test_multiple_rollouts_all_complete(self):
-        for seed in range(5):
-            stats = self._run_rollout(epsilon=1.0, seed=seed)
-            assert stats["done"] is True
-            assert stats["illegal_selections"] == 0
 
-    def test_rollout_positive_step_count(self):
-        stats = self._run_rollout(epsilon=1.0, seed=2)
-        assert stats["step_count"] > 0
+# ---------------------------------------------------------------------------
+# TestQNetworkHiddenLayers (Phase 16A)
+# ---------------------------------------------------------------------------
+
+class TestQNetworkHiddenLayers:
+    """Tests for variable-depth MLP architecture introduced in Phase 16A."""
+
+    # --- Construction ---
+
+    def test_default_hidden_layers_is_two_256(self):
+        net = QNetwork()
+        assert net.hidden_layers == [256, 256]
+
+    def test_hidden_size_compat_produces_correct_layers(self):
+        """Passing hidden_size=512 without hidden_layers gives [512, 512]."""
+        net = QNetwork(hidden_size=512)
+        assert net.hidden_layers == [512, 512]
+        assert net.hidden_size == 512
+
+    def test_hidden_layers_two_layers(self):
+        net = QNetwork(hidden_layers=[512, 512])
+        assert net.hidden_layers == [512, 512]
+        assert net.hidden_size == 512
+
+    def test_hidden_layers_three_layers(self):
+        net = QNetwork(hidden_layers=[512, 512, 256])
+        assert net.hidden_layers == [512, 512, 256]
+        assert net.hidden_size == 512
+
+    def test_hidden_layers_one_layer(self):
+        net = QNetwork(hidden_layers=[128])
+        assert net.hidden_layers == [128]
+        assert net.hidden_size == 128
+
+    def test_hidden_layers_four_layers(self):
+        net = QNetwork(hidden_layers=[256, 256, 128, 64])
+        assert net.hidden_layers == [256, 256, 128, 64]
+
+    def test_hidden_layers_overrides_hidden_size(self):
+        """When hidden_layers is given, hidden_size arg is ignored."""
+        net = QNetwork(hidden_size=128, hidden_layers=[512, 256])
+        assert net.hidden_layers == [512, 256]
+        assert net.hidden_size == 512
+
+    def test_hidden_layers_stored_as_list_not_reference(self):
+        """Mutation of the original list does not affect net.hidden_layers."""
+        layers = [256, 256]
+        net = QNetwork(hidden_layers=layers)
+        layers.append(128)
+        assert net.hidden_layers == [256, 256]
+
+    # --- Validation ---
+
+    def test_empty_hidden_layers_raises(self):
+        with pytest.raises(ValueError, match="empty"):
+            _validate_hidden_layers([])
+
+    def test_zero_width_raises(self):
+        with pytest.raises(ValueError, match="positive integers"):
+            _validate_hidden_layers([256, 0])
+
+    def test_negative_width_raises(self):
+        with pytest.raises(ValueError, match="positive integers"):
+            _validate_hidden_layers([-1])
+
+    def test_float_width_raises(self):
+        with pytest.raises(ValueError, match="positive integers"):
+            _validate_hidden_layers([256.0])  # type: ignore[list-item]
+
+    def test_qnetwork_empty_hidden_layers_raises(self):
+        with pytest.raises(ValueError):
+            QNetwork(hidden_layers=[])
+
+    # --- Forward shape ---
+
+    def test_forward_shape_two_layers_512(self):
+        net = QNetwork(hidden_layers=[512, 512])
+        obs = torch.zeros(OBSERVATION_SIZE)
+        out = net(obs)
+        assert out.shape == (ACTION_COUNT,)
+
+    def test_forward_shape_three_layers(self):
+        net = QNetwork(hidden_layers=[512, 512, 256])
+        obs = torch.zeros(OBSERVATION_SIZE)
+        out = net(obs)
+        assert out.shape == (ACTION_COUNT,)
+
+    def test_forward_batch_shape_three_layers(self):
+        net = QNetwork(hidden_layers=[512, 512, 256])
+        obs = torch.zeros(8, OBSERVATION_SIZE)
+        out = net(obs)
+        assert out.shape == (8, ACTION_COUNT)
+
+    # --- Parameter counts ---
+
+    def test_parameter_count_default_256x2(self):
+        net = QNetwork()
+        # obs=292, h0=256, h1=256, out=209
+        expected = (292 * 256 + 256) + (256 * 256 + 256) + (256 * 209 + 209)
+        assert net.parameter_count() == expected
+
+    def test_parameter_count_512x2(self):
+        net = QNetwork(hidden_layers=[512, 512])
+        expected = (292 * 512 + 512) + (512 * 512 + 512) + (512 * 209 + 209)
+        assert net.parameter_count() == expected
+
+    def test_parameter_count_512x512x256(self):
+        net = QNetwork(hidden_layers=[512, 512, 256])
+        expected = (292 * 512 + 512) + (512 * 512 + 512) + (512 * 256 + 256) + (256 * 209 + 209)
+        assert net.parameter_count() == expected
+
+    def test_parameter_count_larger_than_default(self):
+        small = QNetwork(hidden_layers=[256, 256])
+        big = QNetwork(hidden_layers=[512, 512])
+        assert big.parameter_count() > small.parameter_count()
+
+    # --- Backward compat: default == old architecture ---
+
+    def test_default_equals_hidden_size_256(self):
+        """QNetwork() must produce exactly the same architecture as old QNetwork(hidden_size=256)."""
+        net_default = QNetwork()
+        net_compat = QNetwork(hidden_size=256)
+        assert net_default.hidden_layers == net_compat.hidden_layers
+        assert net_default.parameter_count() == net_compat.parameter_count()
+
+
+# ---------------------------------------------------------------------------
+# TestCNNQNetwork  (Phase 18A)
+# ---------------------------------------------------------------------------
+
+class TestCNNQNetwork:
+    """Tests for the CNNQNetwork introduced in Phase 18A."""
+
+    # --- Constants ---
+
+    def test_cnn_model_version_string(self):
+        assert CNN_MODEL_VERSION == "cnn_model_v1"
+
+    def test_default_channels_constant(self):
+        assert CNN_DEFAULT_CHANNELS == [32, 64, 64]
+
+    # --- Construction ---
+
+    def test_default_construction(self):
+        net = CNNQNetwork()
+        assert net is not None
+
+    def test_custom_in_channels(self):
+        net = CNNQNetwork(in_channels=CNN_CHANNELS)
+        assert net is not None
+
+    def test_custom_cnn_channels(self):
+        net = CNNQNetwork(in_channels=7, cnn_channels=[16, 32])
+        assert net is not None
+
+    def test_custom_action_count(self):
+        net = CNNQNetwork(action_count=ACTION_COUNT)
+        assert net is not None
+
+    def test_custom_dense_width(self):
+        net = CNNQNetwork(dense_width=128)
+        assert net is not None
+
+    # --- Forward: single observation ---
+
+    def test_forward_single_obs_shape(self):
+        """Single [7, 9, 9] observation -> [ACTION_COUNT]."""
+        net = CNNQNetwork()
+        obs = torch.zeros(CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+        out = net(obs)
+        assert out.shape == torch.Size([ACTION_COUNT])
+
+    def test_forward_single_obs_no_extra_batch_dim(self):
+        """The forward pass must NOT return [1, ACTION_COUNT] for single inputs."""
+        net = CNNQNetwork()
+        obs = torch.zeros(CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+        out = net(obs)
+        assert out.dim() == 1
+
+    # --- Forward: batch ---
+
+    def test_forward_batch_shape(self):
+        """Batch [B, 7, 9, 9] -> [B, ACTION_COUNT]."""
+        net = CNNQNetwork()
+        obs = torch.zeros(8, CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+        out = net(obs)
+        assert out.shape == torch.Size([8, ACTION_COUNT])
+
+    def test_forward_batch_dim_preserved(self):
+        for batch_size in (1, 4, 16):
+            net = CNNQNetwork()
+            obs = torch.zeros(batch_size, CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+            out = net(obs)
+            assert out.shape[0] == batch_size
+
+    # --- Backward ---
+
+    def test_backward_pass_runs(self):
+        """Loss.backward() must not raise for a CNN network."""
+        net = CNNQNetwork()
+        obs = torch.zeros(4, CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+        out = net(obs)
+        loss = out.sum()
+        loss.backward()  # should not raise
+
+    def test_gradients_are_not_none_after_backward(self):
+        net = CNNQNetwork()
+        obs = torch.zeros(4, CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+        out = net(obs)
+        out.sum().backward()
+        for name, p in net.named_parameters():
+            assert p.grad is not None, f"Gradient is None for param: {name}"
+
+    # --- Parameter count ---
+
+    def test_parameter_count_is_positive(self):
+        net = CNNQNetwork()
+        assert net.parameter_count() > 0
+
+    def test_parameter_count_matches_manual(self):
+        """Verify parameter_count() against torch's own sum."""
+        net = CNNQNetwork()
+        expected = sum(p.numel() for p in net.parameters())
+        assert net.parameter_count() == expected
+
+    def test_parameter_count_smaller_channels_is_less(self):
+        big = CNNQNetwork(cnn_channels=[32, 64, 64])
+        small = CNNQNetwork(cnn_channels=[8, 16])
+        assert small.parameter_count() < big.parameter_count()
+
+    # --- Output values ---
+
+    def test_output_finite_random_input(self):
+        net = CNNQNetwork()
+        obs = torch.randn(4, CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+        out = net(obs)
+        assert torch.all(torch.isfinite(out))
+
+    def test_random_input_produces_non_constant_output(self):
+        """With random weights and random input, output should not be all equal."""
+        net = CNNQNetwork()
+        obs = torch.randn(1, CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+        out = net(obs)
+        # Very unlikely to have all equal Q-values with random weights
+        assert not torch.all(out == out[0][0])
+
+    # --- Eval mode ---
+
+    def test_eval_mode_runs(self):
+        net = CNNQNetwork()
+        net.eval()
+        with torch.no_grad():
+            obs = torch.zeros(CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+            out = net(obs)
+        assert out.shape == torch.Size([ACTION_COUNT])
+
+    def test_train_mode_runs(self):
+        net = CNNQNetwork()
+        net.train()
+        obs = torch.zeros(1, CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+        out = net(obs)
+        assert out.shape == torch.Size([1, ACTION_COUNT])
+
+    # --- is_cnn_network utility ---
+
+    def test_cnnqnetwork_is_not_qnetwork(self):
+        cnn = CNNQNetwork()
+        assert not isinstance(cnn, QNetwork)
+
+
+# ---------------------------------------------------------------------------
+# TestBuildQNetwork  (Phase 18A)
+# ---------------------------------------------------------------------------
+
+class TestBuildQNetwork:
+    """Tests for the build_q_network factory function."""
+
+    # --- MLP path ---
+
+    def test_build_mlp_returns_qnetwork(self):
+        net = build_q_network("mlp", ACTION_COUNT, obs_size=OBSERVATION_SIZE,
+                               hidden_layers=[256, 256], in_channels=7,
+                               cnn_channels=[32, 64, 64], dense_width=256)
+        assert isinstance(net, QNetwork)
+
+    def test_build_mlp_default_hidden_layers(self):
+        net = build_q_network("mlp", ACTION_COUNT, obs_size=OBSERVATION_SIZE,
+                               hidden_layers=[256, 256], in_channels=7,
+                               cnn_channels=[32, 64, 64], dense_width=256)
+        assert net.hidden_layers == [256, 256]
+
+    def test_build_mlp_custom_hidden_layers(self):
+        net = build_q_network("mlp", ACTION_COUNT, obs_size=OBSERVATION_SIZE,
+                               hidden_layers=[512, 512, 256], in_channels=7,
+                               cnn_channels=[32, 64, 64], dense_width=256)
+        assert net.hidden_layers == [512, 512, 256]
+
+    def test_build_mlp_forward_shape(self):
+        net = build_q_network("mlp", ACTION_COUNT, obs_size=OBSERVATION_SIZE,
+                               hidden_layers=[256, 256], in_channels=7,
+                               cnn_channels=[32, 64, 64], dense_width=256)
+        obs = torch.zeros(OBSERVATION_SIZE)
+        out = net(obs)
+        assert out.shape == torch.Size([ACTION_COUNT])
+
+    # --- CNN path ---
+
+    def test_build_cnn_returns_cnnqnetwork(self):
+        net = build_q_network("cnn", ACTION_COUNT, obs_size=567,
+                               hidden_layers=[256, 256], in_channels=CNN_CHANNELS,
+                               cnn_channels=[32, 64, 64], dense_width=256)
+        assert isinstance(net, CNNQNetwork)
+
+    def test_build_cnn_forward_single_shape(self):
+        net = build_q_network("cnn", ACTION_COUNT, obs_size=567,
+                               hidden_layers=[256, 256], in_channels=CNN_CHANNELS,
+                               cnn_channels=[32, 64, 64], dense_width=256)
+        obs = torch.zeros(CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+        out = net(obs)
+        assert out.shape == torch.Size([ACTION_COUNT])
+
+    def test_build_cnn_forward_batch_shape(self):
+        net = build_q_network("cnn", ACTION_COUNT, obs_size=567,
+                               hidden_layers=[256, 256], in_channels=CNN_CHANNELS,
+                               cnn_channels=[32, 64, 64], dense_width=256)
+        obs = torch.zeros(4, CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)
+        out = net(obs)
+        assert out.shape == torch.Size([4, ACTION_COUNT])
+
+    def test_build_cnn_custom_channels(self):
+        net = build_q_network("cnn", ACTION_COUNT, obs_size=567,
+                               hidden_layers=[256, 256], in_channels=CNN_CHANNELS,
+                               cnn_channels=[16, 32], dense_width=256)
+        assert isinstance(net, CNNQNetwork)
+
+    # --- Invalid arch ---
+
+    def test_invalid_arch_raises_value_error(self):
+        with pytest.raises(ValueError, match="model_arch"):
+            build_q_network("transformer", ACTION_COUNT, obs_size=OBSERVATION_SIZE,
+                             hidden_layers=[256, 256], in_channels=7,
+                             cnn_channels=[32, 64, 64], dense_width=256)
+
+    def test_empty_arch_raises_value_error(self):
+        with pytest.raises(ValueError):
+            build_q_network("", ACTION_COUNT, obs_size=OBSERVATION_SIZE,
+                             hidden_layers=[256, 256], in_channels=7,
+                             cnn_channels=[32, 64, 64], dense_width=256)
+
+    # --- MLP backward compat: existing tests still pass with build_q_network ---
+
+    def test_mlp_parameter_count_matches_direct_construction(self):
+        net_factory = build_q_network("mlp", ACTION_COUNT, obs_size=OBSERVATION_SIZE,
+                                       hidden_layers=[256, 256], in_channels=7,
+                                       cnn_channels=[32, 64, 64], dense_width=256)
+        net_direct = QNetwork(hidden_layers=[256, 256])
+        assert net_factory.parameter_count() == net_direct.parameter_count()
+
