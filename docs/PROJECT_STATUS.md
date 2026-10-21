@@ -1,0 +1,60 @@
+# Project Status
+
+**Last verified:** 2026-10-21
+
+## Integrated baseline
+
+The active shared integration branch is `integration/dev-training-20261021`.
+It preserves both prior Dev work and the Training research branch:
+
+| Item | Commit | Notes |
+|---|---|---|
+| Dev DQN dependency update | `9bd2aa2` | Added PyTorch dependency. |
+| Shared Training baseline | `63ef2bb` | Training system and dashboard. |
+| Training environment/deployment history | `04bd419` through `3cfb19f` | Dashboard, environment documentation, reproducible matrix, pinned inference, and MLflow registry. |
+| Preserved research source | `9737338` | CNN research workflows, configs, tests, diagnostics, model-management helpers, and Decision Lab. |
+| Dev integration | `7a43e7d`, `4996782` | Non-destructive merges of the Training baseline and research branch. |
+
+The integration branch is the reviewable synchronization point. `feature/dqn`
+and `codex/environment-deployment` remain intact and must not be rewritten.
+See [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) for promotion steps.
+
+## Implemented capabilities
+
+- Rust rule engine with Python bindings; it remains authoritative for legal
+  actions and state transitions.
+- Backend/frontend gameplay, replay, and Agent Service.
+- Agent definitions and Arena evaluation for Random, Greedy, Minimax, DQN, and
+  registered checkpoint-backed agents.
+- Vector-observation DQN training plus CNN observation, supervised
+  policy-distillation, CNN research, benchmark, diagnostics, and Decision Lab
+  tooling.
+- Training dashboard, MLflow Tracking/Registry, an immutable SHA-addressed
+  checkpoint catalog, and external experiment storage on Training.
+
+## Research state
+
+The frozen D2 policy-CNN checkpoint is stored outside Git and has SHA-256
+`09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4`.
+Historical D2 distillation data is external to Git and contains 124,493
+training positions. Historical results are recorded in
+[RESEARCH_LOG.md](RESEARCH_LOG.md); they are context, not a current benchmark.
+
+The next architecture-comparison work must hold observation planes, legal mask,
+D2 labels, cross-entropy objective, augmentation, data split, and evaluation
+protocol constant. It must not combine architecture changes with PPO, DQN,
+DAgger, MCTS, reward shaping, a value head, path features, or action-head
+changes.
+
+## Open risks and required follow-up
+
+1. Training's worktree intentionally still has modified and untracked
+   experiment outputs. They were not committed and must remain external.
+2. Earlier commits tracked some files below `agent_system/training/artifacts/`.
+   New artifacts are now ignored; do not normalize or delete historical files
+   without a dedicated migration and data-retention decision.
+3. The legacy D2 distillation dataset was all used for training. Create a new
+   source-game/opening-group-held-out, teacher-labelled validation set before
+   interpreting architecture generalization.
+4. The integration branch needs normal review and a PR before becoming the
+   branch used by both environments.

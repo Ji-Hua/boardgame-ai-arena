@@ -1,6 +1,22 @@
-# Quoridor
+# Quoridor AI
 
-A Quoridor board game system with a Rust game engine, Python backend server, and React frontend.
+Quoridor AI is a Quoridor game platform and agent-research system with a Rust
+rule engine, Python services, controlled evaluation, GPU training, model
+management, and decision analysis.
+
+## Project navigation
+
+- [Agent guide](AGENTS.md) — required starting point for humans and AI agents.
+- [Project status](docs/PROJECT_STATUS.md) — integrated baseline, research
+  status, and open risks.
+- [Environments](docs/ENVIRONMENTS.md) — Dev/Training responsibilities,
+  verified services, GPU, MLflow, and storage.
+- [Development workflow](docs/DEVELOPMENT_WORKFLOW.md) — Git, tests, handoff,
+  synchronization, and model provenance.
+- [Research log](docs/RESEARCH_LOG.md) — concise experiment and model index.
+- [Architecture target](documents/system/design/quoridor-RL-vision.md) and
+  [contribution governance](documents/system/governance/contribution-standard.md)
+  remain authoritative design/governance sources.
 
 ## Architecture
 
