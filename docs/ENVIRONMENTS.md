@@ -30,6 +30,11 @@ Use named branches and Git fetch/push/merge or PRs.
 - Persistent non-Git data root: `/home/jihua/quoridor-data/`.
 - Training source must use a named Git commit before any experiment. New
   outputs belong in a new external run directory, never inside the repository.
+- The original Training worktree remains on `codex/environment-deployment` and
+  intentionally retains external experiment output. The clean synchronized
+  worktree is `/home/jihua/workspace/boardgame-ai-arena-integration` on
+  `integration/dev-training-20261021`; use it for integration validation and
+  newly approved work until the branch is promoted.
 
 ## Services on Training
 

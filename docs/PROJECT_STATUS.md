@@ -17,6 +17,10 @@ It preserves both prior Dev work and the Training research branch:
 
 The integration branch is the reviewable synchronization point. `feature/dqn`
 and `codex/environment-deployment` remain intact and must not be rewritten.
+A clean Training worktree at
+`/home/jihua/workspace/boardgame-ai-arena-integration` checks out this same
+branch, while the original Training worktree retains its external experiment
+outputs. See [ENVIRONMENTS.md](ENVIRONMENTS.md) for the distinction.
 See [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md) for promotion steps.
 
 ## Implemented capabilities
