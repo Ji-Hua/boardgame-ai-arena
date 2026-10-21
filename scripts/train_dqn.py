@@ -41,7 +41,7 @@ from agent_system.training.dqn.action_space import (
     legal_action_ids as _legal_ids,
     legal_action_mask as _legal_mask,
 )
-from agent_system.training.dqn.checkpoint import save_checkpoint
+from agent_system.training.dqn.checkpoint import load_checkpoint, save_checkpoint
 from agent_system.training.dqn.env import QuoridorEnv
 from agent_system.training.dqn.evaluator import (
     DQNCheckpointAgent,
@@ -56,6 +56,8 @@ from agent_system.training.dqn.model import (
     CNNQNetwork,
     build_q_network,
     select_epsilon_greedy_action,
+    network_outputs,
+    select_policy_action,
 )
 from agent_system.training.dqn.observation import OBSERVATION_SIZE, encode_observation
 from agent_system.training.dqn.observation import OBSERVATION_VERSION as _OBS_V1_VERSION
@@ -138,6 +140,12 @@ class TrainConfig:
     model_arch: str = "mlp"
     # CNN-specific: conv layer output channels (ignored for mlp)
     cnn_channels: list[int] = field(default_factory=lambda: list(CNN_DEFAULT_CHANNELS))
+    cnn_activation: str = "relu"
+    cnn_hierarchical: bool = False
+    # Weight initialization only: fresh optimizer/replay/counters, not resume.
+    warm_start_checkpoint: str | None = None
+    demonstration_dataset: str | None = None
+    demonstration_weight: float = 1.0
     # Reward shaping
     reward_mode: str = "terminal"     # "terminal" | "distance_delta"
     distance_reward_weight: float = 0.01
@@ -208,6 +216,7 @@ class TrainResult:
     episode_lengths: list[int] = field(default_factory=list)
     recent_losses: list[float] = field(default_factory=list)
     recent_q_max: list[float] = field(default_factory=list)   # window of max|Q| per learner step
+    last_demonstration_loss: float = 0.0
     # Batch-level diagnostic windows (filled from TrainStepResult)
     recent_q_min: list[float] = field(default_factory=list)
     recent_q_mean: list[float] = field(default_factory=list)
@@ -277,7 +286,7 @@ def _batch_to_device(batch: dict, device: torch.device) -> dict:
     return {k: v.to(device) for k, v in batch.items()}
 
 
-def train(cfg: TrainConfig) -> TrainResult:
+def train(cfg: TrainConfig, *, checkpoint_callback=None) -> TrainResult:
     """Run the DQN training loop and return a TrainResult."""
 
     from quoridor_engine import Player, RuleEngine
@@ -324,6 +333,8 @@ def train(cfg: TrainConfig) -> TrainResult:
         hidden_layers=cfg.hidden_layers,
         in_channels=_CNN_OBS_SHAPE[0] if cfg.model_arch == "cnn" else 7,
         cnn_channels=cfg.cnn_channels if cfg.model_arch == "cnn" else None,
+        cnn_activation=cfg.cnn_activation,
+        cnn_hierarchical=cfg.cnn_hierarchical,
     ).to(device)
     target_net = build_q_network(
         model_arch=cfg.model_arch,
@@ -332,12 +343,40 @@ def train(cfg: TrainConfig) -> TrainResult:
         hidden_layers=cfg.hidden_layers,
         in_channels=_CNN_OBS_SHAPE[0] if cfg.model_arch == "cnn" else 7,
         cnn_channels=cfg.cnn_channels if cfg.model_arch == "cnn" else None,
+        cnn_activation=cfg.cnn_activation,
+        cnn_hierarchical=cfg.cnn_hierarchical,
     ).to(device)
+    if cfg.warm_start_checkpoint:
+        parent = load_checkpoint(cfg.warm_start_checkpoint, expected_obs_version=_obs_version_str)
+        if parent.model_arch != cfg.model_arch:
+            raise ValueError("Warm-start model architecture mismatch")
+        online_net.load_state_dict(parent.network.state_dict(), strict=True)
     sync_target_network(online_net, target_net)
     target_net.eval()
 
     optimizer = optim.Adam(online_net.parameters(), lr=cfg.lr)
     buffer = ReplayBuffer(capacity=cfg.buffer_capacity)
+
+    demo_data = None
+    demo_generator = torch.Generator(device=device).manual_seed(cfg.seed + 17)
+    if cfg.demonstration_dataset:
+        if cfg.model_arch != "cnn":
+            raise ValueError("Demonstration retention currently supports CNN only")
+        dataset = torch.load(cfg.demonstration_dataset, map_location="cpu", weights_only=True)
+        if dataset["metadata"]["gamma"] != cfg.gamma:
+            raise ValueError("Demonstration return discount does not match gamma")
+        demo_data = {k: v.to(device) for k, v in dataset["train"].items()}
+
+    def optimize(batch):
+        demo = None
+        if demo_data is not None:
+            indices = torch.randint(len(demo_data["obs"]), (cfg.batch_size,), device=device, generator=demo_generator)
+            demo = {k: v[indices] for k, v in demo_data.items()}
+        step = train_step(online_net, target_net, optimizer, batch, gamma=cfg.gamma,
+            grad_clip_norm=cfg.grad_clip_norm, algorithm=cfg.algorithm,
+            demonstration_batch=demo, demonstration_weight=cfg.demonstration_weight)
+        result.last_demonstration_loss = step.demonstration_loss
+        return step
 
     result = TrainResult(config=cfg)
     result.param_count = online_net.parameter_count()
@@ -522,7 +561,9 @@ def train(cfg: TrainConfig) -> TrainResult:
         pending_action_id: int | None = None
         pending_prev_state: object | None = None
 
-        while not done and episode_steps < cfg.max_steps_per_episode:
+        # A sampling cap may be exceeded by one opponent reply. Never
+        # bootstrap a learner transition from the opponent's observation.
+        while not done and (episode_steps < cfg.max_steps_per_episode or pending_obs is not None):
             current_player = state.current_player
             mask = _legal_mask(engine, state)
             legal_ids = [i for i, v in enumerate(mask) if v]
@@ -535,10 +576,11 @@ def train(cfg: TrainConfig) -> TrainResult:
                 obs_tensor = torch.tensor(obs, dtype=torch.float32).to(device)
                 online_net.eval()
                 with torch.no_grad():
-                    q_values = online_net(obs_tensor)
+                    q_values, type_q = network_outputs(online_net, obs_tensor)
                 online_net.train()
 
-                action_id = select_epsilon_greedy_action(q_values, mask, epsilon=epsilon, rng=rng)
+                action_id = (select_policy_action(q_values, mask, type_q=type_q, epsilon=epsilon, rng=rng)
+                             if type_q is not None else select_epsilon_greedy_action(q_values, mask, epsilon=epsilon, rng=rng))
                 if not mask[action_id]:
                     episode_illegal += 1
 
@@ -596,7 +638,7 @@ def train(cfg: TrainConfig) -> TrainResult:
                 # Optimizer step
                 if buffer.is_ready(cfg.warmup_size):
                     batch = _batch_to_device(buffer.sample(cfg.batch_size, rng=rng), device)
-                    step_result = train_step(online_net, target_net, optimizer, batch, gamma=cfg.gamma, grad_clip_norm=cfg.grad_clip_norm, algorithm=cfg.algorithm)
+                    step_result = optimize(batch)
                     optimizer_step += 1
                     result.total_optimizer_steps += 1
                     result.recent_losses.append(step_result.loss)
@@ -659,7 +701,7 @@ def train(cfg: TrainConfig) -> TrainResult:
                 # Optimizer step
                 if buffer.is_ready(cfg.warmup_size):
                     batch = _batch_to_device(buffer.sample(cfg.batch_size, rng=rng), device)
-                    step_result = train_step(online_net, target_net, optimizer, batch, gamma=cfg.gamma, grad_clip_norm=cfg.grad_clip_norm, algorithm=cfg.algorithm)
+                    step_result = optimize(batch)
                     optimizer_step += 1
                     result.total_optimizer_steps += 1
                     result.recent_losses.append(step_result.loss)
@@ -675,33 +717,11 @@ def train(cfg: TrainConfig) -> TrainResult:
 
             state = next_state
 
-        # Flush any pending learner transition that was truncated by max_steps
-        # (neither player won — treat as a draw with reward=0, done=False).
-        if pending_obs is not None:
-            terminal_reward = 0.0
-            breakdown = compute_reward_breakdown(
-                engine, pending_prev_state, state,
-                learner_player, terminal_reward, reward_cfg,
-            )
-            flush_reward = breakdown.combined_reward
-            next_obs = _encode(state)
-            next_mask = _legal_mask(engine, state) if not done else [False] * ACTION_COUNT
-            buffer.push(pending_obs, pending_action_id, flush_reward, next_obs, False, next_mask)
-            result.total_zero_rewards += 1
-            episode_reward += flush_reward
-            episode_terminal_reward += breakdown.terminal_reward
-            episode_distance_reward += breakdown.distance_reward
-            pending_obs = None
-            pending_prev_state = None
-            result.total_terminal_reward += breakdown.terminal_reward
-            result.total_distance_reward += breakdown.distance_reward
-            result.total_combined_reward += flush_reward
-            if reward_cfg.mode == "distance_delta":
-                result.distance_reward_min = min(result.distance_reward_min, breakdown.distance_reward)
-                result.distance_reward_max = max(result.distance_reward_max, breakdown.distance_reward)
-            if breakdown.clipped_delta is not None:
-                result.clipped_delta_min = min(result.clipped_delta_min, breakdown.clipped_delta)
-                result.clipped_delta_max = max(result.clipped_delta_max, breakdown.clipped_delta)
+        # True terminations were already pushed with done=True. A sampling
+        # truncation leaves a complete learner-to-learner transition and keeps
+        # its bootstrap enabled; count every truncated episode, in either seat.
+        assert pending_obs is None
+        if not done:
             result.total_truncated_episodes += 1
 
         # Episode done — record per-opponent outcome
@@ -741,8 +761,12 @@ def train(cfg: TrainConfig) -> TrainResult:
                 distance_reward_weight=cfg.distance_reward_weight,
                 distance_delta_clip=cfg.distance_delta_clip,
                 opponent=opponent_label,
+                eval_summary={"demonstration_dataset": cfg.demonstration_dataset,
+                              "demonstration_weight": cfg.demonstration_weight} if cfg.demonstration_dataset else None,
             )
             result.final_checkpoint_path = str(ckpt_path)
+            if checkpoint_callback is not None:
+                checkpoint_callback(ckpt_path, result)
 
         # Periodic mid-training evaluation
         is_eval_ep = (
@@ -903,6 +927,7 @@ def train(cfg: TrainConfig) -> TrainResult:
                 "avg_q_max": round(avg_q_max, 6) if avg_q_max == avg_q_max else None,
                 "pos_rewards": result.total_pos_rewards,
                 "neg_rewards": result.total_neg_rewards,
+                "demonstration_loss": result.last_demonstration_loss,
                 "timestamp": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
             }
             # Add training opponent info for charting / debug
@@ -1472,7 +1497,7 @@ def parse_args() -> TrainConfig:
     p.add_argument("--grad-clip-norm", type=float, default=None,
                    help="Max gradient norm for clipping (omit or 0 to disable)")
     p.add_argument("--opponent", type=str, default="random_legal",
-                   choices=["random_legal", "dummy", "minimax", "mixed"],
+                   choices=["random_legal", "dummy", "minimax", "mixed", "greedy"],
                    help="Training opponent policy (default: random_legal)")
     p.add_argument("--opponent-depth", type=int, default=2,
                    help="Search depth for minimax opponent (default: 2, ignored for random_legal/mixed)")
@@ -1509,6 +1534,13 @@ def parse_args() -> TrainConfig:
     p.add_argument("--cnn-channels", type=str, default="",
                    help="Comma-separated CNN conv-layer channel widths, e.g. '32,64,64' "
                         "(only used with --model-arch cnn; defaults to '32,64,64')")
+    p.add_argument("--cnn-activation", choices=["relu", "leaky_relu"], default="relu")
+    p.add_argument("--cnn-hierarchical", action="store_true", help="Choose pawn/wall before choosing an action within that category")
+    p.add_argument("--warm-start-checkpoint", default=None,
+                   help="Initialize weights; optimizer, replay and counters start fresh")
+    p.add_argument("--demonstration-dataset", default=None,
+                   help="CNN demonstration dataset whose training split is retained during online updates")
+    p.add_argument("--demonstration-weight", type=float, default=1.0)
 
     # Inject YAML values as defaults before parsing.  Any argument the user
     # provides explicitly on the CLI will still override the YAML value
@@ -1610,6 +1642,11 @@ def parse_args() -> TrainConfig:
         algorithm=args.algorithm,
         model_arch=args.model_arch,
         cnn_channels=_cnn_channels,
+        cnn_activation=args.cnn_activation,
+        cnn_hierarchical=args.cnn_hierarchical,
+        warm_start_checkpoint=args.warm_start_checkpoint,
+        demonstration_dataset=args.demonstration_dataset,
+        demonstration_weight=args.demonstration_weight,
         train_opponent_cfg=_train_opp_cfg,
         eval_opponent_cfgs=_eval_opp_cfgs,
         train_opponent_schedule=_schedule,

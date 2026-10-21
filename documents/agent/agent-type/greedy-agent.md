@@ -2,8 +2,8 @@
 
 Author: Ji Hua  
 Created Date: 2026-04-07  
-Last Modified: 2026-04-07  
-Current Version: 1  
+Last Modified: 2026-10-20
+Current Version: 2
 
 Document Type: Implementation  
 Document Subtype: Agent Strategy  
@@ -155,7 +155,30 @@ All future agents can reuse the same local Rule Engine interface.
 
 ---
 
+# 9. Decision Analysis
+
+The public in-process entry `greedy_agent.score_position(RawState)` is shared by
+`GreedyAgent.make_action` and the independent Decision Lab component. It returns
+engine-ordered legal actions, resulting states, own/opponent distances before and
+after each action, distance deltas, and the actual Greedy score.
+
+With deterministic Top1, equal scores retain the first action in engine order.
+Optional runtime stochastic policies remain unchanged and are outside Decision Lab v1.
+
+The current distance heuristic ignores the opposing pawn. It describes wall-constrained
+shortest paths, not a legal sequence of pawn moves including jumps. The Engine still
+decides all action legality. Greedy has no separate terminal-win override: reaching a
+goal is still scored by distance changes. Explanations must preserve this behavior.
+
+See [analysis contract](../analysis/decision-analysis-interface.md) for evidence fields.
+
+---
+
 # Changelog
+
+Version 2 (2026-10-20)
+- Exposed the serving score kernel to Decision Lab without changing evaluation or tie order.
+- Documented distance evidence and the absence of a terminal-score override.
 
 Version 1 (2026-04-07)
 - Initial Greedy Agent design

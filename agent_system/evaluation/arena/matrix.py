@@ -79,6 +79,9 @@ def play_block(spec_a, spec_b, opening, max_plies=500, seed=0):
         actions = []
         times = {key: 0.0 for key in ids}
         moves = {key: 0 for key in ids}
+        latencies = {key: [] for key in ids}
+        diagnostics = {key: collections.Counter() for key in ids}
+        repeated_states = 0
         seen = set()
         winner = offender = error = None
         termination = "ply_limit"
@@ -86,12 +89,19 @@ def play_block(spec_a, spec_b, opening, max_plies=500, seed=0):
         for _ in range(max_plies):
             wire = _serialize_state(state)
             key = stable_hash(wire)
+            repeated_states += key in seen
             if deterministic and key in seen:
                 termination = "deterministic_cycle"
                 break
             seen.add(key)
             seat = wire["current_player"]
             active = ids[seat-1]
+            # Pawn moves alone can win immediately; include jumps near the goal.
+            y = state.pawn_pos(state.current_player)[1]
+            near_goal = y >= 6 if seat == 1 else y <= 2
+            immediate = any(a.kind == "MovePawn" and a.target_y == (8 if seat == 1 else 0)
+                            for a in engine.legal_actions(state)) if near_goal else False
+            diagnostics[active]["immediate_win_available"] += immediate
             before = time.monotonic()
             try:
                 action = instances[seat].act(wire)
@@ -100,8 +110,15 @@ def play_block(spec_a, spec_b, opening, max_plies=500, seed=0):
                 termination, error = "agent_error", f"{type(exc).__name__}: {exc}"[:300]
                 break
             finally:
-                times[active] += time.monotonic()-before
+                elapsed = time.monotonic()-before
+                times[active] += elapsed
+                latencies[active].append(1000 * elapsed)
                 moves[active] += 1
+            for stat, value in instances[seat].last_decision_stats.items():
+                if stat == "max_depth":
+                    diagnostics[active][stat] = max(diagnostics[active][stat], value)
+                else:
+                    diagnostics[active][stat] += value
             try:
                 if action.get("player") != seat:
                     raise ValueError("Wrong action player")
@@ -111,6 +128,7 @@ def play_block(spec_a, spec_b, opening, max_plies=500, seed=0):
                 termination, error = "illegal_action", f"{type(exc).__name__}: {exc}"[:300]
                 break
             actions.append(action)
+            diagnostics[active]["missed_immediate_win"] += immediate and not engine.is_game_over(state)
             if engine.is_game_over(state):
                 winning_seat = 1 if engine.winner(state) == Player.P1 else 2
                 winner, termination = ids[winning_seat-1], "goal"
@@ -124,6 +142,9 @@ def play_block(spec_a, spec_b, opening, max_plies=500, seed=0):
             "seed_by_agent": seeds, "actions": actions,
             "final_state": final_state,
             "decision_seconds": times, "decisions": moves,
+            "decision_milliseconds": latencies,
+            "decision_diagnostics": {k: dict(v) for k, v in diagnostics.items()},
+            "repeated_states": repeated_states,
             "seconds": time.monotonic()-start,
             "trajectory_hash": stable_hash([opening["state_hash"], actions]),
         })
@@ -133,6 +154,24 @@ def play_block(spec_a, spec_b, opening, max_plies=500, seed=0):
 
 def _points(game, agent):
     return 0.5 if game["winner"] is None else float(game["winner"] == agent)
+
+
+def decision_summary(games, agent):
+    """Optional fields preserve compatibility with historical Arena blocks."""
+    samples = sorted(x for g in games for x in g.get("decision_milliseconds", {}).get(agent, []))
+    counters = collections.Counter()
+    for g in games:
+        for stat, value in g.get("decision_diagnostics", {}).get(agent, {}).items():
+            if stat == "max_depth":
+                counters[stat] = max(counters[stat], value)
+            else:
+                counters[stat] += value
+    return {"decision_diagnostics": dict(counters),
+            "mean_decision_ms": 1000 * sum(g["decision_seconds"][agent] for g in games) / max(1, sum(g["decisions"][agent] for g in games)),
+            "p50_decision_ms": samples[len(samples)//2] if samples else None,
+            "p95_decision_ms": samples[min(len(samples)-1, int(.95*len(samples)))] if samples else None,
+            "repetition_games": sum(g.get("repeated_states", 0) > 0 for g in games),
+            "repetition_rate": sum(g.get("repeated_states", 0) > 0 for g in games) / len(games) if games else None}
 
 
 def summarize(specs, blocks, expected_blocks):
@@ -158,6 +197,10 @@ def summarize(specs, blocks, expected_blocks):
                 "games": len(games), "pairs": len(series), "wins": w, "losses": losses, "draws": draws,
                 "score": (w+draws/2)/len(games) if games else None,
                 "ci95": score_interval(scores),
+                "win_ci95": score_interval([sum(g["winner"] == a for g in x["games"])/2 for x in series]),
+                "draw_ci95": score_interval([sum(g["winner"] is None for g in x["games"])/2 for x in series]),
+                "loss_ci95": score_interval([sum(g["winner"] == b for g in x["games"])/2 for x in series]),
+                **decision_summary(games, a),
                 "p1_games": sum(g["p1"] == a for g in games),
                 "p2_games": sum(g["p2"] == a for g in games),
                 "p1_score": sum(_points(g, a) for g in games if g["p1"] == a)/len(series) if series else None,
@@ -177,6 +220,7 @@ def summarize(specs, blocks, expected_blocks):
         block_means = [sum(v)/len(v) for v in opening_scores.values()]
         rank_rows.append({
             "id": a, "games": len(games), "score": points/len(games) if games else None,
+            **decision_summary(games, a),
             "wins": sum(g["winner"] == a for g in games),
             "draws": sum(g["winner"] is None for g in games),
             "losses": sum(g["winner"] not in (a, None) for g in games),

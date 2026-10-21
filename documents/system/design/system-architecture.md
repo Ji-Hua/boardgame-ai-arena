@@ -2,8 +2,8 @@
 
 Author: Ji Hua
 Created Date: 2026-02-17
-Last Modified: 2026-04-19
-Current Version: 4
+Last Modified: 2026-10-20
+Current Version: 5
 
 Document Type: Design
 Document Subtype: System Architecture
@@ -26,7 +26,7 @@ The system consists of one shared foundational rule kernel and two major upper-l
 
 The Engine Module is the bottom-most rule authority of the entire platform.
 
-The Application System is the complete user-facing entry system. It is the surface through which users interact with the platform. Its current implemented focus is live gameplay, but its long-term scope also includes user-facing workflows such as agent definition, parameter adjustment, evaluation, replay, and training-pipeline access.
+The Application System is the player-facing entry system. Its current implemented focus is live gameplay, but its long-term scope also includes user-facing workflows such as agent definition, parameter adjustment, evaluation, replay, and training-pipeline access. Agent System developer tools may expose independent research interfaces without becoming part of the live Application System.
 
 The Agent System is the system in which agents are defined, evaluated, deployed, and evolved. It owns agent logic and lifecycle concerns. Training remains part of this system, but only as one internal subdomain rather than as a top-level system.
 
@@ -50,7 +50,7 @@ It defines the canonical game rules and the only valid state-transition semantic
 
 ## 2.2 Application System (Current Focus)
 
-The Application System is the complete user-facing entry layer of the platform.
+The Application System is the player-facing entry layer of the platform.
 
 Its current implemented focus is live gameplay and visualization.
 
@@ -91,6 +91,18 @@ The Agent System reuses the Engine Module as the canonical rule kernel and inter
 The Agent System does not depend on Application-System orchestration components.
 
 Within the Agent System, Training System is retained as a narrower internal submodule responsible for training-oriented workflows. It is no longer a top-level system parallel to the Application System.
+
+Decision Analysis is another internal component, alongside Training and Evaluation
+(including Arena). Its developer interface, **Decision Lab**, explains a single
+decision on a supplied position. It owns diagnostic observations and hypothetical
+branches, while the existing agents own scoring/search semantics and the Engine
+owns legality and transitions.
+
+Decision Lab has an independent launch entry and user interface. It does not require
+live-game orchestration, a training run, or an Arena tournament. It is part of the
+Quoridor system and repository, rather than a separate product or an embedded
+gameplay panel. See [Agent System architecture](agent-system-design.md) and
+[Decision Analysis design](../../agent/analysis/decision-analysis.md).
 
 ---
 
@@ -462,6 +474,7 @@ The following invariants must hold:
 - Application System does not define agent logic
 - Agent System is the system of record for agent logic
 - Training System is a submodule within Agent System, not a top-level parallel system
+- Decision Analysis is an independent developer component within Agent System; diagnostic state has no authority over live games or training
 - Agent Service Interface exposes only deployed agents from Agent System
 - Live application state exists only in Engine-mediated context
 - Application and Agent systems share identical rule semantics
@@ -503,6 +516,11 @@ The following areas remain undefined:
 ---
 
 # Changelog
+
+Version 5 (2026-10-20)
+- Added Decision Analysis alongside Training and Arena within Agent System.
+- Distinguished independent developer interfaces from the player-facing Application System.
+- Established diagnostic-state and shared-algorithm authority boundaries.
 
 Version 4 (2026-04-19)
 - Reframed the system into one shared Engine Module plus two upper-layer systems: Application System and Agent System.

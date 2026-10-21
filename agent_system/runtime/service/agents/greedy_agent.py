@@ -76,6 +76,32 @@ def _path_len(state: RawState, player: Player) -> int:
     return result if result is not None else _INF
 
 
+def score_position(state: RawState) -> list[dict]:
+    """Score engine-legal actions, with the distance evidence used by Greedy.
+
+    This in-process entry point is shared by serving and Decision Lab. Order
+    remains the engine's order; equal scores retain the first candidate.
+    """
+    me = state.current_player
+    opp = me.opponent()
+    before = (_path_len(state, me), _path_len(state, opp))
+    results = []
+    for action in _ENGINE.legal_actions(state):
+        try:
+            after = _ENGINE.apply_action(state, action)
+        except ValueError:
+            continue
+        distances = (_path_len(after, me), _path_len(after, opp))
+        delta_self = distances[0] - before[0]
+        delta_opp = distances[1] - before[1]
+        results.append({
+            "action": action, "state": after, "before": before,
+            "after": distances, "delta_self": delta_self, "delta_opp": delta_opp,
+            "score": float(delta_opp - delta_self),
+        })
+    return results
+
+
 class GreedyAgent(BaseAgent):
     type_id = "greedy"
     display_name = "Greedy Agent"
@@ -99,30 +125,15 @@ class GreedyAgent(BaseAgent):
 
     def make_action(self, game_state: dict, legal_actions: list[dict]) -> dict:
         state = _build_state(game_state)
-        me = state.current_player
-        opp = me.opponent()
         seat = game_state["current_player"]
-
-        my_before = _path_len(state, me)
-        opp_before = _path_len(state, opp)
-
-        # Generate full action space (pawn + wall) via local engine.
-        all_engine_actions = _ENGINE.legal_actions(state)
 
         scored_actions: list[tuple[dict, float]] = []
         best_score: float | None = None
         best_wire_action: dict | None = None
 
-        for engine_action in all_engine_actions:
-            try:
-                next_state = _ENGINE.apply_action(state, engine_action)
-            except ValueError:
-                continue
-
-            delta_my = _path_len(next_state, me) - my_before
-            delta_opp = _path_len(next_state, opp) - opp_before
-            score = float(delta_opp - delta_my)
-            wire_action = _engine_action_to_wire(engine_action, seat)
+        for candidate in score_position(state):
+            score = candidate["score"]
+            wire_action = _engine_action_to_wire(candidate["action"], seat)
 
             if self._policy is not None:
                 scored_actions.append((wire_action, score))

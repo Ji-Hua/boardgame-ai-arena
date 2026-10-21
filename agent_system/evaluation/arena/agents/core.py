@@ -132,6 +132,10 @@ class AgentInstance:
     def agent_id(self) -> str:
         return self._agent.id
 
+    @property
+    def last_decision_stats(self) -> dict:
+        return dict(getattr(self._agent.scorer, "last_stats", {}))
+
     def act(self, state: dict) -> dict:
         return self._agent.act(state, self._rng)
 

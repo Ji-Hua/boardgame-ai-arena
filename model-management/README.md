@@ -3,7 +3,7 @@
 Author: Codex for Ji Hua
 Created Date: 2026-10-20
 Last Modified: 2026-10-20
-Current Version: 1
+Current Version: 2
 Document Type: Implementation
 Document Status: Active
 Document Purpose: Operate checkpoint registration, paired evaluation and online deployment.
@@ -14,6 +14,7 @@ Document Purpose: Operate checkpoint registration, paired evaluation and online 
 - Matrix and training dashboard: `http://192.168.68.88:8741/#arena`
 - MLflow Tracking and Registry: `http://192.168.68.88:8742`
 - Pinned-model Agent Service on training: `http://192.168.68.88:8743`
+- Decision Lab developer analysis: `http://192.168.68.88:8744`
 
 The dev backend connects to training's agent service through its ignored
 `docker-compose.override.yml`. Its original agent container remains available
@@ -110,6 +111,40 @@ imports historical checkpoints and records evaluations.
 
 ## Online service and rollback
 
+CNN repair experiments use `publish_cnn_repair.py` and `log_cnn_repair.py` to retain
+every diagnosed checkpoint, including unsuccessful experiments. The training runner
+blocks for 50 Greedy games and decision-level diagnostics after each save. See the
+[CNN repair workflow](../documents/agent/training/cnn-repair.md) for configuration,
+source/input provenance, independent validation and registration commands.
+
+The [Minimax demonstration experiment](../documents/agent/training/cnn-minimax-demonstrations.md)
+uses the same registration path. Teacher depth, actual game episodes, optimizer
+updates, fresh initialization hashes and per-episode training curves are retained
+separately. Its two final 2,000-episode models are fixed before held-out evaluation.
+
+The [policy distillation workflow](../documents/agent/training/cnn-policy-distillation.md)
+uses shared 2,000-game trajectories and supervised legal-action cross entropy.
+These models use the separate `quoridor-cnn-policy` registry, with
+`algorithm=policy_distillation` and `output_semantics=policy_logits`.
+The catalog, inference adapter and Decision Lab support both model families;
+raw policy logits are not return estimates. Shared dataset hashes, teacher
+depths, initial weights, optimizer updates and every checkpoint diagnosis are retained.
+
+The [D2 policy research suite](../documents/agent/training/cnn-policy-rl.md) reuses this workflow
+for DAgger, PPO, PPO plus imitation, self-play PPO and convolution-transfer Double DQN.
+Policy methods remain in `quoridor-cnn-policy`; DDQN remains in `quoridor-cnn-dqn`.
+New environment interactions, teacher queries, gradient updates and CUDA-event timings are
+logged separately. PPO critic/optimizer snapshots are training artifacts; serving keeps the
+unchanged flat CNN actor. Random PPO and DDQN controls and all unsuccessful checkpoints are retained.
+
+For per-position neural diagnostics, select the model in Decision Lab. It reads
+`LAB_MODEL_CATALOG` (default `~/quoridor-data/catalog.json`) and optional SHA-matched
+`registry.json`, uses the same verified inference loader, and runs on CPU. Point the
+component at a new immutable catalog and restart it to expose newly registered models.
+Inspection does not add a model to the online roster or change any registry alias.
+See the [analysis guide](../decision-lab/README.md) for Q, input, activation, weight,
+and sensitivity views and their interpretation limits.
+
 ```bash
 .venv/bin/python model-management/export_runtime.py
 cp model-management/quoridor-agent.service ~/.config/systemd/user/
@@ -142,5 +177,9 @@ References: [MLflow tracking server](https://mlflow.org/docs/latest/self-hosting
 
 ## Changelog
 
+- Version 2: document the catalog-backed Decision Lab consumer and its separation from deployment.
 - Version 1: deploy historical checkpoint registry, paired benchmark evidence,
   dashboard, pinned online agents, and promotion/rollback workflow.
+
+
+The [AlphaZero-lite benchmark](../documents/agent/training/alphazero-lite.md) stores the bounded value head with the existing CNN checkpoint. Publishing adds an actor-only agent and an `_mcts50` agent referencing the same immutable SHA. MLflow logs calibration quality, self-play data, simulation/model-evaluation counters and search diagnostics in the existing policy registry. Historical weights and the production champion are preserved.

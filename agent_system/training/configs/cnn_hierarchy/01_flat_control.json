@@ -1,0 +1,52 @@
+{
+  "output": "/home/jihua/quoridor-data/experiments/cnn-hierarchy-20261020/01-flat-control",
+  "book_manifest": "/home/jihua/quoridor-data/arena/matrix-20261020-v2/manifest.json",
+  "baseline_sha256": "d823125353ffb5e902ddbfba8d6086b88c87354375839682783fd38c86e0abcf",
+  "hypothesis": "Compare flat action Q versus type-first conditional action Q on identical demonstration data, initial shared weights, minibatch sampling and update budget.",
+  "training": {
+    "episodes": 2000,
+    "max_steps_per_episode": 240,
+    "buffer_capacity": 20000,
+    "warmup_size": 512,
+    "batch_size": 256,
+    "lr": 0.0001,
+    "gamma": 0.95,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.1,
+    "epsilon_decay_steps": 20000,
+    "target_sync_interval": 1000,
+    "checkpoint_dir": "/home/jihua/quoridor-data/experiments/cnn-hierarchy-20261020/01-flat-control/checkpoints",
+    "checkpoint_interval": 500,
+    "agent_id": "cnn_flat_control",
+    "eval_interval": 0,
+    "seed": 42,
+    "grad_clip_norm": 1.0,
+    "device": "cuda",
+    "log_interval": 100,
+    "opponent": "greedy",
+    "train_opponent_cfg": {
+      "type": "greedy"
+    },
+    "model_arch": "cnn",
+    "cnn_channels": [
+      32,
+      64,
+      64
+    ],
+    "cnn_activation": "leaky_relu",
+    "warm_start_checkpoint": null,
+    "reward_mode": "distance_delta",
+    "distance_reward_weight": 0.04,
+    "distance_delta_clip": 1.0,
+    "algorithm": "double_dqn",
+    "cnn_hierarchical": false
+  },
+  "demonstrations": {
+    "dataset": "/home/jihua/quoridor-data/experiments/cnn-repair-20261020/03-demonstrations/demonstrations.pt",
+    "batch_seed": 777,
+    "updates": 6000,
+    "checkpoint_updates": 2000,
+    "margin": 0.1,
+    "margin_weight": 1.0
+  }
+}

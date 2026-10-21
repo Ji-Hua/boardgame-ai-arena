@@ -1,0 +1,15 @@
+[Unit]
+Description=Quoridor Decision Lab
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/boardgame-ai-arena
+Environment=LAB_HOST=0.0.0.0
+Environment=LAB_PORT=8744
+ExecStart=/bin/bash %h/workspace/boardgame-ai-arena/decision-lab/start.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

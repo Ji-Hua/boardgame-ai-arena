@@ -2,8 +2,8 @@
 
 Author: Ji Hua
 Created Date: 2026-04-19
-Last Modified: 2026-04-19
-Current Version: 1
+Last Modified: 2026-10-20
+Current Version: 3
 
 Document Type: Design
 Document Subtype: Agent System Architecture
@@ -27,7 +27,7 @@ It is the system in which agents are:
 - executed
 - optionally trained
 
-The Agent System is not a user-facing system. It is a producer system whose outputs are consumed by other systems, especially the Application System through the Agent Service Interface.
+The Agent System produces agent capabilities consumed by other systems, especially the Application System through the Agent Service Interface. It may also expose independent developer tools for research and debugging. These tools belong to the Agent System and do not participate in live-game orchestration.
 
 The Engine Module remains the shared rule foundation of the entire platform. The Agent System must use the same rule semantics as the Application System.
 
@@ -406,6 +406,38 @@ It is one internal subsystem within it.
 
 ---
 
+## 6.6 Decision Analysis Subsystem
+
+Decision Analysis is an independent developer component within the Agent System,
+alongside Training and Evaluation. Its developer interface is named **Decision Lab**.
+
+Responsibilities:
+
+- inspect one decision on a supplied, reproducible position
+- expose the actual scoring and search evidence used by an agent
+- compare algorithm configurations on the same position
+- explore hypothetical continuations without modifying a live game
+- preserve position, Agent Spec, implementation provenance, and explanation together
+
+Decision Analysis consumes canonical Agent Spec and shared agent implementations;
+it does not define a second registry or substitute a simplified algorithm.
+The supported scope is deterministic Greedy, depth-limited Minimax, and CNN/MLP DQN.
+Neural diagnostics consume the existing model-management catalog and shared runtime
+inference, exposing encoded inputs, raw/masked Q values, activations, weight slices,
+and local input sensitivity. Model registration and promotion remain owned by model management.
+
+The component has its own execution entry and developer interface. It does not require
+training, Arena, Agent Service, or the gameplay backend to be running. Diagnostic state
+and traces are local to an analysis request; game rules remain owned by the Engine.
+
+Analysis is an optional cross-cutting activity, not a new mandatory lifecycle stage.
+Its evidence may help explain an experiment or propose an improvement; a single-position
+explanation does not replace Arena's aggregate playing-strength measurements.
+
+See [Decision Analysis design](../../agent/analysis/decision-analysis.md).
+
+---
+
 # 7. Relationship to Other Systems
 
 ## 7.1 Relationship to Engine Module
@@ -491,6 +523,7 @@ The following authority boundaries apply.
 | Game rules | Engine Module |
 | Agent semantic definition | Agent System Definition Subsystem |
 | Evaluation workflow | Agent System Evaluation Subsystem |
+| Decision explanations and developer inspection | Agent System Decision Analysis Subsystem |
 | Deployment selection | Agent System Deployment Subsystem |
 | Runtime serving boundary | Agent Service Interface |
 | User-facing interaction | Application System |
@@ -501,6 +534,7 @@ The following constraints must hold:
 - The Agent Service Interface cannot define agent logic
 - Arena cannot define agent logic
 - Training cannot bypass Agent Spec authority
+- Decision Analysis must preserve actual agent semantics and distinguish observations from estimated bounds
 - Runtime instances cannot redefine Agent Spec identity
 - All agent-related lifecycle stages must remain traceable to Agent Spec
 
@@ -640,6 +674,14 @@ This distinction between Agent Spec and Agent Instance is the foundation on whic
 ---
 
 # Changelog
+
+Version 3 (2026-10-20)
+- Added CNN/MLP diagnostics through shared inference and existing checkpoint identity.
+
+Version 2 (2026-10-20)
+- Added Decision Analysis as an independent developer component alongside Training and Evaluation.
+- Clarified developer-interface ownership, diagnostic-state boundaries, and shared Agent Spec/algorithm provenance.
+- Kept analysis optional and separate from live-game and tournament orchestration.
 
 Version 1 (2026-04-19)
 - Initial Agent System architecture document.
