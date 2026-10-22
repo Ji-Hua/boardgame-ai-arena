@@ -135,6 +135,26 @@ export TRAINING_DASHBOARD_ARTIFACT_ROOTS="/path/to/runs:/another/path"
 |----------|---------|-------------|
 | `TRAINING_DASHBOARD_ARTIFACT_ROOTS` | auto-detected from repo | Colon-separated list of directories to scan for training runs |
 | `TRAINING_DASHBOARD_BACKEND_PORT` | `8740` | Backend listen port (non-Docker only) |
+| `MLFLOW_TRACKING_URI` | `http://192.168.68.88:8742` | Read-only MLflow Tracking API endpoint |
+| `CNN_ARCHITECTURE_ARENA_REPORT` | mounted CNN benchmark report | Immutable Arena report used for checkpoint evaluation summaries |
+
+### MLflow, Arena, and Replay
+
+The **MLflow** page reads experiments, runs, params, tags, and only metrics
+that MLflow actually recorded. It does not infer missing curves or conflate
+policy logits, Q-values, rewards, or value estimates.
+
+For the CNN architecture benchmark, a candidate's recorded `source_path` is
+matched to the immutable Arena report. The resulting summary includes the
+report's checkpoint SHA-256 and per-opponent totals. Raw Arena blocks are
+evidence rather than Dashboard replay records, so a run without an original
+`eval_replay_v1` record is explicitly marked as having no replay.
+
+The replay viewer always uses its saved action/state sequence, supports
+stepping, keyboard navigation, seek, auto-play and speed selection.
+**Analyze Decision** opens Decision Lab with the current replay state. Decision
+Lab validates the imported `Position` with the Rust engine and performs all
+agent analysis; the Dashboard does not duplicate rules or inference.
 
 ---
 
