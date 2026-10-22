@@ -47,13 +47,16 @@ describe('research shell and URL contracts', () => {
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'))
     expect(localStorage.getItem('quoridor-theme')).toBe('dark')
     expect(screen.queryByRole('iframe')).toBeNull()
-    expect(screen.getByText(/External Play is not configured/)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Human vs Checkpoint' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Start game' }).hasAttribute('disabled')).toBe(true)
   })
   it('restores Run tabs after reload and browser back; preserves checkpoint full SHA links', async () => {
     const route = `/training/runs/${encodeURIComponent(runId)}?tab=checkpoints`
     const view = mount(route)
     const link = await screen.findByRole('link', { name: sha })
     expect(link.getAttribute('href')).toBe(`/models/${sha}`)
+    const playLink = screen.getByRole('link', { name: 'Play against' })
+    expect(new URL(playLink.getAttribute('href')!, 'http://localhost').searchParams.get('model_sha')).toBe(sha)
     const arenaLink = within(screen.getByRole('table')).getByRole('link', { name: 'Arena evaluations' })
     const arenaUrl = new URL(arenaLink.getAttribute('href')!, 'http://localhost')
     expect(arenaUrl.pathname).toBe('/arena')

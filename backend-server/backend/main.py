@@ -8,6 +8,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,11 +41,16 @@ def create_app() -> FastAPI:
     app.state.agent_adapter = AgentServiceAdapter()
 
     # REST routes
-    app.include_router(rest_router)
+    if os.environ.get("QUORIDOR_RESEARCH_ONLY") != "1":
+        app.include_router(rest_router)
     # Agent Control routes
-    app.include_router(agent_router)
+        app.include_router(agent_router)
     # WebSocket routes
-    app.include_router(ws_router)
+        app.include_router(ws_router)
+    if os.environ.get("QUORIDOR_RESEARCH_SERVICE_KEY"):
+        from backend.transport.rest.research_routes import router as research_router
+        app.state.research_games = {}
+        app.include_router(research_router)
 
     @app.get("/health")
     def health():

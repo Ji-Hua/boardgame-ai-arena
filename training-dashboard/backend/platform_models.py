@@ -357,11 +357,20 @@ class ModelIndex:
             playable=play_blockers + ["static_eligibility_only", "actual_load_not_verified"] +
                 ([] if verified else ["sha_not_verified"]),
             deployed=deployment_blockers)
+        research_blockers = list(analysis_blockers)
+        if architecture != "cnn":
+            research_blockers.append("research_play_requires_cnn")
+        if semantics not in ("policy_logits", "q_values"):
+            research_blockers.append("unsupported_output_semantics")
+        if not any(entry["source"]["kind"] == "catalog" for entry in group):
+            research_blockers.append("not_in_approved_catalog")
+        reasons["research_playable"] = research_blockers + ["static_only_runtime_load_required"]
         return dict(id=digest, sha256=digest, aliases=sorted(aliases), metadata=metadata,
             architecture=architecture, output_semantics=semantics, conflicts=conflicts,
             evidence=evidence, checkpoints=paths, registry=registries,
             agent_specs=[dict(path=s["path"], spec=s["data"]) for s in matching_specs],
             run_refs=list(unique_refs.values()), available=available, sha_verified=verified,
             analyzable=not analysis_blockers, playable=not play_blockers,
+            research_playable=not research_blockers,
             deployed=not deployment_blockers, deployment_evidence=observed,
             actual_load_verified=False, requires_isolated_research_catalog=True, reasons=reasons)

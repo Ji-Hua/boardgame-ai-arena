@@ -11,6 +11,7 @@ export interface PlatformModel {
   sha_verified: boolean
   analyzable: boolean
   playable: boolean
+  research_playable?: boolean
   deployed: boolean
   actual_load_verified: boolean
   requires_isolated_research_catalog: boolean

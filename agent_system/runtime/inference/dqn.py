@@ -30,6 +30,7 @@ class DQNInference:
         self.metadata["output_semantics"] = loaded.eval_summary.get("output_semantics",
             "policy_logits" if loaded.algorithm in {"policy_distillation", "ppo", "ppo_imitation", "selfplay_ppo", "alphazero_lite", "value_calibration"}
             else "action_values")
+        self.metadata["algorithm"] = loaded.algorithm
         if loaded.observation_version == CNN_OBSERVATION_VERSION:
             self.encoder = encode_observation_cnn
         elif loaded.observation_version == OBSERVATION_VERSION:

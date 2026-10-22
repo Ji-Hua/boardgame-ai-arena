@@ -6,7 +6,8 @@ import { CompareView } from './views/CompareView'
 import { ArenaView } from './views/ArenaView'
 import { ModelsView } from './views/ModelsView'
 import { ReplaysView } from './views/ReplaysView'
-import { LabView, PlayView } from './views/Transitions'
+import { LabView } from './views/Transitions'
+import { PlayView } from './views/PlayView'
 import { runRoute } from './platform'
 import { ResearchContext } from './components/ResearchContext'
 import './App.css'
@@ -42,9 +43,9 @@ export default function App() {
     <header className="app-header">
       <Link className="header-title" to="/training"><span className="brand-mark">Q</span> Quoridor <small>Research</small></Link>
       <nav className="header-nav" aria-label="Main navigation">
-        {['Play', 'Training', 'Arena', 'Replays', 'Lab', 'Models'].map(label => <NavLink key={label} to={`/${label.toLowerCase()}`}>{label === 'Replays' ? 'Replay' : label}{label === 'Play' && <span aria-label="external transition"> ↗</span>}</NavLink>)}
+        {['Play', 'Training', 'Arena', 'Replays', 'Lab', 'Models'].map(label => <NavLink key={label} to={`/${label.toLowerCase()}`}>{label === 'Replays' ? 'Replay' : label}</NavLink>)}
       </nav>
-      <span className="header-badge">Read-only research</span>
+      <span className="header-badge">Research preview</span>
       <button aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`} onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>{theme === 'light' ? '☾ Dark' : '☀ Light'}</button>
     </header>
     <main id="main-content" className="app-main" tabIndex={-1}>

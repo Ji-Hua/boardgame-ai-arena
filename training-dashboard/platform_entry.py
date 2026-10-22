@@ -157,6 +157,8 @@ def create_app(*, backend_app=None, dist=None, lab_upstream=None, transport=None
 
     app = FastAPI(title="Quoridor isolated research platform", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
+    from platform_play import install_play_gateway
+    install_play_gateway(app)
 
     @app.api_route("/research-lab", methods=METHODS)
     async def lab_slash(request: Request):
