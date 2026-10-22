@@ -21,6 +21,7 @@ from .discovery import (
     load_run_detail,
     load_run_metrics,
 )
+from . import mlflow
 
 
 def _asdict(obj: Any) -> Any:
@@ -105,6 +106,27 @@ def create_app() -> FastAPI:
                 raise
             registry = {"models": []}
         return {"models": catalog["models"], "registry": registry["models"]}
+
+    @app.get("/api/mlflow/experiments")
+    def mlflow_experiments():
+        try:
+            return {"experiments": mlflow.experiments()}
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.get("/api/mlflow/experiments/{experiment_id}/runs")
+    def mlflow_runs(experiment_id: str):
+        try:
+            return {"experiment_id": experiment_id, "runs": mlflow.runs(experiment_id)}
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.get("/api/mlflow/runs/{run_id}/metrics/{metric_key}")
+    def mlflow_metric_history(run_id: str, metric_key: str):
+        try:
+            return {"run_id": run_id, "metric_key": metric_key, "metrics": mlflow.metric_history(run_id, metric_key)}
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @app.get("/api/runs")
     def list_runs() -> dict[str, Any]:
