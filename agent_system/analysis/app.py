@@ -1,5 +1,6 @@
 """Standalone HTTP entry point for Quoridor Decision Lab."""
 from contextlib import contextmanager
+import math
 from pathlib import Path
 import threading
 from typing import Literal
@@ -128,8 +129,11 @@ def multi_compare(request: MultiCompareRequest):
                                     node_limit=75_000, seconds=6, trace_limit=0)
             d2_rows.append({"id": branch["action_id"], "action": action, "value": branch["value"],
                             "after": branch["after"], "immediate_win": branch["after"]["winner"] == request.position.turn})
-        best = max(row["value"] for row in d2_rows)
-        optimal = [row["id"] for row in d2_rows if row["value"] == best]
+        def score_value(value):
+            return math.inf if value == "+inf" else -math.inf if value == "-inf" else value
+
+        best = max(score_value(row["value"]) for row in d2_rows)
+        optimal = [row["id"] for row in d2_rows if score_value(row["value"]) == best]
         neural = neural_module()
         models = []
         for model_id in request.model_ids:
