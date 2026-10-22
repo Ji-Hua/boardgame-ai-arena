@@ -325,6 +325,21 @@ async function compare() {
       if (JSON.stringify(model.position) !== positionKey) break;
       renderComparison();
     }
+
+    async function multiCompare() {
+      const ids = [...$("multi-model-select").selectedOptions].map(option => option.value);
+      if (!ids.length) throw new Error("请选择至少一个 CNN checkpoint。");
+      model.comparing = true; $("comparison").hidden = false; controls();
+      try {
+        const result = await api("/api/multi-compare", {position: copy(model.position), model_ids: ids});
+        const optimal = new Set(result.minimax_d2.equivalent_optimal_ids);
+        $("comparison-results").innerHTML = [
+          `<p><strong>D2 等价最优：</strong>${result.minimax_d2.actions.filter(a => optimal.has(a.id)).map(a => esc(a.id)).join("、")}</p>`,
+          ...result.models.map(item => `<div class="compare-row"><span>${esc(item.model_id)}</span><strong>${esc(item.selected_id)}</strong><span>${item.selected_d2_optimal ? "D2 最优" : "D2 次优"}</span><button class="text-button" data-multi-action="${esc(JSON.stringify(item.top_actions[0].action))}">预览</button></div>`),
+        ].join("");
+        model.comparisons = [{name: "multi-agent", result}];
+      } finally { model.comparing = false; controls(); }
+    }
   } finally { model.comparing = false; controls(); }
 }
 
@@ -334,6 +349,7 @@ function safe(fn) {
 
 $("analyze-button").onclick = safe(analyze);
 $("compare-button").onclick = safe(compare);
+$("multi-compare-button").onclick = safe(multiCompare);
 $("model-select").onchange = safe(async event => { model.modelId = event.target.value; await analyze(); });
 $("algorithm-tabs").onclick = safe(async event => {
   const button = event.target.closest("[data-algorithm]");
@@ -407,6 +423,11 @@ $("undo-button").onclick = safe(async () => {
 $("reset-button").onclick = safe(() => setPosition(model.meta.presets[0].position, "标准开局", {preset: "opening"}));
 $("close-comparison").onclick = () => { $("comparison").hidden = true; };
 $("comparison-results").onclick = safe(async event => {
+  const preview = event.target.closest("[data-multi-action]");
+  if (preview) {
+    const next = await api("/api/apply", {position: copy(model.position), action: JSON.parse(preview.dataset.multiAction)});
+    model.preview = next; model.previewLabel = "多模型建议后局面"; renderBoard(); return;
+  }
   const button = event.target.closest("[data-compare]");
   if (!button) return;
   const row = model.comparisons[+button.dataset.compare];
@@ -469,6 +490,8 @@ async function init() {
   model.models = catalog.models; model.catalogMessage = catalog.message;
   model.modelId = model.models.find(m => m.available && m.architecture === "cnn")?.id || model.models.find(m => m.available)?.id || null;
   $("model-select").innerHTML = model.models.map(m => `<option value="${esc(m.id)}" ${m.available ? "" : "disabled"}>${esc(m.id)} · ${esc(m.architecture.toUpperCase())}</option>`).join("");
+  $("multi-model-select").innerHTML = model.models.filter(m => m.available).map(m =>
+    `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join("");
   $("connection").textContent = "Engine connected"; $("connection").classList.add("ready");
   $("source-version").textContent = model.meta.provenance.source_sha256.slice(0, 12);
   $("presets").innerHTML = `<option value="" disabled>自定义局面</option>` + model.meta.presets.map(p => `<option value="${p.id}">${esc(p.title)}</option>`).join("");

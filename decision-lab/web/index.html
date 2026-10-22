@@ -21,7 +21,7 @@
         <h2 class="section-label">Agent</h2>
         <div class="segmented" id="algorithm-tabs" aria-label="选择算法"><button data-algorithm="greedy" class="active" aria-pressed="true">Greedy</button><button data-algorithm="minimax" aria-pressed="false">Minimax</button><button data-algorithm="dqn" aria-pressed="false">神经网络</button></div>
         <p id="algorithm-description" class="muted small"></p>
-        <div id="model-control" hidden><label class="field-label" for="model-select">Checkpoint</label><select id="model-select"></select><div id="model-meta" class="small muted"></div></div>
+        <div id="model-control" hidden><label class="field-label" for="model-select">Checkpoint</label><select id="model-select"></select><div id="model-meta" class="small muted"></div><label class="field-label" for="multi-model-select">多模型比较（最多 8 个）</label><select id="multi-model-select" multiple size="4"></select><button id="multi-compare-button" class="button secondary wide">Multi-Agent Decision Comparison</button></div>
         <div id="depth-control" hidden><div class="field-label">搜索深度 <span>ply</span></div><div class="depth-buttons" aria-label="Minimax 搜索深度"><button data-depth="1">1</button><button data-depth="2" class="active">2</button><button data-depth="3">3</button></div></div>
         <dl class="config"><dt>Policy</dt><dd>top_k · k=1</dd><dt>同分规则</dt><dd id="tie-policy">引擎顺序优先</dd></dl>
         <button id="analyze-button" class="button primary wide">运行分析</button>
