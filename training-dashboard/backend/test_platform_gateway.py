@@ -16,6 +16,47 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import platform_entry as gateway
+from platform_play import install_play_gateway
+
+
+class PlayGatewayTests(unittest.TestCase):
+    def test_fixed_upstream_capability_headers_and_boundaries(self):
+        calls = []
+        def upstream(request):
+            calls.append(request)
+            return httpx.Response(200, json={"game_id": "game"})
+        with patch.dict(os.environ, PLATFORM_GAMEPLAY_UPSTREAM="http://192.168.68.102:8774",
+                        QUORIDOR_RESEARCH_SERVICE_KEY="private-service-key"):
+            app = FastAPI()
+            install_play_gateway(app, transport=httpx.MockTransport(upstream))
+            with TestClient(app) as client:
+                result = client.post("/play-api/games", json={"sha256": "a" * 64},
+                    headers={"Authorization": "Bearer game-capability", "Cookie": "secret=1"})
+                self.assertEqual(result.status_code, 200)
+                self.assertEqual(str(calls[0].url), "http://192.168.68.102:8774/api/research/games")
+                self.assertEqual(calls[0].headers["authorization"], "Bearer game-capability")
+                self.assertEqual(calls[0].headers["x-research-gateway"], "private-service-key")
+                self.assertNotIn("cookie", calls[0].headers)
+                self.assertNotIn("private-service-key", result.text)
+                self.assertEqual(client.post("/play-api/games", headers={"Origin": "http://evil.invalid"}).status_code, 403)
+                self.assertEqual(client.post("/play-api/games", content=b"x" * 8193).status_code, 413)
+                self.assertEqual(client.post("/play-api/games?url=http://evil.invalid").status_code, 405)
+                self.assertEqual(client.post("/play-api/games/http://evil.invalid").status_code, 404)
+                self.assertEqual(len(calls), 1)
+
+    def test_invalid_upstream_and_network_failures(self):
+        with patch.dict(os.environ, PLATFORM_GAMEPLAY_UPSTREAM="http://evil.invalid:8774"):
+            with self.assertRaises(ValueError):
+                install_play_gateway(FastAPI())
+        for error, status in ((httpx.ReadTimeout("slow"), 504), (httpx.ConnectError("down"), 502)):
+            def fail(request):
+                raise error
+            with patch.dict(os.environ, PLATFORM_GAMEPLAY_UPSTREAM="http://192.168.68.102:8774",
+                            QUORIDOR_RESEARCH_SERVICE_KEY="key"):
+                app = FastAPI()
+                install_play_gateway(app, transport=httpx.MockTransport(fail))
+                with TestClient(app) as client:
+                    self.assertEqual(client.post("/play-api/games", json={}).status_code, status)
 
 
 class GatewayTests(unittest.TestCase):

@@ -49,7 +49,7 @@ export default function App() {
       <button aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`} onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>{theme === 'light' ? '☾ Dark' : '☀ Light'}</button>
     </header>
     <main id="main-content" className="app-main" tabIndex={-1}>
-      {location.pathname !== '/lab' && !location.pathname.startsWith('/replays/') && <ResearchContext />}
+      {location.pathname !== '/lab' && location.pathname !== '/play' && !location.pathname.startsWith('/replays/') && <ResearchContext />}
       <Routes>
         <Route path="/" element={<Navigate replace to={location.hash === '#arena' ? '/arena' : '/training'} />} />
         <Route path="/training" element={<TrainingPage />} />

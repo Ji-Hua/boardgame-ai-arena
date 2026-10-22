@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import asyncio
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     if os.environ.get("QUORIDOR_RESEARCH_SERVICE_KEY"):
         from backend.transport.rest.research_routes import router as research_router
         app.state.research_games = {}
+        app.state.research_create_lock = asyncio.Lock()
         app.include_router(research_router)
 
     @app.get("/health")

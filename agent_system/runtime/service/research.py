@@ -90,6 +90,8 @@ class ResearchSessions:
                 name=row.get("name", sha), architecture="cnn",
                 algorithm=actual["algorithm"],
                 output_semantics=row["output_semantics"], agent_spec=asdict(spec),
+                model_config=actual["model_config"], observation_version=actual["observation_version"],
+                action_space_version=actual["action_space_version"], action_count=actual["action_count"],
                 runtime_version=self.version, room_id=room_id, agent_seat=seat,
                 actual_load_verified=True)
             self.sessions[identifier] = dict(agent=agent, token=token, identity=identity,
@@ -112,6 +114,8 @@ class ResearchSessions:
                 identity = session["identity"]
                 if identity["room_id"] != room_id or identity["agent_seat"] != seat:
                     raise PermissionError("Research session is bound to another room or seat")
+                if state.get("current_player") != seat:
+                    raise ValueError("Research state current player does not match the bound seat")
                 agent = session["agent"]
             action = agent.make_action(state, legal)
             if action not in legal:

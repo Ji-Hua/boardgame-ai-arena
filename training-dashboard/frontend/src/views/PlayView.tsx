@@ -17,6 +17,7 @@ export function PlayView() {
   const [snapshot, setSnapshot] = useState<PlaySnapshot | null>(null)
   const [seat, setSeat] = useState<1 | 2>(1)
   const [error, setError] = useState('')
+  const [connectionError, setConnectionError] = useState('')
   const [busy, setBusy] = useState(false)
   const [wallMode, setWallMode] = useState(false)
   const [preview, setPreview] = useState<WallPreview | null>(null)
@@ -30,20 +31,20 @@ export function PlayView() {
   useEffect(() => {
     const element = boardArea.current
     if (!element) return
-    const observer = new ResizeObserver(([entry]) => setCellSize(Math.min(54, Math.max(18, (entry.contentRect.width - 36) / 9))))
+    const observer = new ResizeObserver(([entry]) => setCellSize(Math.min(54, Math.max(18, (entry.contentRect.width - 56) / 9))))
     observer.observe(element)
     return () => observer.disconnect()
   }, [Boolean(snapshot)])
   useEffect(() => {
-    if (!game) { setSnapshot(null); return }
+    if (!game) { setSnapshot(null); setConnectionError(''); return }
     setSnapshot(null)
     let active = true
     let timer: ReturnType<typeof setTimeout>
     async function refresh() {
       try {
         const next = await controller.snapshot(game)
-        if (active) { setSnapshot(next); setError('') }
-      } catch (e) { if (active) setError(String(e)) }
+        if (active) { setSnapshot(next); setConnectionError('') }
+      } catch (e) { if (active) setConnectionError(String(e)) }
       if (active) timer = setTimeout(refresh, 1200)
     }
     void refresh()
@@ -74,7 +75,7 @@ export function PlayView() {
     finally { setBusy(false) }
   }
   const render = snapshot ? projectPlay(snapshot) : null
-  const humanTurn = Boolean(snapshot && snapshot.phase === 'running' && !snapshot.pending && snapshot.state.current_player === snapshot.human_seat && !busy)
+  const humanTurn = Boolean(snapshot && snapshot.phase === 'running' && !snapshot.pending && snapshot.state.current_player === snapshot.human_seat && !busy && !connectionError)
   const legalMoves: [number, number][] = humanTurn && snapshot ? snapshot.legal_actions.filter(a => a.type === 'pawn').map(a => [a.target[1], a.target[0]]) : []
   const identity = snapshot?.identity
   let resumable = ''
@@ -82,6 +83,7 @@ export function PlayView() {
   return <div className="unified-play">
     <div className="page-heading"><div><p className="eyebrow">Research / Play</p><h1>Human vs Checkpoint</h1></div><Link to="/models">Model library</Link></div>
     {error && <div className="error" role="alert">{error}</div>}
+    {connectionError && <div className="error" role="alert">{connectionError}</div>}
     {game && !snapshot && <div className="loading">Reconnecting to game {game}...</div>}
     {!game && <section className="play-setup">
       <label>Checkpoint<select aria-label="Play checkpoint" value={sha} onChange={e => updateSha(e.target.value)} disabled={busy}>

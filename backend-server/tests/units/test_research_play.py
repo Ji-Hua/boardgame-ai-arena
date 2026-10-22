@@ -130,3 +130,55 @@ class ResearchPlayTests(unittest.IsolatedAsyncioTestCase):
         await self.create()
         result = await self.client.post(self.url + "/surrender", headers=self.headers)
         self.assertEqual(result.json()["result"], dict(winner_seat=2, termination="surrender"))
+
+    async def test_gateway_and_session_isolation_expiry(self):
+        forbidden = await self.client.post("/api/research/games",
+            headers={"X-Research-Gateway": "wrong"}, json=dict(sha256=SHA))
+        self.assertEqual(forbidden.status_code, 403)
+        await self.create()
+        unauthorized = await self.client.get(self.url, headers={"Authorization": "Bearer wrong"})
+        self.assertEqual(unauthorized.status_code, 404)
+        self.app.state.research_games[self.identifier].created = 0
+        self.assertEqual((await self.client.get(self.url, headers=self.headers)).status_code, 410)
+
+    async def test_research_step_limit_is_explicit_and_releases_instance(self):
+        state = await self.create()
+        with patch("backend.transport.rest.research_routes.MAX_GAME_PLIES", 1):
+            response = await self.move(state, dict(type="pawn", target=[4, 1]))
+        self.assertEqual(response.status_code, 200)
+        final = await self.snapshot()
+        self.assertEqual(final["result"]["termination"], "forced")
+        self.assertIn("resource limit", final["error"])
+        self.assertEqual(final["step_count"], 1)
+        self.assertEqual(len(self.runtime.released), 1)
+
+
+class ResearchAdapterTests(unittest.IsolatedAsyncioTestCase):
+    async def test_actual_http_transport_errors_and_changed_identity(self):
+        from backend.adapters.agent_service_adapter import AgentServiceAdapter
+        binding = dict(session_id="session", token="token", identity=dict(room_id="room", agent_seat=2,
+            sha256=SHA, actual_sha256=SHA))
+        with patch.dict(os.environ, QUORIDOR_RESEARCH_SERVICE_KEY="test"):
+            for failure, expected in ((httpx.ReadTimeout("slow"), TimeoutError),
+                                      (httpx.ConnectError("refused"), RuntimeError)):
+                def handler(request):
+                    raise failure
+                adapter = AgentServiceAdapter("http://test-runtime")
+                await adapter._async_client.aclose()
+                adapter._async_client = httpx.AsyncClient(base_url="http://test-runtime", transport=httpx.MockTransport(handler))
+                try:
+                    with self.assertRaises(expected):
+                        await adapter.research_action(binding, {}, [])
+                finally:
+                    await adapter._async_client.aclose()
+                    adapter._client.close()
+            adapter = AgentServiceAdapter("http://test-runtime")
+            await adapter._async_client.aclose()
+            adapter._async_client = httpx.AsyncClient(base_url="http://test-runtime", transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, json=dict(action={}, identity={"sha256": "b" * 64}))))
+            try:
+                with self.assertRaisesRegex(RuntimeError, "identity changed"):
+                    await adapter.research_action(binding, {}, [])
+            finally:
+                await adapter._async_client.aclose()
+                adapter._client.close()

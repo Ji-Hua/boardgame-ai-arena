@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
+import os
 
 from agent_system.runtime.service.research import ResearchSessions
 
@@ -38,7 +39,7 @@ class ResearchTests(unittest.TestCase):
         self.assertEqual(result["identity"]["actual_sha256"], self.sha)
         args = (result["session_id"], result["token"])
         legal = [{"type": "pawn", "target": [4, 7], "player": 2}]
-        self.assertEqual(self.manager.action(*args, "room", 2, {}, legal)["action"], legal[0])
+        self.assertEqual(self.manager.action(*args, "room", 2, {"current_player": 2}, legal)["action"], legal[0])
         with self.assertRaises(PermissionError):
             self.manager.action(*args, "other-room", 2, {}, legal)
         with self.assertRaises(PermissionError):
@@ -88,3 +89,64 @@ class ResearchTests(unittest.TestCase):
                 headers={"Authorization": "Bearer test-service-key"})
             self.assertEqual(result.status_code, 200)
             self.assertEqual(result.json()["identity"]["actual_sha256"], self.sha)
+
+    def test_loaded_semantics_and_algorithm_mismatch_fail_closed(self):
+        self.meta["output_semantics"] = "q_values"
+        with self.assertRaisesRegex(ValueError, "metadata"):
+            self.manager.create(self.sha, "room", 1)
+        self.meta["output_semantics"] = "policy_logits"
+        self.meta["algorithm"] = "double_dqn"
+        with self.assertRaisesRegex(ValueError, "algorithm"):
+            self.manager.create(self.sha, "room", 1)
+        self.assertEqual(self.manager.sessions, {})
+
+    def test_expiry_busy_and_wrong_turn(self):
+        result = self.manager.create(self.sha, "room", 2)
+        args = (result["session_id"], result["token"], "room", 2, {"current_player": 1}, [])
+        with self.assertRaisesRegex(ValueError, "current player"):
+            self.manager.action(*args)
+        self.manager.execution.acquire()
+        try:
+            with self.assertRaisesRegex(RuntimeError, "busy"):
+                self.manager.action(*args)
+        finally:
+            self.manager.execution.release()
+        self.manager.sessions[result["session_id"]]["expires"] = 0
+        with self.assertRaises(PermissionError):
+            self.manager.action(*args)
+
+
+@unittest.skipUnless(os.environ.get("RESEARCH_PLAY_SMOKE_CATALOG"), "External approved research catalog required")
+class RealResearchTests(unittest.TestCase):
+    def test_d2_architectures_and_dqn_actual_load_and_action(self):
+        import torch
+        from quoridor_engine import RuleEngine
+        from agent_system.runtime.service.agents.greedy_agent import _action_to_engine, _build_state
+        torch.set_num_threads(1)
+        catalog = Path(os.environ["RESEARCH_PLAY_SMOKE_CATALOG"])
+        rows = json.loads(catalog.read_text())["models"]
+        names = {"A-baseline_seed-42", "B-deep_seed-42", "C-resnet_seed-42", "D-wide_seed-42"}
+        selected = [row for row in rows if row["name"] in names
+            or row["sha256"] == "09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4"
+            or "cnn_observation_2k" in row["name"].split(" / ")]
+        self.assertEqual(len(selected), 6)
+        manager = ResearchSessions(catalog, ["/home/jihua/quoridor-data"])
+        engine = RuleEngine.standard()
+        state = dict(current_player=1, pawns={"1": {"row": 4, "col": 0}, "2": {"row": 4, "col": 8}},
+            walls_remaining={"1": 10, "2": 10}, wall_state={})
+        raw = _build_state(state)
+        from agent_system.runtime.service.agents.greedy_agent import _engine_action_to_wire
+        legal = [_engine_action_to_wire(action, 1) for action in engine.legal_actions(raw)]
+        results = []
+        for row in selected:
+            with self.subTest(model=row["name"]):
+                session = manager.create(row["sha256"], row["sha256"], 1)
+                result = manager.action(session["session_id"], session["token"], row["sha256"], 1, state, legal)
+                engine.apply_action(raw, _action_to_engine(result["action"]))
+                self.assertEqual(result["identity"]["actual_sha256"], row["sha256"])
+                self.assertEqual(result["identity"]["output_semantics"], row["output_semantics"])
+                results.append(dict(identity=result["identity"], action=result["action"], engine_accepted=True))
+                manager.destroy(session["session_id"], session["token"])
+        evidence = os.environ.get("RESEARCH_PLAY_SMOKE_OUTPUT")
+        if evidence:
+            Path(evidence).write_text(json.dumps(results, indent=2))

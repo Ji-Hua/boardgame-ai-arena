@@ -19,6 +19,7 @@ def gateway_authorization(x_research_gateway: str = Header(default="")):
 
 
 router = APIRouter(prefix="/api/research/games", dependencies=[Depends(gateway_authorization)])
+MAX_GAME_PLIES = 1024
 
 
 class CreateGame(BaseModel):
@@ -60,6 +61,8 @@ def get_game(request, identifier, authorization):
     session = request.app.state.research_games.get(identifier)
     if session is None or not secrets.compare_digest(authorization, "Bearer " + session.token):
         raise HTTPException(404, "Research game not found or unauthorized; no game was recreated")
+    if time.monotonic() - session.created > 14400:
+        raise HTTPException(410, "Research game expired; no replacement game was created")
     return session
 
 
@@ -89,7 +92,10 @@ async def drive_agent(request, session):
             if not result["success"]:
                 raise RuntimeError("Engine rejected Agent action: " + result["error"])
             session.error = None
-            if result.get("game_over"):
+            if not result.get("game_over") and session.game.step_count >= MAX_GAME_PLIES:
+                request.app.state.game_manager.force_end(session.game)
+                session.error = "Research game reached the 1024-ply resource limit"
+            if session.game.phase == "finished":
                 await release(request, session)
         except Exception as exc:
             session.error = str(exc)
@@ -106,7 +112,17 @@ def schedule(request, session):
 
 @router.post("")
 async def create_game(body: CreateGame, request: Request):
+    async with request.app.state.research_create_lock:
+        return await create_game_locked(body, request)
+
+
+async def create_game_locked(body, request):
     sessions = request.app.state.research_games
+    for identifier, old in list(sessions.items()):
+        if time.monotonic() - old.created > 14400 and not old.pending:
+            await release(request, old)
+            del sessions[identifier]
+            request.app.state.game_manager._games.pop(identifier, None)
     if len(sessions) >= 16:
         raise HTTPException(429, "Research game capacity reached; close an old game")
     room_id = "research-" + secrets.token_urlsafe(18)
@@ -149,7 +165,10 @@ async def submit(identifier: str, body: SubmitAction, request: Request,
         result = request.app.state.game_manager.submit_action(session.game, action)
         if not result["success"]:
             raise HTTPException(422, result["error"])
-        if result.get("game_over"):
+        if not result.get("game_over") and session.game.step_count >= MAX_GAME_PLIES:
+            request.app.state.game_manager.force_end(session.game)
+            session.error = "Research game reached the 1024-ply resource limit"
+        if session.game.phase == "finished":
             await release(request, session)
         else:
             schedule(request, session)

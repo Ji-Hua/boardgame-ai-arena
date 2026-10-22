@@ -9,7 +9,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import Response
 
 
-def install_play_gateway(app):
+def install_play_gateway(app, *, transport=None):
     upstream = os.environ.get("PLATFORM_GAMEPLAY_UPSTREAM", "")
     if not upstream:
         return
@@ -42,7 +42,7 @@ def install_play_gateway(app):
         headers["X-Research-Gateway"] = os.environ["QUORIDOR_RESEARCH_SERVICE_KEY"]
         async with slots:
             try:
-                async with httpx.AsyncClient(trust_env=False, follow_redirects=False, timeout=40) as client:
+                async with httpx.AsyncClient(transport=transport, trust_env=False, follow_redirects=False, timeout=40) as client:
                     result = await client.request(request.method,
                         upstream + "/api/research/games" + path, content=bytes(body), headers=headers)
                 if len(result.content) > 2 * 1024 * 1024:
