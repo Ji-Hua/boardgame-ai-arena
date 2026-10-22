@@ -56,15 +56,32 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => 
   const [detail, setDetail] = useState<EvalReplayDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [stepIndex, setStepIndex] = useState(0)   // index into detail.states (0 = initial)
+  const [playing, setPlaying] = useState(false)
+  const [speed, setSpeed] = useState(1)
 
   useEffect(() => {
     setDetail(null)
     setError(null)
     setStepIndex(0)
+    setPlaying(false)
     api.getEvalReplay(runId, meta.replay_path)
       .then(setDetail)
       .catch((e: Error) => setError(e.message))
   }, [runId, meta.replay_path])
+
+  useEffect(() => {
+    if (!detail || !playing) return
+    const timer = window.setInterval(() => {
+      setStepIndex(current => {
+        if (current >= detail.states.length - 1) {
+          setPlaying(false)
+          return current
+        }
+        return current + 1
+      })
+    }, 1000 / speed)
+    return () => window.clearInterval(timer)
+  }, [detail, playing, speed])
 
   const handleKey = useCallback((e: KeyboardEvent) => {
     if (!detail) return
@@ -105,6 +122,19 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => 
   const currentState: EvalReplayState = detail.states[stepIndex]
   // The action that produced currentState (stepIndex 0 = initial; action[i] -> state[i+1])
   const lastAction = stepIndex > 0 ? detail.actions[stepIndex - 1] : null
+  const openDecisionLab = () => {
+    const position = {
+      pawns: [currentState.p1, currentState.p2],
+      walls_remaining: [currentState.walls_remaining_p1, currentState.walls_remaining_p2],
+      walls: [
+        ...currentState.h_walls.map(([x, y]) => ({ x, y, orientation: 'horizontal' })),
+        ...currentState.v_walls.map(([x, y]) => ({ x, y, orientation: 'vertical' })),
+      ],
+      turn: stepIndex % 2 === 0 ? 1 : 2,
+    }
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(position))))
+    window.open(`http://${window.location.hostname}:8744/?position=${encodeURIComponent(encoded)}`, '_blank', 'noopener')
+  }
 
   const dqnSeat = detail.dqn_player_id
   const oppSeat = detail.opponent_player_id
@@ -160,6 +190,17 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => 
             <button style={navBtn} onClick={() => setStepIndex(s => Math.min(totalStates - 1, s + 1))} disabled={stepIndex === totalStates - 1}>▶</button>
             <button style={navBtn} onClick={() => setStepIndex(totalStates - 1)} disabled={stepIndex === totalStates - 1}>⏭</button>
           </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button style={navBtn} onClick={() => setPlaying(value => !value)} disabled={stepIndex === totalStates - 1}>
+              {playing ? 'Pause' : 'Auto play'}
+            </button>
+            <label style={{ fontSize: 12 }}>Speed <select value={speed} onChange={event => setSpeed(Number(event.target.value))}>
+              <option value={0.5}>0.5×</option><option value={1}>1×</option><option value={2}>2×</option><option value={4}>4×</option>
+            </select></label>
+          </div>
+          <input aria-label="Replay progress" type="range" min={0} max={totalStates - 1} value={stepIndex}
+            onChange={event => { setPlaying(false); setStepIndex(Number(event.target.value)) }} />
+          <button style={navBtn} onClick={openDecisionLab}>Analyze Decision</button>
           <p style={{ fontSize: 11, color: '#888', margin: 0 }}>← → arrow keys also work</p>
 
           {/* Last action info */}

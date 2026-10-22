@@ -45,6 +45,17 @@ def runs(experiment_id: str, max_results: int = 100) -> list[dict]:
     return result
 
 
+def run(run_id: str) -> dict:
+    data = _request(f"runs/get?{urlencode({'run_id': run_id})}")
+    row = data["run"]
+    info, values = row["info"], row.get("data", {})
+    return {
+        "run_id": info["run_id"],
+        "params": {item["key"]: item["value"] for item in values.get("params", [])},
+        "tags": {item["key"]: item["value"] for item in values.get("tags", [])},
+    }
+
+
 def metric_history(run_id: str, metric_key: str) -> list[dict]:
     query = urlencode({"run_id": run_id, "metric_key": metric_key})
     return _request(f"metrics/get-history?{query}").get("metrics", [])

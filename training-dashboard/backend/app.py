@@ -128,6 +128,51 @@ def create_app() -> FastAPI:
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @app.get("/api/mlflow/runs/{run_id}/arena-evaluation")
+    def mlflow_arena_evaluation(run_id: str) -> dict[str, Any]:
+        """Map a registered checkpoint to immutable CNN benchmark evidence."""
+        try:
+            run = mlflow.run(run_id)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        source_path = run["params"].get("source_path")
+        report_path = Path(os.environ.get(
+            "CNN_ARCHITECTURE_ARENA_REPORT",
+            "/data/quoridor/experiments/cnn-architecture-20261021-213018/arena-v2/report.json",
+        ))
+        try:
+            report = json.loads(report_path.read_text())
+        except FileNotFoundError:
+            return {"available": False, "reason": "No immutable Arena evidence is mounted for this run."}
+        except (OSError, ValueError) as exc:
+            raise HTTPException(status_code=503, detail="Arena evidence is unavailable") from exc
+
+        agent = next(
+            (candidate for candidate in report.get("agents", [])
+             if candidate.get("algo", {}).get("params", {}).get("checkpoint") == source_path),
+            None,
+        )
+        if agent is None:
+            return {"available": False, "reason": "This run has no matching frozen Arena checkpoint evidence."}
+        agent_id = agent["id"]
+        rows = [
+            {"opponent": opponent, **result}
+            for opponent, result in report.get("matrix", {}).get(agent_id, {}).items()
+            if result and result.get("games", 0) > 0
+        ]
+        ranking = next((item for item in report.get("ranking", []) if item.get("id") == agent_id), None)
+        return {
+            "available": True,
+            "run_id": run_id,
+            "checkpoint_sha256": agent["algo"]["params"]["sha256"],
+            "agent_id": agent_id,
+            "evaluation_id": report.get("run_id"),
+            "summary": ranking,
+            "opponents": rows,
+            "game_records_available": False,
+            "game_records_reason": "Arena blocks are immutable raw evidence but are not Dashboard replay records.",
+        }
+
     @app.get("/api/runs")
     def list_runs() -> dict[str, Any]:
         roots = get_artifact_roots()

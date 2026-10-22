@@ -495,6 +495,17 @@ async function init() {
   $("connection").textContent = "Engine connected"; $("connection").classList.add("ready");
   $("source-version").textContent = model.meta.provenance.source_sha256.slice(0, 12);
   $("presets").innerHTML = `<option value="" disabled>自定义局面</option>` + model.meta.presets.map(p => `<option value="${p.id}">${esc(p.title)}</option>`).join("");
+  const encodedPosition = new URLSearchParams(window.location.search).get("position");
+  if (encodedPosition) {
+    try {
+      const position = JSON.parse(decodeURIComponent(escape(atob(encodedPosition))));
+      await setPosition(position, "Dashboard Replay", {preset: "", history: false});
+      notice("已从 Training Dashboard 导入经回放记录还原的局面。");
+      return;
+    } catch {
+      notice("无法导入 Dashboard Replay 局面。", true);
+    }
+  }
   await setPosition(model.meta.presets[0].position, "标准开局", {preset: "opening", history: false});
 }
 controls();
