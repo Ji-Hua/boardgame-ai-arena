@@ -19,7 +19,7 @@ export QUORIDOR_RESEARCH_CATALOG
 QUORIDOR_RESEARCH_CATALOG="$("$PYTHON" "$ROOT/scripts/prepare_research_play.py")"
 "$PYTHON" -c 'import socket; sockets=[]
 for port in (8752,8753):
-    listener=socket.socket(); listener.bind(("0.0.0.0",port)); sockets.append(listener)'
+  listener=socket.socket(); listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); listener.bind(("0.0.0.0",port)); sockets.append(listener)'
 [[ -f "$ROOT/training-dashboard/frontend/dist/index.html" ]] || { printf 'Build frontend first\n' >&2; exit 1; }
 RUNTIME_PID=""; PLATFORM_PID=""
 cleanup() {
