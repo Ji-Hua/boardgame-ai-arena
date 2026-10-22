@@ -3,6 +3,13 @@
 **Verified:** 2026-10-22. Implementation/acceptance record, not a replacement
 for the authoritative [system architecture](../documents/system/design/system-architecture.md).
 
+This is the historical P1/P2 acceptance snapshot. Its source was subsequently
+committed as `be5b200` / `7ec538d`; the 8751/8754 foreground launcher was restored
+under transient user unit `quoridor-platform-p1-p2-preview.service` after its
+caller exited. It is still not reboot-autostart deployment. The separate
+[P3-A implementation](UNIFIED_PLATFORM_P3_A.md) adds integrated checkpoint play
+on 8752; statements below about future P3 work describe this P1/P2 snapshot.
+
 ## Scope and source state
 
 - Worktree: `/home/jihua/workspace/boardgame-ai-arena-platform`.

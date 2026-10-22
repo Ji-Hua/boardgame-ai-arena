@@ -2,14 +2,37 @@
 
 **Last verified:** 2026-10-22
 
+## Unified platform P3-A completed (isolated branch)
+
+`feature/unified-platform-p3-a` implements Training -> exact checkpoint -> Play
+-> human versus CNN in the unified React shell. Source is committed/pushed;
+the separate Dev worktree is synchronized. Preview entry is
+`http://192.168.68.88:8752`, through isolated Dev Gameplay 8774 to Training
+research Runtime 8753. Production 8764 -> 8743 and the P1/P2 8751 entry remain
+unchanged. Session-scoped AgentSpecs use the existing loader, verify actual SHA
+and semantics, and keep Rust authoritative for all game transitions.
+
+Final real browser acceptance: **6/6 passed**, including C-resnet_seed-42 full
+P1/P2 games (36/39 plies), refresh/navigation/offline recovery, wall bit 63,
+illegal/stale rejection and all three prior P1/P2 cases. Additional verification:
+81 backend/runtime/spec pytest tests plus six real-model subtests, 121 Dashboard
+tests (one optional skip), 38 Lab, 21 Node and 22 React tests; types/build passed.
+These are functional checks, not a new training or benchmark result.
+
+Research sessions are in memory, bounded to four hours, and not user-authenticated
+or TLS-protected. Pause/resume, live Lab analysis and durable human games remain
+P3-B/P4 work. See [source versions, evidence, deployment and prerequisites](UNIFIED_PLATFORM_P3_A.md).
+
 ## Unified research platform P1/P2 completed (isolated branch)
 
 `feature/unified-platform-p1-p2` in the platform worktree, baseline `a8fc58d`,
 has completed P1/P2 routed research navigation and exact checkpoint/replay/ply
 handoff into an isolated same-origin Lab. Implementation and documentation are
 committed on the named feature branch; no shared-baseline promotion
-or production replacement is implied. Live HTTP 8751 + loopback Lab 8754 use a
-foreground supervisor, not durable systemd restart management. Existing Training
+or production replacement is implied. Live HTTP 8751 + loopback Lab 8754 now use
+the foreground supervisor under transient user unit
+`quoridor-platform-p1-p2-preview.service` after an earlier caller exited. This
+is not reboot-autostart deployment. Existing Training
 services and the supplied unchanged Dev deployment remain separate.
 
 Final real Playwright evidence: **3/3 passed in 75.572s**. Focused revalidation:
@@ -19,10 +42,10 @@ C-resnet replay ply-7 import and explicitly clicked neural analysis returned
 HTTP 200 with 121 legal policy-logit candidates. The live index has 92 unique
 SHA identities with static capabilities, not 92 verified loads/deployments.
 
-P3 session runtime/pinned-spec permissions/safe wall DTOs and P4 revision-safe
-pause/isolation/React API wrappers are **not completed**. Play remains external;
-Lab is a transition, not a full React Lab. There is no arbitrary checkpoint
-session or persisted game pause, no auth/TLS and no shared source-list cache.
+On the historical P1/P2 branch, Play remains external and there is no checkpoint
+session service. The additional P3-A branch above implements bounded research
+sessions and safe wall DTOs. Lab remains a transition, not a full React Lab;
+durable pause, user auth/TLS and a shared source-list cache are not implemented.
 No Model Registry, champion alias or production roster mutation occurred.
 See [full contracts, evidence, commands and handoff](UNIFIED_PLATFORM_P1_P2.md).
 

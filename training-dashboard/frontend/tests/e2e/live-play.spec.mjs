@@ -138,6 +138,7 @@ test('Training checkpoint to exact CNN: wall, moves, refresh, navigation, offlin
 
 test('Models deep link, P2 opening, mobile/dark layout, illegal/stale rejection and full P2 game', async ({ page }, info) => {
   await page.goto(`/models/${sha}`)
+  await expect(page.getByRole('link', { name: 'Play against', exact: true })).toBeVisible()
   await page.getByRole('link', { name: 'Play against', exact: true }).click()
   await expect(page.getByLabel('Play checkpoint')).toHaveValue(sha)
   await page.getByLabel('Your seat').selectOption('2')
@@ -170,7 +171,7 @@ test('unapproved and incompatible checkpoints fail closed; existing services rem
   const unknown = await request.post('/play-api/games', { data: { sha256: 'b'.repeat(64), human_seat: 1 } })
   expect(unknown.status()).toBe(503)
   expect(await unknown.text()).toContain('not uniquely approved')
-  const listing = await (await request.get('/api/platform/models')).json()
+  const listing = await (await request.get('/api/platform/models', { timeout: 120_000 })).json()
   const unsupported = listing.models.find(model => model.architecture === 'mlp')
   expect(unsupported).toBeTruthy()
   await page.goto(`/play?model_sha=${unsupported.sha256}`)

@@ -16,6 +16,8 @@ management, and decision analysis.
 - [Research log](docs/RESEARCH_LOG.md) — concise experiment and model index.
 - [Completed unified platform P1/P2](docs/UNIFIED_PLATFORM_P1_P2.md) — isolated
   research UI, exact replay-to-Lab contracts, live acceptance and limitations.
+- [Completed unified Play P3-A](docs/UNIFIED_PLATFORM_P3_A.md) — exact-checkpoint
+  human games, bounded research sessions, cross-host preview and acceptance.
 - [Architecture target](documents/system/design/quoridor-RL-vision.md) and
   [contribution governance](documents/system/governance/contribution-standard.md)
   remain authoritative design/governance sources.
@@ -48,15 +50,29 @@ training job, evaluation tournament, or model-registry service.
 ## Unified research platform P1/P2
 
 Completed on `feature/unified-platform-p1-p2` in the isolated platform worktree,
-based on `a8fc58d`; implementation is pending coordinating-agent commit/review.
+implementation `be5b200`, handoff `7ec538d`; not promoted to the shared baseline.
 Live research entry: `http://192.168.68.88:8751`, with a separate loopback Lab
 at `127.0.0.1:8754`. Existing production services and Dev remain unchanged.
-The launcher is a foreground two-process supervisor, **not** a durable systemd
-deployment. P1/P2 provides routed Training, Arena, Replay and SHA-addressed Models
+The foreground two-process launcher now runs under a transient user systemd unit,
+not an installed reboot-autostart deployment. P1/P2 provides routed Training, Arena, Replay and SHA-addressed Models
 plus exact replay-position import into the existing Lab. Play is external and
-Lab is a transition, not a full React rewrite. P3/P4 session runtime and persistent
-pause remain future work; model selection does not mutate the Model Registry.
+Lab is a transition, not a full React rewrite. These statements describe the
+P1/P2 branch; P3-A adds research sessions separately below. Persistent pause
+remains future work; model selection does not mutate the Model Registry.
 See [contracts, commands and final 3/3 real-browser acceptance](docs/UNIFIED_PLATFORM_P1_P2.md).
+
+## Unified Play P3-A
+
+`feature/unified-platform-p3-a` adds Training -> Checkpoint -> Play -> human
+versus the exact approved CNN inside the research React shell. Preview:
+`http://192.168.68.88:8752`, using separate Dev Gameplay 8774 and Training
+research Runtime 8753. Rust remains the rule authority; loaded SHA, algorithm,
+output semantics and Runtime identity are visible per game. Existing production
+and P1/P2 services are preserved. Six real browser tests passed, including full
+C-resnet games as human P1 and P2, recovery and previous replay-to-Lab behavior.
+Sessions are in-memory and expire within four hours. This trusted-LAN preview
+does not add user login/TLS, persistent human games, pause/resume or live Lab
+analysis. See [verified source, operations, evidence and later-phase prerequisites](docs/UNIFIED_PLATFORM_P3_A.md).
 
 ## Decision analysis
 

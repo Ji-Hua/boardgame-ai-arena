@@ -1,6 +1,6 @@
 # Environments
 
-**Last verified:** 2026-10-22 (isolated P1/P2 platform and existing Training health endpoints; other facts retain their original verification)
+**Last verified:** 2026-10-22 (P3-A cross-host play, P1/P2 and protected service health; other facts retain their original verification)
 
 ## Roles
 
@@ -55,13 +55,14 @@ See [deployment/rollback and acceptance](UNIFIED_DASHBOARD_20261022.md).
 ### Isolated unified platform P1/P2 (additional, not replacement)
 
 - Source: `/home/jihua/workspace/boardgame-ai-arena-platform`, branch
-  `feature/unified-platform-p1-p2`, baseline `a8fc58d`; implementation pending
-  coordinating-agent commit. Original/shared worktrees are not overwritten.
+  `feature/unified-platform-p1-p2`, implementation `be5b200`, handoff `7ec538d`.
+  Original/shared worktrees are not overwritten.
 - Live entry `http://192.168.68.88:8751`; separate Lab listens only on
   `http://127.0.0.1:8754`, proxied through `/research-lab/` on 8751.
-- The launcher supervises both children in the foreground. It is **not** an
-  installed systemd service or durable automatic-restart deployment. Do not
-  start a duplicate while the current isolated ports are occupied.
+- The foreground launcher now runs under transient user systemd unit
+  `quoridor-platform-p1-p2-preview.service`, restored after its earlier caller
+  exited. It is not an installed reboot-autostart deployment. Do not start a
+  duplicate while the current isolated ports are occupied.
 - Uses the original Training venv and legacy artifact roots, existing MLflow,
   and original catalogs. Only the isolated Lab child receives an externally
   generated research catalog. No production roster, alias or Model Registry
@@ -77,6 +78,30 @@ See [deployment/rollback and acceptance](UNIFIED_DASHBOARD_20261022.md).
 
 See [P1/P2 contracts, build/start/test commands and limitations](UNIFIED_PLATFORM_P1_P2.md).
 The earlier 8741/8744 deployment record above remains separate and unchanged.
+
+### Isolated unified Play P3-A (additional, not replacement)
+
+- Entry `http://192.168.68.88:8752`; separate research Runtime on Training 8753;
+  Dev Gameplay `http://192.168.68.102:8774` forwards only to that Runtime.
+- Training worktree `/home/jihua/workspace/boardgame-ai-arena-play`, branch
+  `feature/unified-platform-p3-a`; Dev `/home/jihua/workspace/quoridor-play-p3-a`,
+  branch `preview/unified-platform-p3-a`, synchronized by Git.
+- Training transient unit `quoridor-play-p3-a-preview-v3.service`: restart on
+  failure, 2 GiB memory and 150% CPU. Dev container `quoridor-gameplay-p3-a`:
+  one CPU, 768 MiB, read-only source/filesystem, restart policy `no`.
+- Existing P1/P2 loopback Lab 8754 is reused; production 8744 is not replaced.
+  Production Dev Backend 8764 still uses Training Agent Service 8743.
+- The external service key lives under
+  `/home/jihua/quoridor-data/platform-p3-a/private/`; approval snapshots and
+  browser evidence live under that same external P3-A root, never in Git.
+- Session-scoped CNNs are bounded, SHA-verified and capability-protected, but
+  public/user authentication and TLS are absent. Games are in memory for at most
+  four hours; restarts lose them. No pause/resume or persistent human replay.
+- Final six real browser tests passed; C-resnet human P1/P2 games ended naturally
+  after 36/39 plies. Protected production services remained reachable and
+  checkpoint/catalog/registry/AgentSpec hashes unchanged.
+
+See [P3-A versions, contracts, safeguards, evidence and operations](UNIFIED_PLATFORM_P3_A.md).
 
 ### Verified MLflow configuration
 
