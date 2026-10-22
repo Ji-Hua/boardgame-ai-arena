@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api'
-import type { MetricSeries } from '../types'
+import type { AxisKey, MetricSeries } from '../types'
 import { LineChart } from '../components/LineChart'
+import { availableAxes, COLORS, display } from '../runData'
 
 interface MetricsViewProps {
   runId: string
@@ -9,39 +10,30 @@ interface MetricsViewProps {
   embedded?: boolean
 }
 
-const METRIC_DISPLAY: Array<{ key: string; label: string; color: string }> = [
-  { key: 'loss', label: 'Loss', color: '#e05c5c' },
-  { key: 'avg_reward', label: 'Avg Reward', color: '#4f9eff' },
-  { key: 'win_rate', label: 'Win Rate', color: '#5ce05c' },
-  { key: 'epsilon', label: 'Epsilon', color: '#f0a030' },
-  { key: 'avg_q_max', label: 'Avg Q Max', color: '#c04fc0' },
-  { key: 'avg_episode_length', label: 'Avg Episode Length', color: '#808080' },
-]
-
 export function MetricsView({ runId, onBack, embedded = false }: MetricsViewProps) {
   const [series, setSeries] = useState<MetricSeries | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [xKey, setXKey] = useState<'episode' | 'step'>('episode')
+  const [xKey, setXKey] = useState<AxisKey>('episode')
 
   useEffect(() => {
     setLoading(true)
     setError(null)
+    setSeries(null)
+    let active = true
     api.getMetrics(runId)
-      .then(setSeries)
-      .catch(e => setError(String(e)))
-      .finally(() => setLoading(false))
+      .then(r => { if (active) setSeries(r) })
+      .catch(e => { if (active) setError(String(e)) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [runId])
 
   if (loading) return <div className="loading">Loading metrics…</div>
   if (error) return <div className="error">Error: {error}</div>
   if (!series) return null
 
-  const activeColumns = new Set(series.columns)
-
-  // Additional unknown numeric columns not in the standard display list
-  const knownKeys = new Set(METRIC_DISPLAY.map(m => m.key))
-  const extraCols = series.columns.filter(c => !knownKeys.has(c))
+  const axes = availableAxes(series)
+  const axis = axes.find(a => a.key === xKey) ?? axes[0]
 
   return (
     <div>
@@ -50,47 +42,50 @@ export function MetricsView({ runId, onBack, embedded = false }: MetricsViewProp
 
       {series.warnings.map((w, i) => <div key={i} className="warning">{w}</div>)}
 
-      <div className="action-bar">
+      {axis && <div className="action-bar">
         <label>X axis: </label>
-        <select value={xKey} onChange={e => setXKey(e.target.value as 'episode' | 'step')}>
-          <option value="episode">Episode</option>
-          <option value="step">Step</option>
+        <select aria-label="Metric X axis" value={axis.key} onChange={e => setXKey(e.target.value as AxisKey)}>
+          {axes.map(a => <option key={a.key} value={a.key}>{a.label}</option>)}
         </select>
         <span className="muted" style={{ marginLeft: 12 }}>{series.points.length} data points</span>
-      </div>
+      </div>}
 
-      {series.points.length === 0 ? (
-        <div className="empty">No metric data points found.</div>
+      {series.points.length === 0 || !axis ? (
+        <div className="empty">No recorded metric curve with an actual progress axis available.</div>
       ) : (
         <div className="charts-grid">
-          {METRIC_DISPLAY.filter(m => activeColumns.has(m.key)).map(m => (
-            <div key={m.key} className="chart-card">
-              <div className="chart-title">{m.label}</div>
+          {series.columns.map((key, index) => {
+            const meta = series.metadata?.[key]
+            const label = meta?.label ?? key
+            return <div key={key} className="chart-card">
+              <div className="chart-title">{label} · {meta?.unit ?? 'unit unspecified'}</div>
+              <p className="muted">{meta?.semantic ?? 'Semantic unspecified'} · {meta?.scope ?? 'scope unspecified'}</p>
               <LineChart
                 points={series.points}
-                xKey={xKey}
-                yKey={m.key}
-                color={m.color}
+                xKey={axis.key}
+                xLabel={axis.label}
+                yKey={key}
+                yLabel={`${label} (${meta?.unit ?? 'unspecified'})`}
+                color={COLORS[index % COLORS.length]}
                 width={550}
                 height={200}
               />
             </div>
-          ))}
-          {extraCols.map(col => (
-            <div key={col} className="chart-card">
-              <div className="chart-title">{col}</div>
-              <LineChart
-                points={series.points}
-                xKey={xKey}
-                yKey={col}
-                color="#aaa"
-                width={550}
-                height={200}
-              />
-            </div>
-          ))}
+          })}
         </div>
       )}
+      <section>
+        <h3>Recorded snapshots (not training curves)</h3>
+        {!series.snapshots?.length && <div className="empty">No held-out or checkpoint snapshots recorded.</div>}
+        {(series.snapshots ?? []).map((snapshot, i) => <div className="chart-card" key={i}>
+          <h4>{snapshot.scope ?? 'Unspecified scope'} · {snapshot.source ?? snapshot.run_id ?? 'Recorded snapshot'}</h4>
+          <table className="kv-table"><tbody>{Object.entries(snapshot.values).map(([key, value]) => <tr key={key}>
+            <td>{snapshot.metadata?.[key]?.label ?? key}</td><td><pre>{display(value)}</pre></td>
+            <td>{snapshot.metadata?.[key]?.unit ?? 'unit unspecified'} · {snapshot.metadata?.[key]?.semantic ?? 'semantic unspecified'}</td>
+          </tr>)}</tbody></table>
+        </div>)}
+      </section>
+      {Object.keys(series.provenance ?? {}).length > 0 && <details><summary>Metric provenance</summary><pre>{display(series.provenance)}</pre></details>}
     </div>
   )
 }

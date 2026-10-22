@@ -184,6 +184,21 @@ button:hover { border-color: var(--accent); color: var(--accent); }
   letter-spacing: 0.05em;
 }
 
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; max-width: 760px; }
+td pre { min-width: 180px; max-width: 380px; }
+.run-link { border: 0; padding: 0; background: none; color: var(--accent); text-align: left; }
+.replay-group { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; }
+summary { cursor: pointer; overflow-wrap: anywhere; }
+details[open] > summary { margin-bottom: 12px; color: var(--accent); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.chart-card { min-width: 0; max-width: 100%; flex: 1 1 420px; }
+@media (max-width: 700px) {
+  .app-header { height: auto; min-height: var(--header-h); flex-wrap: wrap; padding: 8px 12px; gap: 8px; }
+  .app-main { padding: 16px 12px; }
+  .header-title { font-size: 14px; }
+  .run-header-id { overflow-wrap: anywhere; }
+}
+
 .legend-row {
   display: flex;
   flex-wrap: wrap;

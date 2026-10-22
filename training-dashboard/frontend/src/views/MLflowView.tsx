@@ -60,7 +60,7 @@ export function MLflowView() {
       </table>
     </div>
     {history && <div className="chart-card"><h3>{history.run.run_name ?? history.run.run_id} — {history.key}</h3>
-      {history.points.length ? <LineChart points={history.points} xKey="step" yKey="value" color="#4f9eff" width={700} height={240} /> : <p className="muted">MLflow has no history for this metric.</p>}
+      {history.points.length ? <LineChart points={history.points.map(p => ({ episode: null, step: p.step, timestamp: p.timestamp, values: { value: p.value } }))} xKey="step" yKey="value" color="#4f9eff" width={700} height={240} /> : <p className="muted">MLflow has no history for this metric.</p>}
     </div>}
   </div>
 }

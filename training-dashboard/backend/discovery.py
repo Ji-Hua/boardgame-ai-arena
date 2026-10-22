@@ -508,7 +508,7 @@ def discover_run(run_dir: Path) -> RunSummary | None:
 
     return RunSummary(
         run_id=run_id,
-        algorithm="DQN",
+        algorithm=config.get("algorithm") or "DQN",
         reward_mode=reward_mode,
         model_arch=config.get("model_arch_explicit") or config.get("model_arch") or config.get("obs_version"),
         total_episodes=total_episodes,
@@ -636,7 +636,7 @@ def load_run_detail(run_dir: Path) -> RunDetail | None:
 
     return RunDetail(
         run_id=run_id,
-        algorithm="DQN",
+        algorithm=config.get("algorithm") or "DQN",
         reward_mode=reward_mode,
         model_arch=config.get("model_arch_explicit") or config.get("model_arch") or config.get("obs_version"),
         total_episodes=total_episodes,
@@ -673,13 +673,16 @@ def load_run_metrics(run_dir: Path) -> MetricSeries:
                 step = row.get("step")
                 values = {
                     k: v for k, v in row.items()
-                    if k not in ("episode", "step", "type", "timestamp", "agent_id", "opponent")
+                    if k not in ("episode", "step", "update", "gradient_updates", "type", "timestamp", "agent_id", "opponent")
                     and isinstance(v, (int, float))
                 }
                 points.append(MetricPoint(
                     episode=int(ep) if ep is not None else None,
                     step=int(step) if step is not None else None,
                     values=values,
+                    timestamp=row.get("timestamp"),
+                    update=row.get("update"),
+                    gradient_updates=row.get("gradient_updates"),
                 ))
         except Exception as e:
             warnings.append(f"Could not parse metrics.jsonl: {e}")
@@ -696,11 +699,14 @@ def load_run_metrics(run_dir: Path) -> MetricSeries:
                         for row in reader:
                             ep = _safe_float(row.get("episode", ""))
                             step = _safe_float(row.get("step", ""))
-                            values = {k: _safe_float(v) for k, v in row.items() if k not in ("episode", "step")}
+                            values = {k: _safe_float(v) for k, v in row.items() if k not in ("episode", "step", "timestamp", "update", "gradient_updates")}
                             points.append(MetricPoint(
                                 episode=int(ep) if ep is not None else None,
                                 step=int(step) if step is not None else None,
                                 values=values,
+                                timestamp=row.get("timestamp"),
+                                update=int(row["update"]) if row.get("update") else None,
+                                gradient_updates=int(row["gradient_updates"]) if row.get("gradient_updates") else None,
                             ))
                 except Exception as e:
                     warnings.append(f"Could not parse {candidate}: {e}")
@@ -714,11 +720,14 @@ def load_run_metrics(run_dir: Path) -> MetricSeries:
                         for row in data:
                             ep = row.get("episode")
                             step = row.get("step")
-                            values = {k: v for k, v in row.items() if k not in ("episode", "step") and isinstance(v, (int, float))}
+                            values = {k: v for k, v in row.items() if k not in ("episode", "step", "timestamp", "update", "gradient_updates") and isinstance(v, (int, float))}
                             points.append(MetricPoint(
                                 episode=int(ep) if ep is not None else None,
                                 step=int(step) if step is not None else None,
                                 values=values,
+                                timestamp=row.get("timestamp"),
+                                update=row.get("update"),
+                                gradient_updates=row.get("gradient_updates"),
                             ))
                 except Exception as e:
                     warnings.append(f"Could not parse {candidate}: {e}")
@@ -733,11 +742,14 @@ def load_run_metrics(run_dir: Path) -> MetricSeries:
                     row = json.loads(line)
                     ep = row.get("episode")
                     step = row.get("step")
-                    values = {k: v for k, v in row.items() if k not in ("episode", "step") and isinstance(v, (int, float))}
+                    values = {k: v for k, v in row.items() if k not in ("episode", "step", "timestamp", "update", "gradient_updates") and isinstance(v, (int, float))}
                     points.append(MetricPoint(
                         episode=int(ep) if ep is not None else None,
                         step=int(step) if step is not None else None,
                         values=values,
+                        timestamp=row.get("timestamp"),
+                        update=row.get("update"),
+                        gradient_updates=row.get("gradient_updates"),
                     ))
             except Exception as e:
                 warnings.append(f"Could not parse training_log.jsonl: {e}")

@@ -49,6 +49,10 @@ export function RunListView({ onSelectRun }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filterAlg, setFilterAlg] = useState('')
+  const [filterSource, setFilterSource] = useState('')
+  const [filterExperiment, setFilterExperiment] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [warnings, setWarnings] = useState<string[]>([])
   const [filterReward, setFilterReward] = useState('')
   const [filterArch, setFilterArch] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('modified_at')
@@ -57,7 +61,7 @@ export function RunListView({ onSelectRun }: Props) {
   useEffect(() => {
     setLoading(true)
     Promise.all([api.listRuns(), api.summary()])
-      .then(([r, s]) => { setRuns(r.runs); setSummary(s) })
+      .then(([r, s]) => { setRuns(r.runs); setSummary(s); setWarnings(r.warnings) })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
   }, [])
@@ -70,13 +74,16 @@ export function RunListView({ onSelectRun }: Props) {
     let list = runs
     if (search.trim()) {
       const q = search.trim().toLowerCase()
-      list = list.filter(r => r.run_id.toLowerCase().includes(q))
+      list = list.filter(r => `${r.run_id} ${r.run_name ?? ''} ${r.experiment_name ?? ''}`.toLowerCase().includes(q))
     }
+    if (filterSource) list = list.filter(r => (r.source ?? 'legacy') === filterSource)
+    if (filterExperiment) list = list.filter(r => (r.experiment_id ?? 'untracked') === filterExperiment)
+    if (filterStatus) list = list.filter(r => (r.status ?? 'unrecorded') === filterStatus)
     if (filterAlg) list = list.filter(r => r.algorithm === filterAlg)
     if (filterReward) list = list.filter(r => r.reward_mode === filterReward)
     if (filterArch) list = list.filter(r => r.model_arch === filterArch)
     return list
-  }, [runs, search, filterAlg, filterReward, filterArch])
+  }, [runs, search, filterAlg, filterReward, filterArch, filterSource, filterExperiment, filterStatus])
 
   const sorted = useMemo(() => {
     const asc = sortDir === 'asc'
@@ -119,6 +126,8 @@ export function RunListView({ onSelectRun }: Props) {
   return (
     <div>
       <h2>Training Runs</h2>
+      <p className="muted">Legacy and MLflow runs · read-only recorded evidence</p>
+      {warnings.map((w, i) => <div className="warning" key={i}>{w}</div>)}
 
       {summary && (
         <div className="summary-bar">
@@ -135,10 +144,23 @@ export function RunListView({ onSelectRun }: Props) {
       <div className="list-controls">
         <input
           type="text"
-          placeholder="Search by run ID…"
+          aria-label="Search runs"
+          placeholder="Search run name or ID…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        <select aria-label="Source" value={filterSource} onChange={e => setFilterSource(e.target.value)}>
+          <option value="">All sources</option>
+          {[...new Set(runs.map(r => r.source ?? 'legacy'))].map(s => <option key={s}>{s}</option>)}
+        </select>
+        <select aria-label="Experiment" value={filterExperiment} onChange={e => setFilterExperiment(e.target.value)}>
+          <option value="">All experiments</option>
+          {[...new Map(runs.map(r => [r.experiment_id ?? 'untracked', r.experiment_name ?? r.experiment_id ?? 'Untracked experiment'])).entries()].map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
+        <select aria-label="Status" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          {[...new Set(runs.map(r => r.status ?? 'unrecorded'))].map(s => <option key={s} value={s}>{s === 'unrecorded' ? 'Status not recorded' : s}</option>)}
+        </select>
         <select value={filterAlg} onChange={e => setFilterAlg(e.target.value)}>
           <option value="">All algorithms</option>
           {algorithms.map(a => <option key={a} value={a}>{a}</option>)}
@@ -160,7 +182,7 @@ export function RunListView({ onSelectRun }: Props) {
         <table>
           <thead>
             <tr>
-              <th {...thProps('run_id')}>Run ID</th>
+              <th {...thProps('run_id')}>Run / source / status</th>
               <th {...thProps('algorithm')}>Algorithm</th>
               <th {...thProps('reward_mode')}>Reward</th>
               <th {...thProps('model_arch')}>Arch</th>
@@ -180,7 +202,10 @@ export function RunListView({ onSelectRun }: Props) {
                 className="clickable-row"
                 onClick={() => onSelectRun(run.run_id)}
               >
-                <td className="run-id">{run.run_id}</td>
+                <td className="run-id"><button className="run-link" onClick={e => { e.stopPropagation(); onSelectRun(run.run_id) }}>{run.run_name ?? run.run_id}</button>
+                  <div className="muted">{run.source ?? 'legacy'} · {run.status ?? 'Status not recorded'} · {run.experiment_name ?? 'No experiment recorded'}</div>
+                  <div className="muted mono">{run.run_id}</div>
+                </td>
                 <td>{run.algorithm || '—'}</td>
                 <td className="muted">{run.reward_mode || '—'}</td>
                 <td className="muted">{run.model_arch || '—'}</td>

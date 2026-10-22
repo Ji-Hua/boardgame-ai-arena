@@ -1,6 +1,6 @@
 # Environments
 
-**Last verified:** 2026-10-21
+**Last verified:** 2026-10-22 (Training dashboard/Decision Lab; other facts retain their original verification)
 
 ## Roles
 
@@ -37,6 +37,13 @@ Use named branches and Git fetch/push/merge or PRs.
   newly approved work until the branch is promoted.
 
 ## Services on Training
+
+Dashboard and Decision Lab currently serve the isolated
+`/home/jihua/workspace/boardgame-ai-arena-unified-dashboard` worktree on
+`feature/unified-training-dashboard`. The original legacy artifacts mount and
+external data root are unchanged and read-only. Decision Lab's existing catalog
+is unchanged; only its source worktree selection and frontend startup fix changed.
+See [deployment/rollback and acceptance](UNIFIED_DASHBOARD_20261022.md).
 
 | Service | Address | Persistence / role |
 |---|---|---|

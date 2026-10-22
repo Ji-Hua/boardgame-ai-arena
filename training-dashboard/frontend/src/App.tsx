@@ -3,7 +3,6 @@ import { RunListView } from './views/RunListView'
 import { RunDetailView } from './views/RunDetailView'
 import { CompareView } from './views/CompareView'
 import { ArenaView } from './views/ArenaView'
-import { MLflowView } from './views/MLflowView'
 import './App.css'
 
 type View =
@@ -11,7 +10,6 @@ type View =
   | { kind: 'detail'; runId: string }
   | { kind: 'compare' }
   | { kind: 'arena' }
-  | { kind: 'mlflow' }
 
 export default function App() {
   const [view, setView] = useState<View>({ kind: window.location.hash === '#arena' ? 'arena' : 'list' })
@@ -23,12 +21,6 @@ export default function App() {
           Quoridor Training Dashboard
         </div>
         <nav className="header-nav">
-          <button
-            className={view.kind === 'mlflow' ? 'active' : ''}
-            onClick={() => setView({ kind: 'mlflow' })}
-          >
-            MLflow
-          </button>
           <button
             className={view.kind === 'arena' ? 'active' : ''}
             onClick={() => { window.location.hash = 'arena'; setView({ kind: 'arena' }) }}
@@ -53,7 +45,6 @@ export default function App() {
 
       <main className="app-main">
         {view.kind === 'arena' && <ArenaView />}
-        {view.kind === 'mlflow' && <MLflowView />}
         {view.kind === 'list' && (
           <RunListView onSelectRun={runId => setView({ kind: 'detail', runId })} />
         )}

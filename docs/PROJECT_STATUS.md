@@ -1,6 +1,16 @@
 # Project Status
 
-**Last verified:** 2026-10-21
+**Last verified:** 2026-10-22
+
+## Training dashboard integration
+
+The isolated `feature/unified-training-dashboard` worktree integrates the shared
+baseline and `feature/cnn-architecture-benchmark`. Legacy and MLflow experiments
+now use one provider-neutral Runs/detail/metrics/evaluation/replay/Compare UI.
+Training's Dashboard and Decision Lab deployment/acceptance facts, metric gaps,
+test results and protected dirty-worktree boundaries are recorded in
+[UNIFIED_DASHBOARD_20261022.md](UNIFIED_DASHBOARD_20261022.md).
+This does not promote the feature branch into the shared integration baseline.
 
 ## Integrated baseline
 

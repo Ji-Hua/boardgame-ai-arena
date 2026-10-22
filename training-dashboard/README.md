@@ -2,6 +2,76 @@
 
 A lightweight, read-only visualization dashboard for Quoridor RL training artifacts.
 
+## Unified experiments (2026-10-22)
+
+MLflow is a **provider**, not a separate dashboard. Runs, Run Detail, Metrics,
+Checkpoints, Benchmarks, Diagnostics, Eval Replays and Compare use the same UI
+and `/api/runs` API for both sources. The former `/api/mlflow/*` endpoints are
+read-only compatibility endpoints, not the primary navigation.
+
+```
+Legacy files -> LegacyAdapter ---+
+                                +-> UnifiedRunService -> existing React views
+MLflow API  -> MLflowAdapter ----+
+```
+
+- Filter `/api/runs` by `source`, `algorithm`, `experiment` or `status`.
+- Existing IDs remain valid. Provider identity, human run name, experiment,
+  status and provenance are additive fields; missing historical values are null.
+- Parent/child roles, explicit source directories and checkpoint hashes identify
+  logical training tasks, never display names. Checkpoint registrations coalesce;
+  evaluation descendants do not appear as independent training curves. Exact
+  cross-provider source matches use a composite adapter so legacy evidence is
+  retained under the tracked identity, with old URLs still supported.
+- Metric points retain recorded timestamps (null when absent), actual axes,
+  units, semantics, scopes and origin. Unknown semantics are conservative.
+  Compare overlays require matching semantic/unit/scope/axis and share domains.
+  A held-out scalar is a snapshot, not a fabricated learning curve. Refresh
+  selected runs to invalidate Compare's loaded evidence.
+- Checkpoint evaluations distinguish W/G win rate from (W+D/2)/G score rate.
+  Ranked Arena pairs and standard controls are separate protocols. Groups start
+  collapsed; indexed replay samples are not substituted for aggregate W/D/L.
+- Original Arena actions are validated against manifest, checkpoint, opening,
+  trajectory and final-state identities, then applied by the Rust engine to
+  supply the existing replay viewer. No agents are executed. Missing or corrupt
+  trajectories are not regenerated. Training/evaluation game types stay separate.
+
+### Evidence and missing MLflow metrics
+
+The CNN architecture pilot's MLflow experiment contains checkpoint-registration
+runs, not uploaded training histories. The adapter reads the exact recorded
+source directory through the read-only external data mount, verifies available
+checkpoint identity, and reports that fallback in metric provenance. For
+`C-resnet_seed-42`, 60 points in `distillation-metrics.jsonl` record
+`policy_cross_entropy`, `training_batch_accuracy`, and `max_abs_logit` at updates
+200–12000. Held-out agreement/cross-entropy in `heldout-d2.json` are single
+snapshots. No DQN reward or epsilon curve is invented for this policy model.
+
+Historical host paths under `/home/jihua/quoridor-data` and `/quoridor-data` map
+to `QUORIDOR_DATA_ROOT` (container default `/data/quoridor`). Resolved paths must
+stay in configured read-only roots. MLflow artifact references remain provenance;
+this adapter does not download arbitrary remote artifacts or read its database.
+If local evidence is unavailable, the UI reports the gap. No new database,
+training framework, model promotion or historical MLflow writes are introduced.
+
+### Deployment and tests
+
+Compose builds from the repository root so the image can build the existing
+Rust engine wheel and include the existing state adapters. Build context excludes
+weights, artifacts, environments, Git metadata and generated frontend bundles.
+`TRAINING_ARTIFACTS_DIR` overrides the host legacy mount, `QUORIDOR_DATA_DIR`
+overrides external evidence, and `MLFLOW_TRACKING_URI` selects the Tracking API.
+All artifact/data mounts remain read-only. Frontend runtime requires Node 20+;
+the helper tests use Node 22 type-stripping support.
+
+Backend tests: `PYTHONPATH=training-dashboard python -m unittest discover -s training-dashboard/backend -p 'test_*.py'`.
+Optional `ARENA_REPLAY_TEST_ROOT` points to existing external Arena evidence to
+validate all original C-resnet recordings without generating games.
+Frontend: `npm run typecheck`, `npm test`, `npm run build` in the frontend directory.
+Decision Lab startup/import regression: `npm test` in its directory.
+
+See [deployment and acceptance handoff](../docs/UNIFIED_DASHBOARD_20261022.md).
+
 ---
 
 ## What This Is

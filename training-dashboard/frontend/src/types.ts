@@ -8,9 +8,22 @@ export interface CheckpointInfo {
   modified_at: string | null
   has_benchmark: boolean
   best_win_rate: number | null
+  sha256: string | null
+  model_type: string | null
+  artifact_ref: string | null
+  progress_type: string | null
 }
 
-export interface RunSummary {
+export interface RunIdentity {
+  run_name: string | null
+  source: string
+  experiment_id: string | null
+  experiment_name: string | null
+  status: string | null
+  provenance: Record<string, unknown>
+}
+
+export interface RunSummary extends RunIdentity {
   run_id: string
   algorithm: string
   reward_mode: string | null
@@ -37,7 +50,7 @@ export interface RunSummary {
   total_env_steps: number | null
 }
 
-export interface RunDetail {
+export interface RunDetail extends RunIdentity {
   run_id: string
   algorithm: string
   reward_mode: string | null
@@ -55,11 +68,24 @@ export interface RunDetail {
   has_benchmarks: boolean
   has_notes: boolean
   has_eval_replays: boolean
+  warnings: string[]
+}
+
+export type AxisKey = 'episode' | 'step' | 'update' | 'gradient_updates' | 'timestamp'
+export interface MetricMetadata {
+  label?: string
+  unit?: string | null
+  semantic?: string | null
+  scope?: string | null
+  step_type?: string | null
 }
 
 export interface MetricPoint {
   episode: number | null
   step: number | null
+  update?: number | null
+  gradient_updates?: number | null
+  timestamp?: string | number | null
   values: Record<string, number | null>
 }
 
@@ -68,6 +94,10 @@ export interface MetricSeries {
   points: MetricPoint[]
   columns: string[]
   warnings: string[]
+  metadata: Record<string, MetricMetadata>
+  axes: { key: AxisKey; label: string }[]
+  snapshots: { source?: string; run_id?: string; scope?: string; values: Record<string, unknown>; metadata?: Record<string, MetricMetadata> }[]
+  provenance: Record<string, unknown>
 }
 
 export interface BenchmarkResult {
@@ -90,12 +120,21 @@ export interface BenchmarkResult {
   timeout_count: number | null
   crash_count: number | null
   extra: Record<string, unknown>
+  evaluation_id: string | null
+  protocol: string | null
+  score_rate: number | null
+  game_type: string
+  checkpoint_sha: string | null
+  replay_available: boolean
+  progress_type: string | null
+  source_manifest: Record<string, unknown>
 }
 
 export interface BenchmarksResponse {
   run_id: string
   benchmarks: BenchmarkResult[]
   count: number
+  warnings?: string[]
 }
 
 export interface RunsResponse {
@@ -145,12 +184,22 @@ export interface EvalReplayMeta {
   illegal_acts: number | null
   replay_path: string
   created_at: string | null
+  game_id: string | null
+  evaluation_id: string | null
+  protocol: string | null
+  game_type: string
+  checkpoint_sha: string | null
+  replay_available: boolean
+  replay_unavailable_reason: string | null
+  step: number | null
+  progress_type: string | null
 }
 
 export interface EvalReplaysResponse {
   run_id: string
   count: number
   replays: EvalReplayMeta[]
+  warnings?: string[]
 }
 
 /** State snapshot at one point during a replay. */
@@ -161,6 +210,7 @@ export interface EvalReplayState {
   v_walls: [number, number][]
   walls_remaining_p1: number
   walls_remaining_p2: number
+  current_player?: 'P1' | 'P2' | 1 | 2 | null
 }
 
 /** A single action during a replay. */

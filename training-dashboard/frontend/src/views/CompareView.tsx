@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { api } from '../api'
 import type { BenchmarkResult, MetricSeries, RunDetail, RunSummary, RunsResponse } from '../types'
 import { LineChart } from '../components/LineChart'
+import { comparisonGroups, display } from '../runData'
+import { EvaluationTable } from './BenchmarkView'
 
 interface CompareViewProps {
   onBack: () => void
@@ -11,12 +13,6 @@ function pct(v: number | null | undefined): string {
   if (v == null) return '—'
   return (v * 100).toFixed(1) + '%'
 }
-
-const COMPARE_METRICS = [
-  { key: 'loss', label: 'Loss', color: '#e05c5c' },
-  { key: 'avg_reward', label: 'Avg Reward', color: '#4f9eff' },
-  { key: 'win_rate', label: 'Win Rate', color: '#5ce05c' },
-]
 
 const COLORS = ['#4f9eff', '#e05c5c', '#5ce05c', '#f0a030']
 
@@ -28,12 +24,18 @@ export function CompareView({ onBack }: CompareViewProps) {
   const [benchMap, setBenchMap] = useState<Record<string, BenchmarkResult[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [loadErrors, setLoadErrors] = useState<Record<string, string>>({})
+  const [warnings, setWarnings] = useState<string[]>([])
+  const [benchmarkWarnings, setBenchmarkWarnings] = useState<Record<string, string[]>>({})
+  const [refreshVersion, setRefreshVersion] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
   const [xKey] = useState<'episode' | 'step'>('episode')
 
   useEffect(() => {
     api.listRuns()
       .then((r: RunsResponse) => {
         setAllRuns(r.runs)
+        setWarnings(r.warnings)
         // Preselect latest 3 runs by default
         setSelected(r.runs.slice(0, 3).map(x => x.run_id))
       })
@@ -50,29 +52,52 @@ export function CompareView({ onBack }: CompareViewProps) {
   }
 
   useEffect(() => {
-    for (const runId of selected) {
-      if (!details[runId]) {
-        api.getRun(runId).then(d => setDetails(prev => ({ ...prev, [runId]: d }))).catch(() => {})
-      }
-      if (!metricMap[runId]) {
-        api.getMetrics(runId).then(m => setMetricMap(prev => ({ ...prev, [runId]: m }))).catch(() => {})
-      }
-      if (!benchMap[runId]) {
-        api.getBenchmarks(runId).then(b => setBenchMap(prev => ({ ...prev, [runId]: b.benchmarks }))).catch(() => {})
+    let active = true
+    // One request generation for every selected run and endpoint. Invalidate
+    // snapshots and warnings together, never overlay old and refreshed evidence.
+    setDetails({}); setMetricMap({}); setBenchMap({}); setBenchmarkWarnings({})
+    setRefreshing(selected.length > 0)
+    async function load<T>(key: string, request: () => Promise<T>, apply: (data: T) => void) {
+      try {
+        const data = await request()
+        if (!active) return
+        apply(data)
+        setLoadErrors(prev => {
+          const next = { ...prev }
+          delete next[key]
+          return next
+        })
+      } catch (e) {
+        if (active) setLoadErrors(prev => ({ ...prev, [key]: String(e) }))
       }
     }
-  }, [selected]) // eslint-disable-line react-hooks/exhaustive-deps
+    void Promise.all(selected.flatMap(runId => [
+      load(`${runId}:detail`, () => api.getRun(runId), d => setDetails(prev => ({ ...prev, [runId]: d }))),
+      load(`${runId}:metrics`, () => api.getMetrics(runId), m => setMetricMap(prev => ({ ...prev, [runId]: m }))),
+      load(`${runId}:benchmarks`, () => api.getBenchmarks(runId), b => {
+        setBenchMap(prev => ({ ...prev, [runId]: b.benchmarks }))
+        setBenchmarkWarnings(prev => ({ ...prev, [runId]: b.warnings ?? [] }))
+      }),
+    ])).then(() => { if (active) setRefreshing(false) })
+    return () => { active = false }
+  }, [selected, refreshVersion])
 
   if (loading) return <div className="loading">Loading runs…</div>
   if (error) return <div className="error">Error: {error}</div>
 
   const selectedDetails = selected.map(id => details[id]).filter(Boolean)
+  const name = (id: string) => allRuns.find(r => r.run_id === id)?.run_name ?? id
+  const overlays = comparisonGroups(selected.flatMap(id => metricMap[id] ? [{ runId: id, name: name(id), series: metricMap[id] }] : []))
 
   return (
     <div>
       <button onClick={onBack} className="back-btn">← Back</button>
       <h2>Compare Runs</h2>
-      <p className="muted">Select 2–5 runs to compare. Latest 3 preselected.</p>
+      <button onClick={() => setRefreshVersion(version => version + 1)} disabled={refreshing || !selected.length}>{refreshing ? 'Refreshing selected runs…' : 'Refresh selected runs'}</button>
+      <p className="muted">Select 2–5 Legacy or MLflow runs. Latest 3 preselected. Overlay only exact semantic/unit/scope and actual axis types; unknown types are excluded. All overlaid curves share X/Y domains.</p>
+      {warnings.map((w, i) => <div key={i} className="warning">{w}</div>)}
+      {selected.flatMap(id => (benchmarkWarnings[id] ?? []).map((w, i) => <div key={`${id}-${i}`} className="warning">{name(id)}: {w}</div>))}
+      {Object.entries(loadErrors).filter(([key]) => selected.some(id => key.startsWith(`${id}:`))).map(([key, message]) => <div className="error" key={key}>{key}: {message}</div>)}
 
       <div className="compare-selector">
         {allRuns.map(r => (
@@ -81,9 +106,9 @@ export function CompareView({ onBack }: CompareViewProps) {
               type="checkbox"
               checked={selected.includes(r.run_id)}
               onChange={() => toggleRun(r.run_id)}
-              disabled={!selected.includes(r.run_id) && selected.length >= 4}
+              disabled={!selected.includes(r.run_id) && selected.length >= 5}
             />
-            {r.run_id}
+            {r.run_name ?? r.run_id} · {r.source ?? 'legacy'} · {r.algorithm}
           </label>
         ))}
       </div>
@@ -100,31 +125,31 @@ export function CompareView({ onBack }: CompareViewProps) {
                 <thead>
                   <tr>
                     <th>Field</th>
-                    {selected.map(id => <th key={id}>{id}</th>)}
+                    {selected.map(id => <th key={id}>{name(id)}<div className="muted mono">{id}</div></th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {(['algorithm', 'reward_mode', 'model_arch', 'total_episodes'] as const).map(field => {
-                    const vals = selected.map(id => String(selectedDetails.find(d => d?.run_id === id)?.[field] ?? '…'))
+                  {(['source', 'status', 'experiment_name', 'algorithm', 'reward_mode', 'model_arch', 'total_episodes', 'provenance'] as const).map(field => {
+                    const vals = selected.map(id => display(details[id]?.[field] ?? (loadErrors[`${id}:detail`] ? 'Unavailable' : '…')))
                     const allSame = vals.every(v => v === vals[0])
                     return (
                       <tr key={field}>
                         <td className="kv-key">{field}</td>
                         {selected.map((id, i) => (
-                          <td key={id} className={!allSame ? 'diff-highlight' : ''}>{vals[i]}</td>
+                          <td key={id} className={!allSame ? 'diff-highlight' : ''}><pre>{vals[i]}</pre></td>
                         ))}
                       </tr>
                     )
                   })}
                   {/* Config keys — highlight differing values */}
                   {Array.from(new Set(selectedDetails.flatMap(d => Object.keys(d?.config ?? {})))).map(k => {
-                    const vals = selected.map(id => String(details[id]?.config?.[k] ?? '—'))
+                    const vals = selected.map(id => display(details[id]?.config?.[k]))
                     const allSame = vals.every(v => v === vals[0])
                     return (
                       <tr key={k}>
                         <td className="kv-key">{k}</td>
                         {selected.map((id, i) => (
-                          <td key={id} className={!allSame ? 'diff-highlight' : ''}>{vals[i]}</td>
+                          <td key={id} className={!allSame ? 'diff-highlight' : ''}><pre>{vals[i]}</pre></td>
                         ))}
                       </tr>
                     )
@@ -136,81 +161,29 @@ export function CompareView({ onBack }: CompareViewProps) {
 
           {/* Benchmark win rate comparison */}
           <section>
-            <h3>Latest Benchmark Win Rates</h3>
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Run</th>
-                    <th>Opponent</th>
-                    <th>Episode</th>
-                    <th>Win Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selected.flatMap(id => {
-                    const bs = benchMap[id] ?? []
-                    if (bs.length === 0) return [
-                      <tr key={id}><td>{id}</td><td colSpan={3} className="muted">loading…</td></tr>
-                    ]
-                    // Show last benchmark per opponent
-                    const byOpp: Record<string, BenchmarkResult> = {}
-                    for (const b of bs) {
-                      const k = b.opponent ?? 'unknown'
-                      byOpp[k] = b
-                    }
-                    return Object.values(byOpp).map((b, i) => (
-                      <tr key={`${id}-${i}`}>
-                        <td>{id}</td>
-                        <td>{b.opponent ?? '—'}</td>
-                        <td>{b.checkpoint_episode ?? '—'}</td>
-                        <td>{pct(b.win_rate)}</td>
-                      </tr>
-                    ))
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <h3>Checkpoint evaluation summaries</h3>
+            <p className="muted">Recorded aggregate W/D/L, win rate and score rate remain separate for each protocol/opponent/checkpoint. No pooled score or cross-protocol ranking.</p>
+            {selected.map(id => <div key={id}><h4>{name(id)}</h4>{benchMap[id] ? <EvaluationTable rows={benchMap[id]} /> : <div className="muted">{loadErrors[`${id}:benchmarks`] ? 'Unavailable' : 'Loading summaries…'}</div>}</div>)}
           </section>
 
           {/* Metric overlay charts */}
           <section>
-            <h3>Metric Curves</h3>
+            <h3>Compatible metric curves</h3>
+            {selected.some(id => !metricMap[id] && !loadErrors[`${id}:metrics`]) && <p className="muted">Loading metric evidence…</p>}
+            {!overlays.length && <div className="empty">No compatible curves with exact semantic/unit/scope/axis metadata among loaded runs.</div>}
             <div className="charts-grid">
-              {COMPARE_METRICS.map(m => {
-                const hasData = selected.some(id => metricMap[id]?.columns.includes(m.key))
-                if (!hasData) return null
-                return (
-                  <div key={m.key} className="chart-card">
-                    <div className="chart-title">{m.label}</div>
-                    <div style={{ position: 'relative' }}>
-                      {selected.map((id, idx) => {
-                        const pts = metricMap[id]?.points ?? []
-                        if (!pts.length) return null
-                        return (
-                          <div key={id} style={{ position: idx === 0 ? 'relative' : 'absolute', top: 0, left: 0 }}>
-                            <LineChart
-                              points={pts}
-                              xKey={xKey}
-                              yKey={m.key}
-                              color={COLORS[idx % COLORS.length]}
-                              label={id}
-                              width={550}
-                              height={200}
-                            />
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <div className="legend-row">
-                      {selected.map((id, idx) => (
-                        <span key={id} className="legend-item" style={{ color: COLORS[idx % COLORS.length] }}>■ {id}</span>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
+              {overlays.map(([key, group]) => <div key={key} className="chart-card">
+                <div className="chart-title">{group.label} · {group.unit}</div><p className="muted">{group.scope} · {group.axisType} · shared X/Y domains</p>
+                <LineChart series={group.curves.map(c => ({ ...c, color: COLORS[selected.indexOf(c.runId) % COLORS.length] }))} xKey={group.curves[0].xKey} xLabel={group.axisType} yLabel={`${group.label} (${group.unit})`} width={550} height={220} />
+                <div className="legend-row">{group.curves.map((c, i) => <span key={`${c.runId}-${i}`} className="legend-item" style={{ color: COLORS[selected.indexOf(c.runId) % COLORS.length] }}>■ {c.label} · {c.yKey}</span>)}</div>
+              </div>)}
             </div>
+            {selected.flatMap(id => (metricMap[id]?.warnings ?? []).map((w, i) => <div className="warning" key={`${id}-${i}`}>{name(id)}: {w}</div>))}
+          </section>
+          <section><h3>Recorded snapshots — not training curves</h3>
+            {selected.map(id => <details key={id}><summary>{name(id)} · {metricMap[id]?.snapshots?.length ?? 0} snapshots</summary>
+              {(metricMap[id]?.snapshots ?? []).map((snapshot, i) => <div key={i}><h4>{snapshot.scope ?? 'Scope unspecified'} · {snapshot.source ?? snapshot.run_id}</h4><pre>{display(snapshot)}</pre></div>)}
+            </details>)}
           </section>
         </>
       )}

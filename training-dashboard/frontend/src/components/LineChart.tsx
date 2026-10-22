@@ -1,10 +1,23 @@
 import React, { useState } from 'react'
-import type { MetricPoint } from '../types'
+import type { AxisKey, MetricPoint } from '../types'
+import { chartData, chartDomains } from '../runData'
+
+export interface ChartSeries {
+  points: MetricPoint[]
+  yKey: string
+  label?: string
+  color?: string
+  xKey?: AxisKey
+}
 
 interface LineChartProps {
-  points: MetricPoint[]
-  xKey: 'episode' | 'step'
-  yKey: string
+  points?: MetricPoint[]
+  series?: ChartSeries[]
+  xKey: AxisKey
+  xLabel?: string
+  yKey?: string
+  yLabel?: string
+  connect?: boolean
   color?: string
   label?: string
   width?: number
@@ -17,22 +30,18 @@ interface TooltipState {
   y: number
   xVal: number
   yVal: number
+  label?: string
 }
 
-function toNum(v: number | null | undefined): number | null {
-  if (v == null || isNaN(v)) return null
-  return v
-}
-
-export function LineChart({ points, xKey, yKey, color = '#4f9eff', label, width = 600, height = 200 }: LineChartProps) {
+export function LineChart({ points = [], series, xKey, xLabel, yKey = '', yLabel, connect = true, color = '#4f9eff', label, width = 600, height = 200 }: LineChartProps) {
   const [tooltip, setTooltip] = useState<TooltipState>({ visible: false, x: 0, y: 0, xVal: 0, yVal: 0 })
   const pad = { top: 10, right: 10, bottom: 30, left: 55 }
 
-  const data = points
-    .map(p => ({ x: toNum(p[xKey]), y: toNum(p.values[yKey]) }))
-    .filter((d): d is { x: number; y: number } => d.x != null && d.y != null)
+  const curves = (series ?? [{ points, yKey, color, label }]).map(s => ({ ...s, data: chartData(s.points, s.xKey ?? xKey, s.yKey) }))
+  const data = curves.flatMap(s => s.data.map(p => ({ ...p, label: s.label })))
+  const domains = chartDomains(series ?? [{ points, yKey }], xKey)
 
-  if (data.length === 0) {
+  if (!domains || data.length === 0) {
     return (
       <div style={{ width, height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: 12 }}>
         No data for {yKey}
@@ -40,10 +49,9 @@ export function LineChart({ points, xKey, yKey, color = '#4f9eff', label, width 
     )
   }
 
-  const xMin = Math.min(...data.map(d => d.x))
-  const xMax = Math.max(...data.map(d => d.x))
-  const yMin = Math.min(...data.map(d => d.y))
-  const yMax = Math.max(...data.map(d => d.y))
+  let { xMin, xMax, yMin, yMax } = domains
+  if (xMin === xMax) { xMin -= 0.5; xMax += 0.5 }
+  if (yMin === yMax) { const delta = Math.abs(yMin) * 0.05 || 0.5; yMin -= delta; yMax += delta }
 
   const chartW = width - pad.left - pad.right
   const chartH = height - pad.top - pad.bottom
@@ -54,17 +62,13 @@ export function LineChart({ points, xKey, yKey, color = '#4f9eff', label, width 
   const scaleX = (x: number) => ((x - xMin) / xRange) * chartW
   const scaleY = (y: number) => chartH - ((y - yMin) / yRange) * chartH
 
-  const pathD = data
-    .map((d, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(d.x).toFixed(1)} ${scaleY(d.y).toFixed(1)}`)
-    .join(' ')
-
   const yTicks = 4
   const xTicks = 5
 
   function handleMouseMove(e: React.MouseEvent<SVGSVGElement>) {
     const svgRect = e.currentTarget.getBoundingClientRect()
-    const mouseX = e.clientX - svgRect.left - pad.left
-    const mouseY = e.clientY - svgRect.top - pad.top
+    const mouseX = (e.clientX - svgRect.left) * width / svgRect.width - pad.left
+    const mouseY = (e.clientY - svgRect.top) * height / svgRect.height - pad.top
 
     if (mouseX < 0 || mouseX > chartW || mouseY < 0 || mouseY > chartH) {
       setTooltip(t => ({ ...t, visible: false }))
@@ -72,11 +76,10 @@ export function LineChart({ points, xKey, yKey, color = '#4f9eff', label, width 
     }
 
     // Find nearest data point by x
-    const hoverXVal = xMin + (mouseX / chartW) * xRange
     let nearest = data[0]
     let nearestDist = Infinity
     for (const d of data) {
-      const dist = Math.abs(d.x - hoverXVal)
+      const dist = Math.hypot(scaleX(d.x) - mouseX, scaleY(d.y) - mouseY)
       if (dist < nearestDist) {
         nearestDist = dist
         nearest = d
@@ -89,6 +92,7 @@ export function LineChart({ points, xKey, yKey, color = '#4f9eff', label, width 
       y: e.clientY - 10,
       xVal: nearest.x,
       yVal: nearest.y,
+      label: nearest.label,
     })
   }
 
@@ -105,9 +109,10 @@ export function LineChart({ points, xKey, yKey, color = '#4f9eff', label, width 
   return (
     <>
       <svg
-        width={width}
-        height={height}
-        style={{ display: 'block', cursor: 'crosshair' }}
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={`${yLabel ?? yKey} by ${xLabel ?? xKey}`}
+        style={{ display: 'block', cursor: 'crosshair', width: '100%', maxWidth: width }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
@@ -132,13 +137,16 @@ export function LineChart({ points, xKey, yKey, color = '#4f9eff', label, width 
               <g key={i}>
                 <line x1={x} y1={0} x2={x} y2={chartH} stroke="#333" strokeWidth={0.5} />
                 <text x={x} y={chartH + 15} textAnchor="middle" fontSize={10} fill="#aaa">
-                  {Math.round(v)}
+                  {xKey === 'timestamp' ? new Date(v).toLocaleDateString() : Math.round(v)}
                 </text>
               </g>
             )
           })}
           {/* Data line */}
-          <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} />
+          {curves.map((curve, index) => <g key={index}>
+            {connect && <path d={curve.data.map((p, i) => `${i ? 'L' : 'M'} ${scaleX(p.x)} ${scaleY(p.y)}`).join(' ')} fill="none" stroke={curve.color ?? color} strokeWidth={1.5} />}
+            {curve.data.map((p, i) => <circle key={i} cx={scaleX(p.x)} cy={scaleY(p.y)} r={2} fill={curve.color ?? color} />)}
+          </g>)}
           {/* Hover indicator */}
           {tooltip.visible && (
             <line
@@ -157,7 +165,7 @@ export function LineChart({ points, xKey, yKey, color = '#4f9eff', label, width 
           <line x1={0} y1={chartH} x2={chartW} y2={chartH} stroke="#555" strokeWidth={1} />
           {/* X-axis label */}
           <text x={chartW / 2} y={chartH + 28} textAnchor="middle" fontSize={10} fill="#888">
-            {xKey}
+            {xLabel ?? xKey}
           </text>
           {/* Legend */}
           {label && (
@@ -170,8 +178,9 @@ export function LineChart({ points, xKey, yKey, color = '#4f9eff', label, width 
           className="chart-tooltip"
           style={{ left: tooltip.x, top: tooltip.y }}
         >
-          <span style={{ color: '#888' }}>{xKey}:</span> {Math.round(tooltip.xVal)}&nbsp;&nbsp;
-          <span style={{ color: '#888' }}>{yKey}:</span> {fmtY(tooltip.yVal)}
+          {tooltip.label && <strong>{tooltip.label} · </strong>}
+          <span style={{ color: '#888' }}>{xLabel ?? xKey}:</span> {xKey === 'timestamp' ? new Date(tooltip.xVal).toLocaleString() : tooltip.xVal}&nbsp;&nbsp;
+          <span style={{ color: '#888' }}>{yLabel ?? yKey}:</span> {fmtY(tooltip.yVal)}
         </div>
       )}
     </>

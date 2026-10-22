@@ -21,5 +21,5 @@ export const api = {
   getDiagnosis: (runId: string) => get<DiagnosisReport>(`/api/runs/${encodeURIComponent(runId)}/diagnosis`),
   listEvalReplays: (runId: string) => get<EvalReplaysResponse>(`/api/runs/${encodeURIComponent(runId)}/eval-replays`),
   getEvalReplay: (runId: string, replayPath: string) =>
-    get<EvalReplayDetail>(`/api/runs/${encodeURIComponent(runId)}/eval-replays/${replayPath}`),
+    get<EvalReplayDetail>(`/api/runs/${encodeURIComponent(runId)}/eval-replays/${replayPath.split('/').map(encodeURIComponent).join('/')}`),
 }

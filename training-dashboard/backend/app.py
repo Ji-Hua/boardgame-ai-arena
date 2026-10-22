@@ -7,21 +7,14 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+from types import SimpleNamespace
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_artifact_roots
-from .discovery import (
-    diagnose_run,
-    discover_all_runs,
-    discover_run,
-    load_eval_replays,
-    load_run_benchmarks,
-    load_run_detail,
-    load_run_metrics,
-)
 from . import mlflow
+from .providers import LegacyAdapter, UnifiedRunService
 
 
 def _asdict(obj: Any) -> Any:
@@ -35,12 +28,7 @@ def _asdict(obj: Any) -> Any:
 
 def _find_run_dir(run_id: str) -> Path | None:
     """Search artifact roots for a run directory matching run_id."""
-    for root_str in get_artifact_roots():
-        root = Path(root_str)
-        candidate = root / run_id
-        if candidate.is_dir():
-            return candidate
-    return None
+    return LegacyAdapter().find(run_id)
 
 
 def create_app() -> FastAPI:
@@ -60,6 +48,18 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "HEAD", "OPTIONS"],
         allow_headers=["*"],
     )
+    app.state.runs = UnifiedRunService()
+
+    def delegate(run_id: str, method: str, *args) -> dict:
+        try:
+            provider = app.state.runs.provider_for(run_id)
+            return getattr(provider, method)(run_id, *args)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Run or replay not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except (RuntimeError, ImportError, OSError) as exc:
+            raise HTTPException(status_code=503, detail=f"Evidence unavailable: {exc}") from exc
 
     @app.get("/health")
     def health() -> dict[str, Any]:
@@ -141,7 +141,7 @@ def create_app() -> FastAPI:
             "/data/quoridor/experiments/cnn-architecture-20261021-213018/arena-v2/report.json",
         ))
         try:
-            report = json.loads(report_path.read_text())
+            report = app.state.runs.mlflow.local.json(report_path)
         except FileNotFoundError:
             return {"available": False, "reason": "No immutable Arena evidence is mounted for this run."}
         except (OSError, ValueError) as exc:
@@ -149,7 +149,9 @@ def create_app() -> FastAPI:
 
         agent = next(
             (candidate for candidate in report.get("agents", [])
-             if candidate.get("algo", {}).get("params", {}).get("checkpoint") == source_path),
+             if candidate.get("algo", {}).get("params", {}).get("checkpoint") == source_path
+             and run.get("tags", {}).get("checkpoint_sha256")
+             and candidate.get("algo", {}).get("params", {}).get("sha256") == run["tags"]["checkpoint_sha256"]),
             None,
         )
         if agent is None:
@@ -174,58 +176,30 @@ def create_app() -> FastAPI:
         }
 
     @app.get("/api/runs")
-    def list_runs() -> dict[str, Any]:
-        roots = get_artifact_roots()
-        summaries, warnings = discover_all_runs(roots)
-        return {
-            "runs": [_asdict(s) for s in summaries],
-            "count": len(summaries),
-            "artifact_roots_scanned": roots,
-            "warnings": warnings,
-        }
+    def list_runs(source: str | None = None, algorithm: str | None = None,
+                  experiment: str | None = None, status: str | None = None) -> dict[str, Any]:
+        return app.state.runs.listing(source, algorithm, experiment, status)
 
     @app.get("/api/runs/{run_id}")
     def get_run(run_id: str) -> dict[str, Any]:
-        run_dir = _find_run_dir(run_id)
-        if run_dir is None:
-            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
-        detail = load_run_detail(run_dir)
-        if detail is None:
-            raise HTTPException(status_code=404, detail=f"Run '{run_id}' could not be loaded")
-        return _asdict(detail)
+        return delegate(run_id, "detail")
 
     @app.get("/api/runs/{run_id}/metrics")
     def get_run_metrics(run_id: str) -> dict[str, Any]:
-        run_dir = _find_run_dir(run_id)
-        if run_dir is None:
-            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
-        series = load_run_metrics(run_dir)
-        return _asdict(series)
+        return delegate(run_id, "metrics")
 
     @app.get("/api/runs/{run_id}/benchmarks")
     def get_run_benchmarks(run_id: str) -> dict[str, Any]:
-        run_dir = _find_run_dir(run_id)
-        if run_dir is None:
-            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
-        results = load_run_benchmarks(run_dir)
-        return {
-            "run_id": run_id,
-            "benchmarks": [_asdict(r) for r in results],
-            "count": len(results),
-        }
+        return delegate(run_id, "benchmarks")
 
     @app.get("/api/runs/{run_id}/diagnosis")
     def get_run_diagnosis(run_id: str) -> dict[str, Any]:
-        run_dir = _find_run_dir(run_id)
-        if run_dir is None:
-            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
-        report = diagnose_run(run_dir)
-        return _asdict(report)
+        return delegate(run_id, "diagnosis")
 
     @app.get("/api/summary")
     def get_summary() -> dict[str, Any]:
-        roots = get_artifact_roots()
-        summaries, _ = discover_all_runs(roots)
+        listing = app.state.runs.listing()
+        summaries = [SimpleNamespace(**row) for row in listing["runs"]]
         algorithms: set[str] = set()
         reward_modes: set[str] = set()
         model_arches: set[str] = set()
@@ -251,6 +225,7 @@ def create_app() -> FastAPI:
                     latest_modified = s.modified_at
                     latest_run_id = s.run_id
         return {
+            "warnings": listing["warnings"],
             "total_runs": len(summaries),
             "runs_with_metrics": with_metrics,
             "runs_with_benchmarks": with_benchmarks,
@@ -265,33 +240,12 @@ def create_app() -> FastAPI:
     @app.get("/api/runs/{run_id}/eval-replays")
     def get_eval_replays(run_id: str):
         """List all saved evaluation replay index entries for a run."""
-        run_dir = _find_run_dir(run_id)
-        if run_dir is None:
-            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
-        replays = load_eval_replays(run_dir)
-        return {"run_id": run_id, "count": len(replays), "replays": _asdict(replays)}
+        return delegate(run_id, "replays")
 
     @app.get("/api/runs/{run_id}/eval-replays/{replay_path:path}")
     def get_eval_replay_file(run_id: str, replay_path: str):
         """Return the raw replay JSON for a specific replay file."""
-        run_dir = _find_run_dir(run_id)
-        if run_dir is None:
-            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
-        # Prevent path traversal
-        try:
-            full_path = (run_dir / replay_path).resolve()
-            run_dir_resolved = run_dir.resolve()
-            full_path.relative_to(run_dir_resolved)
-        except (ValueError, OSError):
-            raise HTTPException(status_code=400, detail="Invalid replay path")
-        if not full_path.exists():
-            raise HTTPException(status_code=404, detail=f"Replay file not found: {replay_path}")
-        try:
-            import json as _json
-            with open(full_path) as fh:
-                return _json.load(fh)
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Failed to read replay: {exc}")
+        return delegate(run_id, "replay", replay_path)
 
     return app
 

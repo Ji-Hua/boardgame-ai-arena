@@ -4,6 +4,7 @@ import type { DiagnosisReport, RunDetail } from '../types'
 import { BenchmarkView } from './BenchmarkView'
 import { MetricsView } from './MetricsView'
 import EvalReplaysView from './EvalReplaysView'
+import { display } from '../runData'
 
 interface Props {
   runId: string
@@ -43,10 +44,13 @@ function DiagnosisPanel({ runId }: { runId: string }) {
 
   useEffect(() => {
     setLoading(true)
+    setErr(null)
+    let active = true
     api.getDiagnosis(runId)
-      .then(setReport)
-      .catch(e => setErr(String(e)))
-      .finally(() => setLoading(false))
+      .then(r => { if (active) setReport(r) })
+      .catch(e => { if (active) setErr(String(e)) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [runId])
 
   if (loading) return <div className="loading">Analyzing run…</div>
@@ -64,7 +68,7 @@ function DiagnosisPanel({ runId }: { runId: string }) {
     <div>
       <h3>Automated Diagnosis</h3>
       {report.items.length === 0 ? (
-        <div className="muted">No issues detected.</div>
+        <div className="muted">No diagnosis observations recorded.</div>
       ) : (
         <div className="diag-list">
           {report.items.map((item, i) => (
@@ -87,10 +91,15 @@ export function RunDetailView({ runId, onBack }: Props) {
 
   useEffect(() => {
     setLoading(true)
+    setError(null)
+    setDetail(null)
+    setTab('overview')
+    let active = true
     api.getRun(runId)
-      .then(setDetail)
-      .catch(e => setError(String(e)))
-      .finally(() => setLoading(false))
+      .then(r => { if (active) setDetail(r) })
+      .catch(e => { if (active) setError(String(e)) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [runId])
 
   if (loading) return <div className="loading">Loading run {runId}…</div>
@@ -101,12 +110,12 @@ export function RunDetailView({ runId, onBack }: Props) {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
-    ...(detail.has_metrics ? [{ id: 'metrics' as Tab, label: 'Metrics' }] : []),
-    ...(detail.has_benchmarks ? [{ id: 'benchmarks' as Tab, label: 'Benchmarks' }] : []),
+    { id: 'metrics', label: 'Metrics' },
+    { id: 'benchmarks', label: 'Benchmarks' },
     { id: 'checkpoints', label: `Checkpoints (${detail.checkpoints.length})` },
     { id: 'config', label: 'Config' },
     { id: 'diagnosis', label: 'Diagnosis' },
-    ...(detail.has_eval_replays ? [{ id: 'replays' as Tab, label: 'Eval Replays' }] : []),
+    { id: 'replays', label: 'Eval Replays' },
   ]
 
   return (
@@ -115,14 +124,19 @@ export function RunDetailView({ runId, onBack }: Props) {
 
       {/* Header */}
       <div className="run-header-bar">
-        <span className="run-header-id">{runId}</span>
+        <span className="run-header-id">{detail.run_name ?? runId}</span>
         <div className="run-header-meta">
+          <span>{detail.source ?? 'legacy'}</span>
+          <span>{detail.status ?? 'Status not recorded'}</span>
+          <span>{detail.experiment_name ?? 'Experiment not recorded'}</span>
           <span>{detail.algorithm}</span>
           {detail.reward_mode && <span>{detail.reward_mode}</span>}
           {detail.model_arch && <span>{detail.model_arch}</span>}
           <span style={{ color: 'var(--text-muted)' }}>Modified: {fmtDate(detail.modified_at)}</span>
         </div>
       </div>
+      <div className="muted mono">{runId}</div>
+      {(detail.warnings ?? []).map((w, i) => <div className="warning" key={i}>{w}</div>)}
 
       {/* Tab bar */}
       <div className="tab-bar">
@@ -145,7 +159,7 @@ export function RunDetailView({ runId, onBack }: Props) {
             <Card label="Env Steps" value={stats.total_env_steps != null ? stats.total_env_steps.toLocaleString() : '—'} />
             <Card label="Avg Reward" value={fmt3(stats.avg_episode_reward)} />
             <Card label="Final Loss" value={fmt3(stats.final_avg_loss)} />
-            <Card label="Final Q-Max" value={fmt3(stats.final_avg_q_max)} />
+            {stats.final_avg_q_max != null && <Card label="Final Q-Max (Q-value)" value={fmt3(stats.final_avg_q_max)} />}
             <Card label="Checkpoints" value={detail.checkpoints.length || '—'} />
           </div>
 
@@ -156,7 +170,7 @@ export function RunDetailView({ runId, onBack }: Props) {
                 {Object.entries(stats).map(([k, v]) => (
                   <tr key={k}>
                     <td className="kv-key">{k}</td>
-                    <td className="kv-val">{v == null ? '—' : String(v)}</td>
+                    <td className="kv-val"><pre>{display(v)}</pre></td>
                   </tr>
                 ))}
               </tbody>
@@ -210,17 +224,21 @@ export function RunDetailView({ runId, onBack }: Props) {
                     <th>Filename</th>
                     <th>Episode</th>
                     <th>Step</th>
+                    <th>Progress type</th>
+                    <th>SHA-256 / model type / artifact reference</th>
                     <th>Has Benchmark</th>
                     <th>Best WR</th>
                     <th>Modified</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {detail.checkpoints.map(ck => (
-                    <tr key={ck.filename}>
+                  {detail.checkpoints.map((ck, i) => (
+                    <tr key={`${ck.sha256 ?? ck.path}-${i}`}>
                       <td className="mono">{ck.filename}</td>
                       <td>{ck.episode ?? '—'}</td>
                       <td>{ck.step ?? '—'}</td>
+                      <td>{ck.progress_type ?? 'Unspecified'}</td>
+                      <td><div className="mono">{ck.sha256 ?? 'SHA unavailable'}</div><div>{ck.model_type ?? 'Model type unavailable'}</div><div className="mono">{ck.artifact_ref ?? ck.path ?? 'Artifact reference unavailable'}</div></td>
                       <td>
                         {ck.has_benchmark
                           ? <span style={{ color: 'var(--good)' }}>✓</span>
@@ -246,14 +264,14 @@ export function RunDetailView({ runId, onBack }: Props) {
         <section>
           <h3>Training Config</h3>
           {Object.keys(detail.config).length === 0 ? (
-            <div className="muted">No config extracted from train.log</div>
+            <div className="muted">No configuration recorded or accessible.</div>
           ) : (
             <table className="kv-table">
               <tbody>
                 {Object.entries(detail.config).map(([k, v]) => (
                   <tr key={k}>
                     <td className="kv-key">{k}</td>
-                    <td className="kv-val">{v == null ? '—' : String(v)}</td>
+                    <td className="kv-val"><pre>{display(v)}</pre></td>
                   </tr>
                 ))}
               </tbody>
@@ -261,6 +279,12 @@ export function RunDetailView({ runId, onBack }: Props) {
           )}
         </section>
       )}
+
+      {(tab === 'overview' || tab === 'config') && <section>
+        <h3>Architecture & provenance</h3>
+        <p>Architecture: {detail.model_arch ?? 'Not recorded'} · Algorithm: {detail.algorithm} · Output semantics: {display(detail.provenance?.output_semantics)}</p>
+        <pre className="notes">{display(detail.provenance ?? {})}</pre>
+      </section>}
 
       {/* Diagnosis */}
       {tab === 'diagnosis' && <DiagnosisPanel runId={runId} />}

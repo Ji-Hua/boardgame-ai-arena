@@ -325,21 +325,21 @@ async function compare() {
       if (JSON.stringify(model.position) !== positionKey) break;
       renderComparison();
     }
+  } finally { model.comparing = false; controls(); }
+}
 
-    async function multiCompare() {
-      const ids = [...$("multi-model-select").selectedOptions].map(option => option.value);
-      if (!ids.length) throw new Error("请选择至少一个 CNN checkpoint。");
-      model.comparing = true; $("comparison").hidden = false; controls();
-      try {
-        const result = await api("/api/multi-compare", {position: copy(model.position), model_ids: ids});
-        const optimal = new Set(result.minimax_d2.equivalent_optimal_ids);
-        $("comparison-results").innerHTML = [
-          `<p><strong>D2 等价最优：</strong>${result.minimax_d2.actions.filter(a => optimal.has(a.id)).map(a => esc(a.id)).join("、")}</p>`,
-          ...result.models.map(item => `<div class="compare-row"><span>${esc(item.model_id)}</span><strong>${esc(item.selected_id)}</strong><span>${item.selected_d2_optimal ? "D2 最优" : "D2 次优"}</span><button class="text-button" data-multi-action="${esc(JSON.stringify(item.top_actions[0].action))}">预览</button></div>`),
-        ].join("");
-        model.comparisons = [{name: "multi-agent", result}];
-      } finally { model.comparing = false; controls(); }
-    }
+async function multiCompare() {
+  const ids = [...$("multi-model-select").selectedOptions].map(option => option.value);
+  if (!ids.length) throw new Error("请选择至少一个 CNN checkpoint。");
+  model.comparing = true; $("comparison").hidden = false; controls();
+  try {
+    const result = await api("/api/multi-compare", {position: copy(model.position), model_ids: ids});
+    const optimal = new Set(result.minimax_d2.equivalent_optimal_ids);
+    $("comparison-results").innerHTML = [
+      `<p><strong>D2 等价最优：</strong>${result.minimax_d2.actions.filter(a => optimal.has(a.id)).map(a => esc(a.id)).join("、")}</p>`,
+      ...result.models.map(item => `<div class="compare-row"><span>${esc(item.model_id)}</span><strong>${esc(item.selected_id)}</strong><span>${item.selected_d2_optimal ? "D2 最优" : "D2 次优"}</span><button class="text-button" data-multi-action="${esc(JSON.stringify(item.top_actions[0].action))}">预览</button></div>`),
+    ].join("");
+    model.comparisons = [{name: "multi-agent", result}];
   } finally { model.comparing = false; controls(); }
 }
 

@@ -5,8 +5,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
-import type { EvalReplayMeta, EvalReplayDetail, EvalReplayState, EvalReplaysResponse } from '../types'
+import type { BenchmarkResult, EvalReplayMeta, EvalReplayDetail, EvalReplayState, EvalReplaysResponse } from '../types'
 import { EvalReplayBoard } from '../components/EvalReplayBoard'
+import { evaluationGroups, replayTurn } from '../runData'
+import { EvaluationTable } from './BenchmarkView'
 
 interface Props {
   runId: string
@@ -19,7 +21,8 @@ interface Props {
 function resultBadge(result: string | null) {
   if (result === 'win') return <span style={badge('green')}>WIN</span>
   if (result === 'loss') return <span style={badge('red')}>LOSS</span>
-  return <span style={badge('gray')}>DRAW</span>
+  if (result === 'draw') return <span style={badge('gray')}>DRAW</span>
+  return <span style={badge('gray')}>UNKNOWN</span>
 }
 
 function badge(color: string): React.CSSProperties {
@@ -52,7 +55,7 @@ interface ReplayViewerProps {
   onClose: () => void
 }
 
-const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => {
+export const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => {
   const [detail, setDetail] = useState<EvalReplayDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [stepIndex, setStepIndex] = useState(0)   // index into detail.states (0 = initial)
@@ -64,9 +67,19 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => 
     setError(null)
     setStepIndex(0)
     setPlaying(false)
+    let active = true
     api.getEvalReplay(runId, meta.replay_path)
-      .then(setDetail)
-      .catch((e: Error) => setError(e.message))
+      .then(replay => {
+        if (!active) return
+        if (!Array.isArray(replay.states) || !Array.isArray(replay.actions) || replay.states.length < 2 || replay.states.length !== replay.actions.length + 1 || replay.actions.length !== replay.game_length) {
+          setError('Full recorded trajectory is unavailable. Playback is disabled; no game will be regenerated.')
+          return
+        }
+        setDetail(replay)
+        setPlaying(true)
+      })
+      .catch((e: Error) => { if (active) setError(e.message) })
+    return () => { active = false }
   }, [runId, meta.replay_path])
 
   useEffect(() => {
@@ -85,6 +98,11 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => 
 
   const handleKey = useCallback((e: KeyboardEvent) => {
     if (!detail) return
+    if (e.target instanceof HTMLElement && (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(e.target.tagName) || e.target.isContentEditable)) return
+    if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End', ' '].includes(e.key)) return
+    e.preventDefault()
+    if (e.key === ' ') { setPlaying(p => !p); return }
+    setPlaying(false)
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       setStepIndex(s => Math.min(s + 1, detail.states.length - 1))
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
@@ -122,7 +140,9 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => 
   const currentState: EvalReplayState = detail.states[stepIndex]
   // The action that produced currentState (stepIndex 0 = initial; action[i] -> state[i+1])
   const lastAction = stepIndex > 0 ? detail.actions[stepIndex - 1] : null
+  const turn = replayTurn(currentState, detail.actions[stepIndex]?.player_id)
   const openDecisionLab = () => {
+    if (turn == null) return
     const position = {
       pawns: [currentState.p1, currentState.p2],
       walls_remaining: [currentState.walls_remaining_p1, currentState.walls_remaining_p2],
@@ -130,7 +150,7 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => 
         ...currentState.h_walls.map(([x, y]) => ({ x, y, orientation: 'horizontal' })),
         ...currentState.v_walls.map(([x, y]) => ({ x, y, orientation: 'vertical' })),
       ],
-      turn: stepIndex % 2 === 0 ? 1 : 2,
+      turn,
     }
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(position))))
     window.open(`http://${window.location.hostname}:8744/?position=${encodeURIComponent(encoded)}`, '_blank', 'noopener')
@@ -145,10 +165,10 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
         <button onClick={onClose} style={closeBtn}>✕ Close</button>
         <span style={{ fontWeight: 600, fontSize: 14 }}>
-          Ep {detail.episode} vs {detail.eval_opponent.name}
+          Episode {detail.episode ?? '—'} vs {detail.eval_opponent.name}
           {detail.eval_opponent.depth != null ? ` (d${detail.eval_opponent.depth})` : ''}
         </span>
-        <span>DQN seat: <strong>{dqnSeat}</strong></span>
+        <span>Agent seat: <strong>{dqnSeat}</strong></span>
         <span>Opp seat: <strong>{oppSeat}</strong></span>
         {resultBadge(detail.result_from_dqn_perspective)}
         {detail.winner
@@ -185,23 +205,21 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => 
             Step {stepIndex} / {totalStates - 1}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button style={navBtn} onClick={() => setStepIndex(0)} disabled={stepIndex === 0}>⏮</button>
-            <button style={navBtn} onClick={() => setStepIndex(s => Math.max(0, s - 1))} disabled={stepIndex === 0}>◀</button>
-            <button style={navBtn} onClick={() => setStepIndex(s => Math.min(totalStates - 1, s + 1))} disabled={stepIndex === totalStates - 1}>▶</button>
-            <button style={navBtn} onClick={() => setStepIndex(totalStates - 1)} disabled={stepIndex === totalStates - 1}>⏭</button>
+            <button aria-label="First position" style={navBtn} onClick={() => { setPlaying(false); setStepIndex(0) }} disabled={stepIndex === 0}>⏮</button>
+            <button aria-label="Previous position" style={navBtn} onClick={() => { setPlaying(false); setStepIndex(s => Math.max(0, s - 1)) }} disabled={stepIndex === 0}>◀</button>
+            <button aria-label="Next position" style={navBtn} onClick={() => { setPlaying(false); setStepIndex(s => Math.min(totalStates - 1, s + 1)) }} disabled={stepIndex === totalStates - 1}>▶</button>
+            <button aria-label="Last position" style={navBtn} onClick={() => { setPlaying(false); setStepIndex(totalStates - 1) }} disabled={stepIndex === totalStates - 1}>⏭</button>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <button style={navBtn} onClick={() => setPlaying(value => !value)} disabled={stepIndex === totalStates - 1}>
               {playing ? 'Pause' : 'Auto play'}
             </button>
-            <label style={{ fontSize: 12 }}>Speed <select value={speed} onChange={event => setSpeed(Number(event.target.value))}>
-              <option value={0.5}>0.5×</option><option value={1}>1×</option><option value={2}>2×</option><option value={4}>4×</option>
-            </select></label>
+            <label style={{ fontSize: 12 }}>Speed {speed}× <input aria-label="Playback speed" type="range" min={0.5} max={4} step={0.5} value={speed} onChange={event => setSpeed(Number(event.target.value))} /></label>
           </div>
           <input aria-label="Replay progress" type="range" min={0} max={totalStates - 1} value={stepIndex}
             onChange={event => { setPlaying(false); setStepIndex(Number(event.target.value)) }} />
-          <button style={navBtn} onClick={openDecisionLab}>Analyze Decision</button>
-          <p style={{ fontSize: 11, color: '#888', margin: 0 }}>← → arrow keys also work</p>
+          <button style={navBtn} onClick={openDecisionLab} disabled={turn == null} title={turn == null ? 'No recorded current player or next actor' : `Recorded turn: P${turn}`}>Analyze Decision</button>
+          <p style={{ fontSize: 11, color: '#888', margin: 0 }}>Space: pause/play · ← →: step · Home/End: jump</p>
 
           {/* Last action info */}
           {lastAction && (
@@ -211,7 +229,7 @@ const ReplayViewer: React.FC<ReplayViewerProps> = ({ runId, meta, onClose }) => 
               </div>
               <div style={{ fontSize: 12 }}>
                 <span style={{ color: lastAction.is_dqn_action ? '#4a90e2' : '#e24a4a' }}>
-                  {lastAction.is_dqn_action ? '🤖 DQN' : `⚔ ${lastAction.actor_name}`}
+                  {lastAction.player_id === dqnSeat ? '🤖 Agent' : `⚔ ${lastAction.actor_name}`}
                 </span>
               </div>
               <div style={{ fontSize: 12 }}>
@@ -254,15 +272,23 @@ const EvalReplaysView: React.FC<Props> = ({ runId }) => {
   const [replaysResp, setReplaysResp] = useState<EvalReplaysResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [selectedMeta, setSelectedMeta] = useState<EvalReplayMeta | null>(null)
+  const [benchmarks, setBenchmarks] = useState<BenchmarkResult[]>([])
+  const [benchmarkWarning, setBenchmarkWarning] = useState<string | null>(null)
 
   // Filtering
   const [filterOpponent, setFilterOpponent] = useState<string>('')
   const [filterResult, setFilterResult] = useState<string>('')
 
   useEffect(() => {
+    let active = true
+    setReplaysResp(null); setSelectedMeta(null); setError(null); setBenchmarks([]); setBenchmarkWarning(null)
+    setFilterOpponent(''); setFilterResult('')
     api.listEvalReplays(runId)
-      .then(setReplaysResp)
-      .catch((e: Error) => setError(e.message))
+      .then(r => { if (active) setReplaysResp(r) })
+      .catch((e: Error) => { if (active) setError(e.message) })
+    api.getBenchmarks(runId).then(r => { if (active) { setBenchmarks(r.benchmarks); setBenchmarkWarning(r.warnings?.join('\n') || null) } })
+      .catch(e => { if (active) setBenchmarkWarning(`Aggregate summaries unavailable: ${e}`) })
+    return () => { active = false }
   }, [runId])
 
   if (error) {
@@ -270,17 +296,6 @@ const EvalReplaysView: React.FC<Props> = ({ runId }) => {
   }
   if (!replaysResp) {
     return <div style={{ padding: 16, color: '#888' }}>Loading evaluation replays…</div>
-  }
-  if (replaysResp.count === 0) {
-    return (
-      <div style={{ padding: 16, color: '#888' }}>
-        <p>No evaluation replays found for this run.</p>
-        <p style={{ fontSize: 13 }}>
-          Replays are saved during periodic evaluation when <code>replay_sample_every</code> is
-          set in the <code>evaluation</code> section of the training config.
-        </p>
-      </div>
-    )
   }
 
   // Build filter options
@@ -292,13 +307,18 @@ const EvalReplaysView: React.FC<Props> = ({ runId }) => {
     if (filterResult && r.result_from_dqn_perspective !== filterResult) return false
     return true
   })
+  const groups = evaluationGroups(filtered, benchmarks.filter(b => !filterOpponent || b.opponent === filterOpponent))
 
   return (
     <div style={{ padding: '8px 0' }}>
+      <p className="muted">Recorded games only. All groups start collapsed. Aggregate evaluation summaries are shown when available; indexed replay samples are not full-evaluation W/D/L. Missing trajectories cannot be regenerated.</p>
+      {(replaysResp.warnings ?? []).map((w, i) => <div className="warning" key={i}>{w}</div>)}
+      {benchmarkWarning && <div className="warning">{benchmarkWarning}</div>}
       {/* Viewer overlay */}
       {selectedMeta && (
         <div style={{ marginBottom: 20 }}>
           <ReplayViewer
+            key={`${runId}-${selectedMeta.replay_path}`}
             runId={runId}
             meta={selectedMeta}
             onClose={() => setSelectedMeta(null)}
@@ -338,14 +358,23 @@ const EvalReplaysView: React.FC<Props> = ({ runId }) => {
         </span>
       </div>
 
-      {/* Table */}
+      {!groups.length && <div className="empty">No recorded evaluation games or summaries available.</div>}
+      <details className="replay-group">
+        <summary>Run: {runId} · {filtered.length} indexed games · {benchmarks.length} aggregate summaries</summary>
+        {groups.map(checkpoint => <details className="replay-group" key={checkpoint.key}>
+          <summary>{checkpoint.label}</summary>
+          {checkpoint.groups.map(group => <details className="replay-group" key={group.key}>
+            <summary>{group.label} · {group.summaries.length ? group.summaries.map(row => `Aggregate: ${row.games ?? '—'} games · W/D/L ${row.wins ?? '—'}/${row.draws ?? '—'}/${row.losses ?? '—'}`).join(' · ') : 'Aggregate W/D/L unknown'} · {group.games.length} sampled replay records</summary>
+            <EvaluationTable rows={group.summaries} />
+            {!group.summaries.length && <p className="muted">No matching aggregate summary. These games may be sampled replays; full evaluation W/D/L is unknown.</p>}
+            {!group.games.length && <p className="muted">No indexed replay trajectories for this evaluation.</p>}
       <div style={{ overflowX: 'auto' }}>
         <table style={tableStyle}>
           <thead>
             <tr style={{ background: '#f0f0f0' }}>
               <th style={th}>Episode</th>
               <th style={th}>Opponent</th>
-              <th style={th}>DQN Seat</th>
+              <th style={th}>Agent Seat</th>
               <th style={th}>Game #</th>
               <th style={th}>Result</th>
               <th style={th}>Winner</th>
@@ -354,7 +383,7 @@ const EvalReplaysView: React.FC<Props> = ({ runId }) => {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r, i) => (
+            {group.games.map((r, i) => (
               <tr
                 key={i}
                 style={{
@@ -369,23 +398,29 @@ const EvalReplaysView: React.FC<Props> = ({ runId }) => {
                     {r.dqn_player_id ?? '—'}
                   </span>
                 </td>
-                <td style={td}>{r.game_index ?? '—'}</td>
+                <td style={td}>{r.game_id ?? r.game_index ?? '—'}</td>
                 <td style={td}>{resultBadge(r.result_from_dqn_perspective)}</td>
-                <td style={td}>{r.winner ?? 'Draw'}</td>
+                <td style={td}>{r.winner ?? (r.result_from_dqn_perspective === 'draw' ? 'Draw' : 'Unknown')}</td>
                 <td style={td}>{r.game_length ?? '—'}</td>
                 <td style={td}>
                   <button
+                    disabled={r.replay_available === false}
+                    title={r.replay_unavailable_reason ?? undefined}
                     onClick={() => setSelectedMeta(selectedMeta?.replay_path === r.replay_path ? null : r)}
                     style={viewBtn}
                   >
-                    {selectedMeta?.replay_path === r.replay_path ? 'Hide' : 'View'}
+                    {r.replay_available === false ? 'Unavailable' : selectedMeta?.replay_path === r.replay_path ? 'Hide' : 'View recorded game'}
                   </button>
+                  {r.replay_available === false && <div className="muted">{r.replay_unavailable_reason ?? 'Full trajectory not available; playback disabled.'}</div>}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+          </details>)}
+        </details>)}
+      </details>
     </div>
   )
 }

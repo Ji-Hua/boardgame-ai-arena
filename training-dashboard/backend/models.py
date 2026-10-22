@@ -15,6 +15,10 @@ class CheckpointInfo:
     modified_at: str | None = None
     has_benchmark: bool = False
     best_win_rate: float | None = None
+    sha256: str | None = None
+    model_type: str | None = None
+    artifact_ref: str | None = None
+    progress_type: str | None = None
 
 
 @dataclass
@@ -43,6 +47,12 @@ class RunSummary:
     final_avg_reward: float | None
     final_epsilon: float | None
     total_env_steps: int | None
+    run_name: str | None = None
+    source: str = "legacy"
+    experiment_id: str | None = None
+    experiment_name: str | None = None
+    status: str | None = None
+    provenance: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -64,6 +74,13 @@ class RunDetail:
     has_benchmarks: bool
     has_notes: bool
     has_eval_replays: bool
+    run_name: str | None = None
+    source: str = "legacy"
+    experiment_id: str | None = None
+    experiment_name: str | None = None
+    status: str | None = None
+    provenance: dict[str, Any] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -71,6 +88,9 @@ class MetricPoint:
     episode: int | None
     step: int | None
     values: dict[str, float | None]
+    timestamp: str | int | float | None = None
+    update: int | None = None
+    gradient_updates: int | None = None
 
 
 @dataclass
@@ -79,6 +99,10 @@ class MetricSeries:
     points: list[MetricPoint]
     columns: list[str]
     warnings: list[str] = field(default_factory=list)
+    metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
+    axes: list[dict[str, str]] = field(default_factory=list)
+    snapshots: list[dict[str, Any]] = field(default_factory=list)
+    provenance: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -102,6 +126,14 @@ class BenchmarkResult:
     timeout_count: int | None
     crash_count: int | None
     extra: dict[str, Any] = field(default_factory=dict)
+    evaluation_id: str | None = None
+    protocol: str | None = None
+    score_rate: float | None = None
+    game_type: str = "evaluation"
+    checkpoint_sha: str | None = None
+    replay_available: bool = False
+    progress_type: str | None = None
+    source_manifest: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -132,3 +164,12 @@ class EvalReplayMeta:
     illegal_acts: int | None
     replay_path: str
     created_at: str | None
+    game_id: str | None = None
+    evaluation_id: str | None = None
+    protocol: str | None = None
+    game_type: str = "evaluation"
+    checkpoint_sha: str | None = None
+    replay_available: bool = True
+    replay_unavailable_reason: str | None = None
+    step: int | None = None
+    progress_type: str | None = None

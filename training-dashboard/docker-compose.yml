@@ -13,15 +13,15 @@
 services:
   training-dashboard:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: training-dashboard/Dockerfile
     ports:
       - "8740:8740"
       - "8741:8741"
     volumes:
       # Mount training artifacts read-only.
       # The host path is relative to this file (training-dashboard/).
-      - ../agent_system/training/artifacts:/data/training_artifacts:ro
+      - ${TRAINING_ARTIFACTS_DIR:-../agent_system/training/artifacts}:/data/training_artifacts:ro
       - ${QUORIDOR_DATA_DIR:-/home/jihua/quoridor-data}:/data/quoridor:ro
     environment:
       # Colon-separated list of container paths to scan for training runs.
@@ -29,6 +29,7 @@ services:
       # sees individual run directories whichever layout is present.
       TRAINING_DASHBOARD_ARTIFACT_ROOTS: "/data/training_artifacts/dqn:/data/training_artifacts"
       QUORIDOR_DATA_ROOT: "/data/quoridor"
+      MLFLOW_TRACKING_URI: "${MLFLOW_TRACKING_URI:-http://192.168.68.88:8742}"
     init: true
     stop_grace_period: 15s
     healthcheck:
