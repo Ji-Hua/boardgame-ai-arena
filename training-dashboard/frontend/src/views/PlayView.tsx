@@ -24,10 +24,11 @@ export function PlayView() {
   const [cellSize, setCellSize] = useState(48)
   const boardArea = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (game) return
     let active = true
     api.models().then(data => { if (active) setModels(data.models) }).catch(e => { if (active) setError(String(e)) })
     return () => { active = false }
-  }, [])
+  }, [game])
   useEffect(() => {
     const element = boardArea.current
     if (!element) return

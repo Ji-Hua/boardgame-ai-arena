@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { projectPlay, ResearchPlayController, type PlaySnapshot } from '../src/play'
 import { PlayView } from '../src/views/PlayView'
 
-afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
 const sha = 'a'.repeat(64)
 test('safe coordinate projection retains P2, walls and wall stocks', () => {
   const snapshot = { state: { current_player: 2, pawns: { '1': { row: 4, col: 3 }, '2': { row: 4, col: 5 } }, walls_remaining: { '1': 9, '2': 8 }, walls: [{ x: 7, y: 7, orientation: 'vertical' }], game_over: false }, actions: [], human_seat: 2, step_count: 7, result: null } as unknown as PlaySnapshot
@@ -32,4 +32,13 @@ test('Play deep link selects exact SHA and never starts automatically', async ()
   expect(await screen.findByTestId('selected-sha')).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Start game' }).hasAttribute('disabled')).toBe(false)
   expect(vi.mocked(fetch).mock.calls.every(call => !call[1] || call[1].method !== 'POST')).toBe(true)
+})
+test('reconnecting to a pinned game does not depend on model catalog requests', () => {
+  const fetch = vi.fn().mockRejectedValue(new Error('Offline catalog'))
+  vi.stubGlobal('fetch', fetch)
+  const snapshot = vi.spyOn(ResearchPlayController.prototype, 'snapshot').mockImplementation(() => new Promise(() => {}))
+  render(<MemoryRouter initialEntries={['/play?game=existing-game']}><PlayView /></MemoryRouter>)
+  expect(snapshot).toHaveBeenCalledWith('existing-game')
+  expect(fetch).not.toHaveBeenCalled()
+  expect(screen.queryByRole('alert')).toBeNull()
 })
