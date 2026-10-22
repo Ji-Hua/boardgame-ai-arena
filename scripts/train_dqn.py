@@ -140,8 +140,10 @@ class TrainConfig:
     model_arch: str = "mlp"
     # CNN-specific: conv layer output channels (ignored for mlp)
     cnn_channels: list[int] = field(default_factory=lambda: list(CNN_DEFAULT_CHANNELS))
+    cnn_dense_width: int = 256
     cnn_activation: str = "relu"
     cnn_hierarchical: bool = False
+    cnn_variant: str = "baseline"
     # Weight initialization only: fresh optimizer/replay/counters, not resume.
     warm_start_checkpoint: str | None = None
     demonstration_dataset: str | None = None
@@ -333,8 +335,10 @@ def train(cfg: TrainConfig, *, checkpoint_callback=None) -> TrainResult:
         hidden_layers=cfg.hidden_layers,
         in_channels=_CNN_OBS_SHAPE[0] if cfg.model_arch == "cnn" else 7,
         cnn_channels=cfg.cnn_channels if cfg.model_arch == "cnn" else None,
+        dense_width=cfg.cnn_dense_width,
         cnn_activation=cfg.cnn_activation,
         cnn_hierarchical=cfg.cnn_hierarchical,
+        cnn_variant=cfg.cnn_variant,
     ).to(device)
     target_net = build_q_network(
         model_arch=cfg.model_arch,
@@ -343,8 +347,10 @@ def train(cfg: TrainConfig, *, checkpoint_callback=None) -> TrainResult:
         hidden_layers=cfg.hidden_layers,
         in_channels=_CNN_OBS_SHAPE[0] if cfg.model_arch == "cnn" else 7,
         cnn_channels=cfg.cnn_channels if cfg.model_arch == "cnn" else None,
+        dense_width=cfg.cnn_dense_width,
         cnn_activation=cfg.cnn_activation,
         cnn_hierarchical=cfg.cnn_hierarchical,
+        cnn_variant=cfg.cnn_variant,
     ).to(device)
     if cfg.warm_start_checkpoint:
         parent = load_checkpoint(cfg.warm_start_checkpoint, expected_obs_version=_obs_version_str)

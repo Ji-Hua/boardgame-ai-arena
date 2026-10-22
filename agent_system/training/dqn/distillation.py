@@ -85,9 +85,15 @@ def _collect_game(job):
             legal[index] = True
             wins[index] = engine.winner(candidate["state"]) == state.current_player
         obs = np.asarray(encode_observation_cnn(state), dtype=np.float32)
+        optimal_d2 = np.zeros(ACTION_COUNT, dtype=np.bool_)
+        best_d2 = max(candidate["score"] for candidate in d2)
+        for candidate in d2:
+            if candidate["score"] == best_d2:
+                optimal_d2[encode_engine_action(candidate["action"])] = True
         rows.append({"obs": obs, "legal": legal, "winning": wins,
                      "expert_d1": encode_engine_action(teachers[0]["action"]),
-                     "expert_d2": encode_engine_action(teachers[1]["action"])})
+                     "expert_d2": encode_engine_action(teachers[1]["action"]),
+                     "optimal_d2": optimal_d2})
         actions.append(wire_action(chosen["action"]))
         state = chosen["state"]
         if engine.is_game_over(state):
@@ -137,10 +143,86 @@ def collect_shared_dataset(config, folder):
     return metadata
 
 
+def collect_heldout_dataset(config, folder, excluded_state_keys):
+    """Collect fresh D2-labelled games outside the training symmetry groups."""
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=False)
+    excluded = set(json.loads(Path(excluded_state_keys).read_text()))
+    if not excluded or any(not isinstance(key, str) or len(key) != 64 for key in excluded):
+        raise ValueError("Held-out collection requires valid training symmetry keys")
+    rows, seen, traces = [], set(), []
+    episode_start = config.get("episode_start", 0)
+    jobs = ((episode_start + i, config) for i in range(config["episodes"]))
+    with ProcessPoolExecutor(max_workers=config["workers"]) as pool:
+        for game_rows, trace in pool.map(_collect_game, jobs, chunksize=4):
+            kept = 0
+            for row in game_rows:
+                key = symmetry_key(row["obs"])
+                if key in excluded or key in seen:
+                    continue
+                seen.add(key)
+                rows.append(row)
+                kept += 1
+            traces.append({**trace, "retained_positions": kept})
+    if not rows:
+        raise ValueError("Held-out collection retained no positions")
+    tensors = {key: torch.from_numpy(np.asarray([row[key] for row in rows])) for key in rows[0]}
+    metadata = {
+        "episodes": config["episodes"],
+        "episode_start": episode_start,
+        "source_game_family": config["source_game_family"],
+        "teacher_depth": 2,
+        "training_symmetry_groups_excluded": len(excluded),
+        "validation_positions": len(rows),
+        "validation_symmetry_groups": len(seen),
+        "isolation": "fresh source-game family; training and reflected training positions excluded",
+    }
+    torch.save({"validation": tensors, "metadata": metadata}, folder / "heldout.pt")
+    (folder / "metadata.json").write_text(json.dumps(metadata, indent=2))
+    with gzip.open(folder / "games.jsonl.gz", "wt") as stream:
+        for trace in traces:
+            stream.write(json.dumps(trace) + "\n")
+    return metadata
+
+
 def policy_loss(logits, legal, expert):
     if not bool(legal.gather(1, expert[:, None]).all()):
         raise ValueError("Expert labels must be legal")
     return nn.functional.cross_entropy(logits.masked_fill(~legal, -torch.inf), expert)
+
+
+def evaluate_heldout_policy(checkpoint, dataset_path, output):
+    """Score a frozen policy checkpoint on isolated D2-labelled positions."""
+    from .checkpoint import load_checkpoint
+
+    checkpoint_path = Path(checkpoint)
+    loaded = load_checkpoint(checkpoint_path, expected_obs_version="dqn_obs_cnn_v1")
+    if loaded.algorithm != "policy_distillation":
+        raise ValueError("Held-out policy evaluation requires a policy-distillation checkpoint")
+    dataset = torch.load(dataset_path, map_location="cpu", weights_only=True)
+    data = dataset["validation"]
+    metadata = dataset["metadata"]
+    if metadata.get("teacher_depth") != 2 or not metadata.get("isolation"):
+        raise ValueError("Held-out dataset is missing D2 isolation metadata")
+    network = loaded.network.eval()
+    with torch.no_grad():
+        logits = network(data["obs"].float())
+        selected = logits.masked_fill(~data["legal"], -torch.inf).argmax(1)
+        cross_entropy = policy_loss(logits, data["legal"], data["expert_d2"]).item()
+    result = {
+        "checkpoint": str(checkpoint_path),
+        "dataset": str(dataset_path),
+        "dataset_sha256": hashlib.sha256(Path(dataset_path).read_bytes()).hexdigest(),
+        "positions": len(selected),
+        "strict_action_agreement": (selected == data["expert_d2"]).float().mean().item(),
+        "equivalent_optimal_action_rate": data["optimal_d2"].gather(1, selected[:, None]).float().mean().item(),
+        "cross_entropy": cross_entropy,
+        "isolation": metadata["isolation"],
+    }
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(result, indent=2))
+    return result
 
 
 def train_distillation(cfg, config, output, callback):
@@ -156,9 +238,20 @@ def train_distillation(cfg, config, output, callback):
     (output / "dataset.json").write_text(json.dumps(metadata, indent=2))
     data = {k: v.to(cfg.device) for k, v in dataset["train"].items()}
     torch.manual_seed(cfg.seed)
-    net = CNNQNetwork(cnn_channels=cfg.cnn_channels, activation=cfg.cnn_activation).to(cfg.device)
+    net = CNNQNetwork(
+        cnn_channels=cfg.cnn_channels,
+        dense_width=cfg.cnn_dense_width,
+        activation=cfg.cnn_activation,
+        variant=cfg.cnn_variant,
+    ).to(cfg.device)
     initial_hash = hashlib.sha256(b"".join(p.detach().cpu().numpy().tobytes() for p in net.parameters())).hexdigest()
-    initialization = {"mode": "fresh", "seed": cfg.seed, "initial_weights_sha256": initial_hash}
+    initialization = {
+        "mode": "fresh",
+        "seed": cfg.seed,
+        "initial_weights_sha256": initial_hash,
+        "parameter_count": net.parameter_count(),
+        "cnn_variant": cfg.cnn_variant,
+    }
     (output / "initialization.json").write_text(json.dumps(initialization, indent=2))
     optimizer = torch.optim.AdamW(net.parameters(), lr=cfg.lr, weight_decay=1e-4)
     generator = torch.Generator(device=cfg.device).manual_seed(config["batch_seed"])

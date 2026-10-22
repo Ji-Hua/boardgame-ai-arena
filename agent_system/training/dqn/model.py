@@ -64,6 +64,7 @@ DEFAULT_HIDDEN_SIZE: int = 256
 
 # Default CNN channel sizes: [conv1_out, conv2_out, conv3_out].
 CNN_DEFAULT_CHANNELS: list[int] = [32, 64, 64]
+CNN_VARIANTS: frozenset[str] = frozenset({"baseline", "deep", "resnet"})
 
 # CNN board dimensions (matches Quoridor 9×9 board).
 _CNN_BOARD_SIZE: int = 9
@@ -163,6 +164,26 @@ def _validate_hidden_layers(layers: list[int]) -> None:
 # CNN Q-network
 # ---------------------------------------------------------------------------
 
+class ResidualCNNBlock(nn.Module):
+    """Two-convolution residual block that preserves the 9×9 board geometry."""
+
+    def __init__(self, in_channels: int, out_channels: int, nonlinearity) -> None:
+        super().__init__()
+        self.convs = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nonlinearity(),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+        )
+        self.skip = (
+            nn.Identity() if in_channels == out_channels
+            else nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        )
+        self.activation = nonlinearity()
+
+    def forward(self, obs: torch.Tensor) -> torch.Tensor:
+        return self.activation(self.convs(obs) + self.skip(obs))
+
+
 class CNNQNetwork(nn.Module):
     """Small CNN Q-network for Quoridor DQN.
 
@@ -205,12 +226,16 @@ class CNNQNetwork(nn.Module):
         activation: str = "relu",
         hierarchical: bool = False,
         value_head: bool = False,
+        variant: str = "baseline",
     ) -> None:
         super().__init__()
         self.in_channels = in_channels
         self.cnn_channels: list[int] = list(cnn_channels or CNN_DEFAULT_CHANNELS)
         self.action_count = action_count
         self.dense_width = dense_width
+        if variant not in CNN_VARIANTS:
+            raise ValueError(f"Unsupported CNN variant: {variant}")
+        self.variant = variant
         if activation not in {"relu", "leaky_relu"}:
             raise ValueError(f"Unsupported CNN activation: {activation}")
         self.activation = activation
@@ -218,14 +243,31 @@ class CNNQNetwork(nn.Module):
         def nonlinearity():
             return nn.ReLU() if activation == "relu" else nn.LeakyReLU(0.01)
 
-        # Convolutional layers
-        conv_layers: list[nn.Module] = []
-        ch = in_channels
-        for out_ch in self.cnn_channels:
-            conv_layers.append(nn.Conv2d(ch, out_ch, kernel_size=3, padding=1))
-            conv_layers.append(nonlinearity())
-            ch = out_ch
-        self.conv = nn.Sequential(*conv_layers)
+        if variant == "baseline":
+            conv_layers: list[nn.Module] = []
+            ch = in_channels
+            for out_ch in self.cnn_channels:
+                conv_layers.append(nn.Conv2d(ch, out_ch, kernel_size=3, padding=1))
+                conv_layers.append(nonlinearity())
+                ch = out_ch
+            self.conv = nn.Sequential(*conv_layers)
+        else:
+            if len(self.cnn_channels) != 3:
+                raise ValueError(f"{variant} CNN requires three block widths")
+            ch = in_channels
+            blocks: list[nn.Module] = []
+            for out_ch in self.cnn_channels:
+                if variant == "deep":
+                    blocks.extend((
+                        nn.Conv2d(ch, out_ch, kernel_size=3, padding=1),
+                        nonlinearity(),
+                        nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1),
+                        nonlinearity(),
+                    ))
+                else:
+                    blocks.append(ResidualCNNBlock(ch, out_ch, nonlinearity))
+                ch = out_ch
+            self.conv = nn.Sequential(*blocks)
 
         # Dense head
         flat_size = ch * _CNN_BOARD_SIZE * _CNN_BOARD_SIZE
@@ -304,6 +346,7 @@ def build_q_network(
     dense_width: int = 256,
     cnn_activation: str = "relu",
     cnn_hierarchical: bool = False,
+    cnn_variant: str = "baseline",
 ) -> "QNetwork | CNNQNetwork":
     """Construct a Q-network for the requested architecture.
 
@@ -346,6 +389,7 @@ def build_q_network(
             dense_width=dense_width,
             activation=cnn_activation,
             hierarchical=cnn_hierarchical,
+            variant=cnn_variant,
         )
     raise ValueError(
         f"Unknown model_arch '{model_arch}'. Expected 'mlp' or 'cnn'."

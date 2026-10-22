@@ -592,6 +592,15 @@ class TestPhase18ACNNCheckpoint:
         raw = torch.load(path, map_location="cpu", weights_only=False)
         assert raw["model_config"]["cnn_channels"] == [16, 32, 32]
 
+    def test_resnet_variant_round_trips(self, tmp_path):
+        net = CNNQNetwork(cnn_channels=[8, 8, 8], dense_width=16, variant="resnet")
+        path = tmp_path / "resnet.pt"
+        save_checkpoint(path, net, model_arch="cnn")
+        checkpoint = load_checkpoint(path)
+        assert checkpoint.model_config["cnn_variant"] == "resnet"
+        assert checkpoint.network.variant == "resnet"
+        assert torch.allclose(net(torch.zeros(7, 9, 9)), checkpoint.network(torch.zeros(7, 9, 9)))
+
     def test_save_cnn_stores_in_channels(self, tmp_path):
         """CNN checkpoint model_config must include in_channels."""
         net = CNNQNetwork()
@@ -694,5 +703,3 @@ class TestPhase18ACNNCheckpoint:
                          cnn_channels=list(CNN_DEFAULT_CHANNELS))
         ckpt = load_checkpoint(path)
         assert ckpt.param_count == expected
-
-

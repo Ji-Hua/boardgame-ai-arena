@@ -281,6 +281,7 @@ def save_checkpoint(
             "cnn_channels": _cnn_channels,
             "dense_width": getattr(network, "dense_width", 256),
             "cnn_activation": getattr(network, "activation", "relu"),
+            "cnn_variant": getattr(network, "variant", "baseline"),
             "cnn_hierarchical": getattr(network, "hierarchical", False),
             "cnn_value_head": getattr(network, "value_head", None) is not None,
             "action_count": _action_count,
@@ -406,6 +407,7 @@ def load_checkpoint(
             activation=cfg.get("cnn_activation", "relu"),
             hierarchical=cfg.get("cnn_hierarchical", False),
             value_head=cfg.get("cnn_value_head", False),
+            variant=cfg.get("cnn_variant", "baseline"),
         )
     else:
         # MLP — fall back for old checkpoints that only store hidden_size

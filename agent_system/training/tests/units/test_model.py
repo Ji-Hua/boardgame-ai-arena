@@ -24,6 +24,7 @@ from agent_system.training.dqn.action_space import ACTION_COUNT
 from agent_system.training.dqn.model import (
     CNN_DEFAULT_CHANNELS,
     CNN_MODEL_VERSION,
+    CNN_VARIANTS,
     DEFAULT_HIDDEN_SIZE,
     MODEL_VERSION,
     OBSERVATION_SIZE,
@@ -600,6 +601,23 @@ class TestCNNQNetwork:
         net = CNNQNetwork(dense_width=128)
         assert net is not None
 
+    @pytest.mark.parametrize("variant", sorted(CNN_VARIANTS))
+    def test_architecture_variants_preserve_policy_shape(self, variant):
+        net = CNNQNetwork(
+            cnn_channels=[8, 8, 8],
+            dense_width=16,
+            variant=variant,
+        )
+        assert net(torch.zeros(2, CNN_CHANNELS, CNN_BOARD_SIZE, CNN_BOARD_SIZE)).shape == (2, ACTION_COUNT)
+
+    def test_residual_variant_rejects_non_block_widths(self):
+        with pytest.raises(ValueError, match="three block widths"):
+            CNNQNetwork(cnn_channels=[8, 8], variant="resnet")
+
+    def test_unknown_variant_is_rejected(self):
+        with pytest.raises(ValueError, match="Unsupported CNN variant"):
+            CNNQNetwork(variant="unknown")
+
     # --- Forward: single observation ---
 
     def test_forward_single_obs_shape(self):
@@ -794,4 +812,3 @@ class TestBuildQNetwork:
                                        cnn_channels=[32, 64, 64], dense_width=256)
         net_direct = QNetwork(hidden_layers=[256, 256])
         assert net_factory.parameter_count() == net_direct.parameter_count()
-

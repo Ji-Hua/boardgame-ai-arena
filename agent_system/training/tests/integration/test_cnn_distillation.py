@@ -9,10 +9,11 @@ import torch
 from agent_system.analysis.state import ENGINE, Position, build_state, to_position
 from agent_system.runtime.service.agents.minimax_agent import inspect_branch, score_position
 from agent_system.training.dqn.action_space import decode_action_id, encode_engine_action
-from agent_system.training.dqn.checkpoint import load_checkpoint
+from agent_system.training.dqn.checkpoint import load_checkpoint, save_checkpoint
 from agent_system.training.dqn.distillation import (
-    _collect_game, policy_loss, reflect_batch, reflection_permutation, train_distillation,
+    _collect_game, evaluate_heldout_policy, policy_loss, reflect_batch, reflection_permutation, train_distillation,
 )
+from agent_system.training.dqn.model import CNNQNetwork
 from agent_system.training.dqn.observation_cnn import encode_observation_cnn
 from scripts.train_dqn import TrainConfig
 
@@ -87,3 +88,27 @@ def test_shared_collection_and_fresh_training_record_real_episode_and_logit_sema
         assert checkpoints[-1].algorithm == "policy_distillation"
         assert checkpoints[-1].eval_summary["output_semantics"] == "policy_logits"
     assert hashes[0] == hashes[1]
+
+
+def test_heldout_evaluation_reports_strict_and_equivalent_d2_metrics(tmp_path):
+    dataset = tmp_path / "heldout.pt"
+    legal = torch.zeros((2, 209), dtype=torch.bool)
+    legal[:, :2] = True
+    optimal = torch.zeros((2, 209), dtype=torch.bool)
+    optimal[:, 0] = True
+    torch.save({
+        "validation": {
+            "obs": torch.zeros((2, 7, 9, 9)),
+            "legal": legal,
+            "expert_d2": torch.zeros(2, dtype=torch.long),
+            "optimal_d2": optimal,
+        },
+        "metadata": {"teacher_depth": 2, "isolation": "fresh source-game family"},
+    }, dataset)
+    network = CNNQNetwork(cnn_channels=[2, 2, 2], dense_width=4)
+    checkpoint = tmp_path / "policy.pt"
+    save_checkpoint(checkpoint, network, model_arch="cnn", algorithm="policy_distillation")
+    result = evaluate_heldout_policy(checkpoint, dataset, tmp_path / "result.json")
+    assert result["positions"] == 2
+    assert 0 <= result["strict_action_agreement"] <= 1
+    assert 0 <= result["equivalent_optimal_action_rate"] <= 1
