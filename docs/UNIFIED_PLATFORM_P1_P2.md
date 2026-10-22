@@ -357,6 +357,17 @@ boundary; UI wrappers alone do not provide persisted pause or safe concurrency.
 
 ## Handoff
 
+Implementation commit: `be5b20096a1b717bb1239f9ec981267017642b07`, pushed normally
+to `origin/feature/unified-platform-p1-p2`; no PR created. Dev fetched that
+commit through Git into `/home/jihua/workspace/quoridor-platform-p1-p2` on
+`review/unified-platform-p1-p2`. Its existing primary checkout remains clean
+on `integration/dev-training-20261021` at `69b495f`; production Backend health
+remained OK and container `AGENT_SERVICE_URL` remained
+`http://192.168.68.88:8743`. Training's feature worktree was clean after the
+implementation commit; the final 119-test backend regression still passed
+with the same single optional skip. Dev has the source for review, not a new
+deployment or a separately verified Dev frontend build.
+
 All implementation, tests, launcher and documentation belong to the isolated
 `feature/unified-platform-p1-p2` branch. No PR, shared-baseline promotion,
 production replacement, registry mutation, training or new tournament occurred.
