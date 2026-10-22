@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { replayRoute } from '../platform'
 import { api } from '../api'
 import type { AxisKey, BenchmarkResult, BenchmarksResponse, MetricPoint } from '../types'
 import { LineChart } from '../components/LineChart'
-import { COLORS, display, percent } from '../runData'
+import { checkpointKey, COLORS, display, evaluationKey, percent } from '../runData'
 
 interface BenchmarkViewProps {
   runId: string
@@ -19,12 +21,12 @@ export function EvaluationTable({ rows }: { rows: BenchmarkResult[] }) {
   </tr></thead><tbody>{rows.map((b, i) => <tr key={i}>
     <td>{b.evaluation_id ?? 'ID not recorded'}<div>{b.protocol ?? 'Protocol unspecified'} · {b.game_type ?? 'evaluation'}</div>
       <details><summary>Protocol / manifest</summary><pre>{display(b.source_manifest ?? {})}</pre><pre>{display(b.extra)}</pre></details></td>
-    <td>{b.checkpoint ?? 'Not recorded'}<div className="mono">{b.checkpoint_sha ?? 'SHA unavailable'}</div></td>
+    <td>{b.checkpoint ?? 'Not recorded'}<div className="mono sha">{b.checkpoint_sha ? <Link to={`/models/${b.checkpoint_sha}`}>{b.checkpoint_sha}</Link> : 'SHA unavailable'}</div></td>
     <td>Episode {b.checkpoint_episode ?? '—'}<div>{b.progress_type ?? 'Recorded step'}: {b.checkpoint_step ?? '—'}</div></td>
     <td>{b.opponent ?? 'Unspecified'}{b.opponent_depth != null && ` (d${b.opponent_depth})`}<div>Side {b.side ?? '—'} · seed {b.seed ?? '—'}</div></td>
     <td>{b.games ?? '—'}</td><td>{b.wins ?? '—'} / {b.draws ?? '—'} / {b.losses ?? '—'}</td>
     <td>{percent(b.win_rate)}</td><td>{percent(b.score_rate)}</td>
-    <td>{b.replay_available ? 'Recorded replay available' : 'No full replay available'}<div>Illegal: {b.illegal_action_count ?? '—'} · timeouts: {b.timeout_count ?? '—'} · crashes: {b.crash_count ?? '—'}</div></td>
+    <td>{b.replay_available ? 'Recorded replay available' : 'No full replay available'}<div><Link to={replayRoute(b.run_id, { checkpoint_sha: b.checkpoint_sha, checkpoint: b.checkpoint_sha ? undefined : b.checkpoint, evaluation: b.evaluation_id, opponent: b.opponent, checkpoint_group: checkpointKey(b), evaluation_group: evaluationKey(b) })}>Evaluation replay list →</Link></div><div>Illegal: {b.illegal_action_count ?? '—'} · timeouts: {b.timeout_count ?? '—'} · crashes: {b.crash_count ?? '—'}</div></td>
   </tr>)}</tbody></table></div>
 }
 

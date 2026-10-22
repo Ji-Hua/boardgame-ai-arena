@@ -1,4 +1,16 @@
 import React, { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { runRoute, replayRoute } from '../platform'
+import EvalReplaysView from './EvalReplaysView'
+
+export function ArenaView() {
+  const [params] = useSearchParams()
+  const runId = params.get('run_id')
+  return <div>
+    <div className="page-heading"><div><p className="eyebrow">Research / Arena</p><h1>{runId ? 'Run Arena evaluations' : 'Arena evaluation evidence'}</h1><p className="muted">Exact checkpoint identities, recorded protocols and aggregate results. Replay samples are not aggregate scores.</p></div><div className="action-bar"><Link to="/arena">Latest Arena matrix</Link><Link to="/training">Find a training run</Link></div></div>
+    {runId ? <><div className="action-bar"><Link to={runRoute(runId, 'checkpoints')}>Run checkpoints</Link><Link to={replayRoute(runId, { checkpoint_sha: params.get('checkpoint_sha'), checkpoint: params.get('checkpoint'), evaluation: params.get('evaluation') })}>Replay archive</Link></div><h2>Recorded evaluations &amp; replay evidence</h2><EvalReplaysView key={runId} runId={runId} arena /></> : <LatestArenaView />}
+  </div>
+}
 
 type Cell = {
   games: number; wins: number; losses: number; draws: number; score: number | null
@@ -33,14 +45,13 @@ const reasons: Record<string, string> = {
   illegal_action: '非法出招', agent_error: '推理异常',
 }
 
-export function ArenaView() {
+function LatestArenaView() {
   const [report, setReport] = useState<Report>()
   const [catalog, setCatalog] = useState<Catalog>()
   const [error, setError] = useState('')
   const [modelError, setModelError] = useState('')
   const [selected, setSelected] = useState<[string, string]>()
   const mlflow = `${window.location.protocol}//${window.location.hostname}:8742`
-  const playUrl = 'http://192.168.68.102:8765'
   useEffect(() => {
     let active = true
     const refresh = async () => {
@@ -67,7 +78,7 @@ export function ArenaView() {
   return <div className="arena-view">
     <div className="arena-heading">
       <div><h2>对战矩阵与模型库</h2><p>{report.run_id} · {report.status === 'complete' ? '已完成' : '评测中，每 10 秒更新'}</p></div>
-      <div className="arena-links"><a href={playUrl} target="_blank" rel="noreferrer">开始对战 ↗</a><a href={mlflow + '/#/models'} target="_blank" rel="noreferrer">MLflow 模型库 ↗</a></div>
+      <div className="arena-links"><Link to="/play">External Play ↗</Link><Link to="/replays">Recorded replays</Link><Link to="/models">Model identities</Link><a href={mlflow + '/#/models'} target="_blank" rel="noreferrer">MLflow ↗</a></div>
     </div>
     {error && <div className="warning">{error}；以下为上次成功读取的数据。</div>}
     {report.forfeits.length > 0 && <div className="error">{report.forfeits.length} 局发生弃权，需检查出招或推理错误后再解释排名。</div>}

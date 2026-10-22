@@ -1,3 +1,5 @@
+:root .context-banner { margin: 0 0 20px; padding: 16px 20px; border: 1px solid #a8c4b8; border-radius: 12px; background: #f0f7f3; overflow-wrap: anywhere; }
+:root .context-banner p { margin: 6px 0; font-size: 13px; }
 * {
   box-sizing:border-box
 }

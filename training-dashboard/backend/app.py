@@ -9,12 +9,14 @@ from pathlib import Path
 from typing import Any
 from types import SimpleNamespace
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_artifact_roots
 from . import mlflow
 from .providers import LegacyAdapter, UnifiedRunService
+from .platform_models import ModelIndex
+from .platform_context import analysis_context, evaluations
 
 
 def _asdict(obj: Any) -> Any:
@@ -31,7 +33,7 @@ def _find_run_dir(run_id: str) -> Path | None:
     return LegacyAdapter().find(run_id)
 
 
-def create_app() -> FastAPI:
+def create_app(*, unified_run_service=None, model_index=None) -> FastAPI:
     app = FastAPI(
         title="Quoridor Training Dashboard",
         version="0.1.0",
@@ -48,7 +50,36 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "HEAD", "OPTIONS"],
         allow_headers=["*"],
     )
-    app.state.runs = UnifiedRunService()
+    app.state.runs = unified_run_service if unified_run_service is not None else UnifiedRunService()
+    app.state.models = model_index if model_index is not None else ModelIndex(unified_run_service=app.state.runs)
+
+    def platform_call(operation, *args, **kwargs):
+        try:
+            return operation(*args, **kwargs)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Run, replay, model, or required evidence not found") from exc
+        except (ValueError, TypeError, IndexError, OverflowError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except (RuntimeError, ImportError, OSError) as exc:
+            raise HTTPException(status_code=503, detail=f"Evidence unavailable: {exc}") from exc
+
+    @app.get("/api/platform/models")
+    def platform_models():
+        return platform_call(app.state.models.listing)
+
+    @app.get("/api/platform/models/{sha}")
+    def platform_model(sha: str):
+        return platform_call(app.state.models.detail, sha, verify_sha=True)
+
+    @app.get("/api/platform/runs/{run_id}/evaluations")
+    def platform_evaluations(run_id: str):
+        return platform_call(evaluations, app.state.runs, run_id)
+
+    @app.get("/api/platform/context")
+    def platform_context(run_id: str | None = None, replay_path: str | None = None,
+                         ply: int = Query(default=0, ge=0), model_sha: str | None = None):
+        return platform_call(analysis_context, app.state.runs, app.state.models,
+                             run_id=run_id, replay_path=replay_path, ply=ply, model_sha=model_sha)
 
     def delegate(run_id: str, method: str, *args) -> dict:
         try:

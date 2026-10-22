@@ -138,12 +138,19 @@ test('recorded checkpoint/protocol conflicts never attach to an aggregate', () =
 test('compare refresh reloads every endpoint, clears recovered errors and never auto-retries', async () => {
   const states = [], effects = [], pendingEffects = [], requests = []
   let cursor = 0, tree
+  let searchParams = new URLSearchParams('run=a&run=b')
   const react = {
     createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) }),
     useState(initial) {
       const index = cursor++
       if (!(index in states)) states[index] = initial
       return [states[index], value => { states[index] = typeof value === 'function' ? value(states[index]) : value }]
+    },
+    useMemo(factory, deps) {
+      const index = cursor++
+      const previous = states[index]
+      if (!previous || deps.some((value, i) => value !== previous.deps[i])) states[index] = { deps, value: factory() }
+      return states[index].value
     },
     useEffect(effect, deps) {
       const index = cursor++, previous = effects[index]
@@ -164,7 +171,7 @@ test('compare refresh reloads every endpoint, clears recovered errors and never 
   const source = ts.transpileModule(readFileSync(new URL('../src/views/CompareView.tsx', import.meta.url), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true },
   }).outputText
-  runInNewContext(source, { exports, require: name => name === 'react' ? react : name === '../api' ? { api } : name === '../runData' ? { comparisonGroups, display: String } : name.startsWith('.') ? {} : require(name) })
+  runInNewContext(source, { exports, URLSearchParams, require: name => name === 'react' ? react : name === 'react-router-dom' ? { useSearchParams: () => [searchParams, next => { searchParams = next }] } : name === '../api' ? { api } : name === '../runData' ? { comparisonGroups, display: String } : name.startsWith('.') ? {} : require(name) })
   const render = () => {
     cursor = 0
     tree = exports.CompareView({ onBack() {} })

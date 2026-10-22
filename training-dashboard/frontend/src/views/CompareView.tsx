@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import type { BenchmarkResult, MetricSeries, RunDetail, RunSummary, RunsResponse } from '../types'
 import { LineChart } from '../components/LineChart'
@@ -18,7 +19,9 @@ const COLORS = ['#4f9eff', '#e05c5c', '#5ce05c', '#f0a030']
 
 export function CompareView({ onBack }: CompareViewProps) {
   const [allRuns, setAllRuns] = useState<RunSummary[]>([])
-  const [selected, setSelected] = useState<string[]>([])
+  const [params, setParams] = useSearchParams()
+  const selectionKey = params.getAll('run').join('\u0000')
+  const selected = React.useMemo(() => Array.from(new Set(params.getAll('run').filter(Boolean))).slice(0, 5), [selectionKey])
   const [details, setDetails] = useState<Record<string, RunDetail>>({})
   const [metricMap, setMetricMap] = useState<Record<string, MetricSeries>>({})
   const [benchMap, setBenchMap] = useState<Record<string, BenchmarkResult[]>>({})
@@ -36,19 +39,17 @@ export function CompareView({ onBack }: CompareViewProps) {
       .then((r: RunsResponse) => {
         setAllRuns(r.runs)
         setWarnings(r.warnings)
-        // Preselect latest 3 runs by default
-        setSelected(r.runs.slice(0, 3).map(x => x.run_id))
       })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
   }, [])
 
   function toggleRun(runId: string) {
-    setSelected(prev => {
-      if (prev.includes(runId)) return prev.filter(r => r !== runId)
-      if (prev.length >= 5) return prev
-      return [...prev, runId]
-    })
+    const nextSelected = selected.includes(runId) ? selected.filter(r => r !== runId) : selected.length < 5 ? [...selected, runId] : selected
+    const next = new URLSearchParams(params)
+    next.delete('run')
+    nextSelected.forEach(id => next.append('run', id))
+    setParams(next)
   }
 
   useEffect(() => {
@@ -94,7 +95,7 @@ export function CompareView({ onBack }: CompareViewProps) {
       <button onClick={onBack} className="back-btn">← Back</button>
       <h2>Compare Runs</h2>
       <button onClick={() => setRefreshVersion(version => version + 1)} disabled={refreshing || !selected.length}>{refreshing ? 'Refreshing selected runs…' : 'Refresh selected runs'}</button>
-      <p className="muted">Select 2–5 Legacy or MLflow runs. Latest 3 preselected. Overlay only exact semantic/unit/scope and actual axis types; unknown types are excluded. All overlaid curves share X/Y domains.</p>
+      <p className="muted">Select 2–5 Legacy or MLflow runs. Selection is stored in the URL. Overlay only exact semantic/unit/scope and actual axis types; unknown types are excluded. All overlaid curves share X/Y domains.</p>
       {warnings.map((w, i) => <div key={i} className="warning">{w}</div>)}
       {selected.flatMap(id => (benchmarkWarnings[id] ?? []).map((w, i) => <div key={`${id}-${i}`} className="warning">{name(id)}: {w}</div>))}
       {Object.entries(loadErrors).filter(([key]) => selected.some(id => key.startsWith(`${id}:`))).map(([key, message]) => <div className="error" key={key}>{key}: {message}</div>)}

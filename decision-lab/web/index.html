@@ -6,15 +6,16 @@
   <meta name="color-scheme" content="light">
   <title>Quoridor · Decision Lab</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231c6c59'/%3E%3Cpath d='M9 8h14v14H9zM19 19l6 7' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/assets/style.css">
+  <link rel="stylesheet" href="./assets/style.css">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">Quoridor</a><h1>Decision Lab</h1>
+    <a class="brand" href="./">Quoridor</a><h1>Decision Lab</h1>
     <div class="header-actions"><span id="connection" class="connection">连接引擎…</span><button id="export-button" class="button quiet">数据 / JSON</button></div>
   </header>
   <main>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section id="context-banner" class="context-banner" aria-label="Platform analysis context" aria-live="polite" hidden></section>
     <div class="workspace">
       <aside class="setup-panel">
         <section class="agent-input" aria-label="Agent 配置">
@@ -66,6 +67,6 @@
   </main>
   <dialog id="import-dialog"><div class="dialog-heading"><h2>导入局面</h2><button id="close-import" class="text-button" aria-label="关闭导入">×</button></div><p class="muted small">接受 Position JSON 或含 position 字段的分析 JSON。</p><label for="import-text" class="field-label">Position</label><textarea id="import-text" rows="12" spellcheck="false" placeholder='{"pawns":[[4,0],[4,8]],"walls_remaining":[10,10],"walls":[],"turn":1}'></textarea><p id="import-error" class="error-text" role="alert"></p><div class="dialog-actions"><button id="import-example" class="button secondary">填入当前局面</button><button id="confirm-import" class="button primary">验证并导入</button></div></dialog>
   <dialog id="export-dialog"><div class="dialog-heading"><h2>分析数据</h2><button id="close-export" class="text-button" aria-label="关闭数据">×</button></div><label for="data-scope" class="field-label">数据对象</label><select id="data-scope"><option value="case">完整分析记录</option><option value="position">Position · 根局面</option><option value="agent_spec">Agent Spec · 参数</option><option value="candidates">Candidates · 根搜索候选</option><option value="analysis">Analysis · 根搜索结果</option><option value="inspected_branch">Branch · 当前检查分支</option><option value="neural">Neural · 网络诊断</option><option value="neural_tensor">Tensor · 当前激活或权重切片</option><option value="neural_search">PUCT · 搜索诊断</option><option value="comparison">Comparison · 对比结果</option><option value="provenance">Provenance · 源码与引擎指纹</option></select><label for="export-text" class="field-label">JSON</label><textarea id="export-text" rows="16" readonly spellcheck="false"></textarea><p id="export-status" class="small muted"></p><div class="dialog-actions"><button id="select-export" class="button secondary">全选 JSON</button><button id="download-case" class="button primary">下载 JSON</button></div></dialog>
-  <script type="module" src="/assets/app.js?v=unified-dashboard-20261022"></script>
+  <script type="module" src="./assets/app.js?v=platform-context-v1"></script>
 </body>
 </html>

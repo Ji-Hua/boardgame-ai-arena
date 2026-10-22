@@ -2,6 +2,30 @@
 
 **Last verified:** 2026-10-22
 
+## Unified research platform P1/P2 completed (isolated branch)
+
+`feature/unified-platform-p1-p2` in the platform worktree, baseline `a8fc58d`,
+has completed P1/P2 routed research navigation and exact checkpoint/replay/ply
+handoff into an isolated same-origin Lab. Implementation and documentation are
+committed on the named feature branch; no shared-baseline promotion
+or production replacement is implied. Live HTTP 8751 + loopback Lab 8754 use a
+foreground supervisor, not durable systemd restart management. Existing Training
+services and the supplied unchanged Dev deployment remain separate.
+
+Final real Playwright evidence: **3/3 passed in 75.572s**. Focused revalidation:
+119 backend tests run (118 passed / 1 skipped), 38 Lab, 21 frontend Node and
+18 React UI tests passed; typecheck/build passed on Node 22.22.0. The exact
+C-resnet replay ply-7 import and explicitly clicked neural analysis returned
+HTTP 200 with 121 legal policy-logit candidates. The live index has 92 unique
+SHA identities with static capabilities, not 92 verified loads/deployments.
+
+P3 session runtime/pinned-spec permissions/safe wall DTOs and P4 revision-safe
+pause/isolation/React API wrappers are **not completed**. Play remains external;
+Lab is a transition, not a full React Lab. There is no arbitrary checkpoint
+session or persisted game pause, no auth/TLS and no shared source-list cache.
+No Model Registry, champion alias or production roster mutation occurred.
+See [full contracts, evidence, commands and handoff](UNIFIED_PLATFORM_P1_P2.md).
+
 ## Training dashboard integration
 
 The isolated `feature/unified-training-dashboard` worktree integrates the shared

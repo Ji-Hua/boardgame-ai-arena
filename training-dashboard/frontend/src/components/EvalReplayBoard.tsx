@@ -227,7 +227,9 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
   return (
     <svg
       {...svgProps}
-      style={{ background: BOARD_BG, borderRadius: 8, border: '2px solid #c8a96e' }}
+      role="img"
+      aria-label="Recorded Quoridor position"
+      style={{ background: BOARD_BG, borderRadius: 8, border: '2px solid #c8a96e', maxWidth: '100%', height: 'auto', display: 'block' }}
     >
       {/* Background */}
       <rect x={0} y={0} width={viewSize} height={viewSize} fill={BOARD_BG} />

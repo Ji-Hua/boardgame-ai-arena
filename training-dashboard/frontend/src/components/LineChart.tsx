@@ -116,7 +116,7 @@ export function LineChart({ points = [], series, xKey, xLabel, yKey = '', yLabel
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
-        <g transform={`translate(${pad.left},${pad.top})`}>
+        <g className="chart-plot" transform={`translate(${pad.left},${pad.top})`}>
           {/* Grid lines */}
           {Array.from({ length: yTicks + 1 }, (_, i) => {
             const v = yMin + (yRange * i) / yTicks

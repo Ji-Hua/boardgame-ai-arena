@@ -81,7 +81,7 @@ type Evidence = (BenchmarkResult | EvalReplayMeta) & {
   seed?: number | null
   source_manifest?: Record<string, unknown>
 }
-const isBenchmark = (row: Evidence): row is BenchmarkResult => 'checkpoint_episode' in row
+const isBenchmark = (row: Evidence): row is BenchmarkResult => !('replay_path' in row)
 const identityValue = (value: unknown): string => JSON.stringify(value, (_key, item) =>
   item && typeof item === 'object' && !Array.isArray(item)
     ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item)

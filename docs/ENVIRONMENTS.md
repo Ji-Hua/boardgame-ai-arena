@@ -1,6 +1,6 @@
 # Environments
 
-**Last verified:** 2026-10-22 (Training dashboard/Decision Lab; other facts retain their original verification)
+**Last verified:** 2026-10-22 (isolated P1/P2 platform and existing Training health endpoints; other facts retain their original verification)
 
 ## Roles
 
@@ -51,6 +51,32 @@ See [deployment/rollback and acceptance](UNIFIED_DASHBOARD_20261022.md).
 | MLflow | `http://192.168.68.88:8742` | Tracking server and model registry. |
 | Agent Service | `http://192.168.68.88:8743` | Pinned-model inference service. |
 | Decision Lab | `http://192.168.68.88:8744` | Developer decision-analysis UI/API. |
+
+### Isolated unified platform P1/P2 (additional, not replacement)
+
+- Source: `/home/jihua/workspace/boardgame-ai-arena-platform`, branch
+  `feature/unified-platform-p1-p2`, baseline `a8fc58d`; implementation pending
+  coordinating-agent commit. Original/shared worktrees are not overwritten.
+- Live entry `http://192.168.68.88:8751`; separate Lab listens only on
+  `http://127.0.0.1:8754`, proxied through `/research-lab/` on 8751.
+- The launcher supervises both children in the foreground. It is **not** an
+  installed systemd service or durable automatic-restart deployment. Do not
+  start a duplicate while the current isolated ports are occupied.
+- Uses the original Training venv and legacy artifact roots, existing MLflow,
+  and original catalogs. Only the isolated Lab child receives an externally
+  generated research catalog. No production roster, alias or Model Registry
+  mutation is involved; 8740–8744 and 8764–8765 are protected launcher ports.
+- 8751 platform APIs and existing 8741/8744/8743 health returned HTTP 200.
+  Supplied Dev handoff remains checkout `69b495f…`, production Backend HTTP
+  8764 → Training Agent Service 8743; no Dev deployment or remote revalidation
+  was performed by this documentation task.
+- Plain HTTP on a trusted LAN only, without auth/TLS. Research model flags are
+  static eligibility, not proof that all models load, play or are deployed.
+- Final browser evidence stays outside Git at
+  `/home/jihua/quoridor-data/platform-p1-p2/acceptance/live-e2e-20261022-final`.
+
+See [P1/P2 contracts, build/start/test commands and limitations](UNIFIED_PLATFORM_P1_P2.md).
+The earlier 8741/8744 deployment record above remains separate and unchanged.
 
 ### Verified MLflow configuration
 

@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import type { DiagnosisReport, RunDetail } from '../types'
 import { BenchmarkView } from './BenchmarkView'
 import { MetricsView } from './MetricsView'
 import EvalReplaysView from './EvalReplaysView'
 import { display } from '../runData'
+import { arenaRoute, replayRoute, runTab } from '../platform'
 
 interface Props {
   runId: string
@@ -87,13 +89,14 @@ export function RunDetailView({ runId, onBack }: Props) {
   const [detail, setDetail] = useState<RunDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('overview')
+  const [params, setParams] = useSearchParams()
+  const tab = runTab(params.get('tab'))
+  const setTab = (value: Tab) => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next) }
 
   useEffect(() => {
     setLoading(true)
     setError(null)
     setDetail(null)
-    setTab('overview')
     let active = true
     api.getRun(runId)
       .then(r => { if (active) setDetail(r) })
@@ -136,6 +139,7 @@ export function RunDetailView({ runId, onBack }: Props) {
         </div>
       </div>
       <div className="muted mono">{runId}</div>
+      <div className="action-bar"><Link to={arenaRoute(runId)}>Run Arena evaluations →</Link><Link to={replayRoute(runId)}>Recorded evaluations & replays →</Link><Link to={`/training/compare?${new URLSearchParams({ run: runId })}`}>Compare this run</Link></div>
       {(detail.warnings ?? []).map((w, i) => <div className="warning" key={i}>{w}</div>)}
 
       {/* Tab bar */}
@@ -238,7 +242,7 @@ export function RunDetailView({ runId, onBack }: Props) {
                       <td>{ck.episode ?? '—'}</td>
                       <td>{ck.step ?? '—'}</td>
                       <td>{ck.progress_type ?? 'Unspecified'}</td>
-                      <td><div className="mono">{ck.sha256 ?? 'SHA unavailable'}</div><div>{ck.model_type ?? 'Model type unavailable'}</div><div className="mono">{ck.artifact_ref ?? ck.path ?? 'Artifact reference unavailable'}</div></td>
+                      <td><div className="mono sha">{ck.sha256 ? <Link to={`/models/${ck.sha256}`}>{ck.sha256}</Link> : 'SHA unavailable'}</div><div>{ck.model_type ?? 'Model type unavailable'}</div><div className="mono">{ck.artifact_ref ?? ck.path ?? 'Artifact reference unavailable'}</div><div className="action-bar"><Link to={arenaRoute(runId, ck.sha256, ck.filename)}>Arena evaluations</Link><Link to={replayRoute(runId, { checkpoint_sha: ck.sha256, checkpoint: ck.sha256 ? undefined : ck.filename })}>Checkpoint evaluations & replays</Link></div></td>
                       <td>
                         {ck.has_benchmark
                           ? <span style={{ color: 'var(--good)' }}>✓</span>

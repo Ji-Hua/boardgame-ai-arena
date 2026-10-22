@@ -8,6 +8,7 @@ export default defineConfig({
     port: 8741,
     strictPort: true,
     proxy: {
+      '/research-lab': { target: 'http://localhost:8740', changeOrigin: true },
       '/api': {
         target: 'http://localhost:8740',
         changeOrigin: true,
@@ -23,6 +24,7 @@ export default defineConfig({
     port: 8741,
     strictPort: true,
     proxy: {
+      '/research-lab': { target: 'http://localhost:8740', changeOrigin: true },
       '/api': { target: 'http://localhost:8740', changeOrigin: true },
       '/health': { target: 'http://localhost:8740', changeOrigin: true },
     },

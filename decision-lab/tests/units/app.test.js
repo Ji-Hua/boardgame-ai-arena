@@ -67,7 +67,7 @@ test("module initialization binds multiCompare and reaches default position star
   assert.equal(typeof element("multi-compare-button").onclick, "function");
   assert.equal(typeof element("download-case").onclick, "function");
   assert.equal(element("connection").textContent, "Engine connected");
-  assert.deepEqual(calls.map(call => call.path), ["/api/meta", "/api/models", "/api/position", "/api/analyze"]);
+  assert.deepEqual(calls.map(call => call.path), ["/api/meta", "/api/models", "/api/position"]);
   assert.deepEqual(calls.find(call => call.path === "/api/position").body, opening);
   await element("multi-compare-button").onclick({});
   assert.equal(element("notice").textContent, "请选择至少一个 CNN checkpoint。");
@@ -81,7 +81,7 @@ test("startup imports the dashboard encoded position instead of the opening pres
   const search = `?${new URLSearchParams({position: Buffer.from(JSON.stringify(position), "utf8").toString("base64")})}`;
   const {element, calls} = await loadApp(t, search);
   assert.deepEqual(calls.filter(call => call.path === "/api/position").map(call => call.body), [position]);
-  assert.deepEqual(calls.find(call => call.path === "/api/analyze").body.position, position);
+  assert.equal(calls.some(call => call.path === "/api/analyze"), false);
   assert.equal(element("position-title").textContent, "Dashboard Replay");
   assert.equal(element("turn-select").value, "2");
   assert.equal(element("notice").textContent, "已从 Training Dashboard 导入经回放记录还原的局面。");

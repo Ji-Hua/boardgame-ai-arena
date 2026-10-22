@@ -228,6 +228,9 @@ export interface EvalReplayAction {
 
 /** Full replay detail (the replay JSON file contents). */
 export interface EvalReplayDetail {
+  checkpoint_sha256?: string | null
+  checkpoint_sha?: string | null
+  source?: { checkpoint_sha256?: string | null }
   schema_version: string
   run_id: string
   agent_id: string

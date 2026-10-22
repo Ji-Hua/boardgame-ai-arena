@@ -2,6 +2,53 @@ import {boardSVG, escapeHTML as esc, numeric, scoreText} from "./board.js";
 import {createNeuralPanel, hierarchyHTML, outputLabel} from "./neural.js";
 
 const $ = id => document.getElementById(id);
+const contextRequested = new URLSearchParams(window.location.search).has("context");
+const apiBase = /^\/research-lab(?:\/|$)/.test(window.location.pathname || "") ? "/research-lab" : "";
+const fullSHA = value => typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+const MAX_CONTEXT_BYTES = 65_536;
+
+function decodeContext(encoded) {
+  if (!encoded || encoded.length > Math.ceil(MAX_CONTEXT_BYTES * 4 / 3))
+    throw new Error("Context 为空或超过 64 KiB 限制。");
+  if (!/^[A-Za-z0-9_-]+$/.test(encoded) || encoded.length % 4 === 1)
+    throw new Error("Context 必须是无填充 base64url。");
+  const binary = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
+  if (binary.length > MAX_CONTEXT_BYTES) throw new Error("Context 超过 64 KiB 限制。");
+  if (btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") !== encoded)
+    throw new Error("Context base64url 编码无效。");
+  const context = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(Uint8Array.from(binary, c => c.charCodeAt(0))));
+  const p = context?.position;
+  if (context?.schema_version !== "analysis_context_v1" || !p || ![1, 2].includes(p.turn)
+      || !Array.isArray(p.pawns) || !Array.isArray(p.walls) || !Array.isArray(p.walls_remaining)
+      || !fullSHA(context.position_hash) || !context.source || !Number.isSafeInteger(context.source.ply)
+      || context.source.ply < 0 || !Array.isArray(context.warnings))
+    throw new Error("Context 合约无效：需要完整局面、实际行动方和来源证据。");
+  if (context.analysis_model !== null && !fullSHA(context.analysis_model?.sha256))
+    throw new Error("analysis_model 必须指定完整小写 SHA-256；不接受名称或别名。");
+  return context;
+}
+
+function safeReturnRoute(route) {
+  if (typeof route !== "string" || !route.startsWith("/") || route.startsWith("//")) return null;
+  try {
+    if (/[\\\u0000-\u0020\u007f]/.test(decodeURIComponent(route))) return null;
+    const url = new URL(route, "https://platform.invalid");
+    return url.origin === "https://platform.invalid" && /^\/(training|replays|models|arena)(\/|$)/.test(url.pathname)
+      ? url.pathname + url.search + url.hash : null;
+  } catch { return null; }
+}
+
+function contextModel(context, rows) {
+  const sha = context.analysis_model?.sha256;
+  if (!sha) throw new Error("Context 未指定 analysis_model SHA-256；神经分析已禁用。");
+  const matches = rows.filter(row => row.sha256 === sha && row.available);
+  if (!matches.length) throw new Error(`隔离 Lab catalog 缺少可用的精确 SHA-256 ${sha}；神经分析已禁用，不回退到名称或别名。`);
+  const entry = matches[0];
+  if (typeof entry.id !== "string" || !entry.id || rows.some(row => row.id === entry.id && row.sha256 !== sha))
+    throw new Error("隔离 Lab catalog 模型 ID / SHA 冲突；神经分析已禁用。");
+  return entry;
+}
+
 const model = {
   meta: null, position: null, snapshot: null, analysis: null, branch: null,
   algorithm: "greedy", depth: 2, map: "pawn", tool: "p1", editing: false,
@@ -9,7 +56,7 @@ const model = {
   history: [], comparisons: [], preset: "opening", title: "标准开局",
   revision: 0, branchRevision: 0, previewRevision: 0, busy: false, comparing: false,
   dataSnapshot: null,
-  models: [], modelId: null, catalogMessage: "",
+  models: [], modelId: null, catalogMessage: "", context: null, contextError: "",
 };
 const kindName = {pawn: "走子", horizontal: "横墙", vertical: "竖墙"};
 const boundName = {exact: "精确值", upper: "上界", lower: "下界"};
@@ -21,7 +68,13 @@ const signed = value => value > 0 ? `+${value}` : String(value);
 const neuralPanel = createNeuralPanel({api, onCandidate: chooseCandidate});
 
 async function api(path, body) {
-  const response = await fetch(path, body === undefined ? {} : {
+  // neural.js also uses this injected client: no root /api requests escape the proxy.
+  if (contextRequested && body && (body.algorithm === "dqn" || path.startsWith("/api/neural/") || path === "/api/multi-compare")) {
+    const pinned = model.context && !model.contextError ? contextModel(model.context, model.models) : null;
+    if (!pinned || body.model_id !== pinned.id)
+      throw new Error(model.contextError || "Context 神经分析仅允许精确 SHA-256 对应的模型。");
+  }
+  const response = await fetch(apiBase + path, body === undefined ? {} : {
     method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
   });
   const data = await response.json();
@@ -72,6 +125,9 @@ function controls() {
     : hierarchical ? "决策：类别 Q → 类别内动作 Q" : `评分：${outputLabel(entry)} · 合法动作 Top1`;
   $("model-control").hidden = model.algorithm !== "dqn";
   $("model-select").value = model.modelId || "";
+  $("model-select").disabled = contextRequested;
+  $("multi-compare-button").disabled = contextRequested || model.busy || model.comparing || !model.position;
+  $("multi-model-select").disabled = contextRequested;
   $("tie-policy").textContent = model.algorithm === "dqn"
     ? (hierarchical ? "类别同分选走子；类内最小索引" : "最小动作索引") : "引擎顺序优先";
   $("model-meta").innerHTML = entry
@@ -84,6 +140,24 @@ function controls() {
   document.querySelectorAll("[data-tool]").forEach(b => b.classList.toggle("active", b.dataset.tool === model.tool));
   $("presets").value = model.preset || "";
   document.querySelectorAll("[data-map]").forEach(b => b.classList.toggle("active", b.dataset.map === model.map));
+  renderContext();
+}
+
+function renderContext() {
+  const banner = $("context-banner"), context = model.context;
+  banner.hidden = !contextRequested;
+  if (!contextRequested) return;
+  const route = safeReturnRoute(context?.return_route);
+  const modified = context && model.position && JSON.stringify(model.position) !== JSON.stringify(context.position);
+  banner.innerHTML = `<strong>Platform → Decision Lab · ${modified ? "已编辑；来源证据仅对应导入局面" : "导入来源局面"}</strong>
+    ${context ? `<p>Source / ply ${esc(context.source.ply)}：${esc(JSON.stringify(context.source))}</p>
+    <p>源局面 hash：<code>${esc(context.position_hash)}</code></p>
+    <p>Recorded model：<code>${esc(context.recorded_model?.sha256 || "未知（不推断）")}</code></p>
+    <p>Analysis model：<code>${esc(context.analysis_model?.sha256 || "未指定")}</code> · Lab ID：${esc(model.modelId || "不可用")} · ${model.analysis?.neural ? "已运行" : "未运行神经分析"}</p>
+    <p>Recorded actual action：${esc(JSON.stringify(context.actual_action))}</p>
+    ${context.warnings.map(w => `<p>${esc(w)}</p>`).join("")}` : ""}
+    ${model.contextError ? `<p class="error-text" role="alert">${esc(model.contextError)}</p>` : ""}
+    ${route ? `<a class="text-button" href="${esc(route)}">返回来源 / Return to platform</a>` : "<span>无安全的来源返回链接</span>"}`;
 }
 
 function renderBoard() {
@@ -449,7 +523,7 @@ $("confirm-import").onclick = async () => {
     if (text.length > 2_000_000) throw new Error("文件超过 2 MB，请仅导入其中的 position 字段。");
     const data = JSON.parse(text);
     await setPosition(data.position || data, "导入局面", {run: false});
-    $("import-dialog").close(); await analyze();
+    $("import-dialog").close();
   } catch (error) { $("import-error").textContent = error.message; }
   finally { $("confirm-import").disabled = false; }
 };
@@ -465,6 +539,7 @@ function renderData() {
 $("data-scope").onchange = renderData;
 $("export-button").onclick = () => {
   model.dataSnapshot = copy({schema: "quoridor-decision-case-v1", exported_at: new Date().toISOString(),
+    context: model.context,
     title: model.title, position: model.position, provenance: model.analysis?.provenance || model.meta.provenance,
     analysis: model.analysis, inspected_branch: model.branch,
     neural_tensor: neuralPanel.currentTensor(),
@@ -488,25 +563,41 @@ async function init() {
   model.meta = await api("/api/meta");
   const catalog = await api("/api/models").catch(error => ({models: [], message: error.message}));
   model.models = catalog.models; model.catalogMessage = catalog.message;
-  model.modelId = model.models.find(m => m.available && m.architecture === "cnn")?.id || model.models.find(m => m.available)?.id || null;
+  model.modelId = contextRequested ? null : model.models.find(m => m.available && m.architecture === "cnn")?.id || model.models.find(m => m.available)?.id || null;
   $("model-select").innerHTML = model.models.map(m => `<option value="${esc(m.id)}" ${m.available ? "" : "disabled"}>${esc(m.id)} · ${esc(m.architecture.toUpperCase())}</option>`).join("");
   $("multi-model-select").innerHTML = model.models.filter(m => m.available).map(m =>
     `<option value="${esc(m.id)}">${esc(m.id)}</option>`).join("");
   $("connection").textContent = "Engine connected"; $("connection").classList.add("ready");
   $("source-version").textContent = model.meta.provenance.source_sha256.slice(0, 12);
   $("presets").innerHTML = `<option value="" disabled>自定义局面</option>` + model.meta.presets.map(p => `<option value="${p.id}">${esc(p.title)}</option>`).join("");
+  if (contextRequested) {
+    model.algorithm = "dqn";
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.getAll("context").length !== 1) throw new Error("只允许一个 context 参数。");
+      model.context = decodeContext(params.get("context"));
+      try { model.modelId = contextModel(model.context, model.models).id; }
+      catch (error) { model.contextError = error.message; }
+      await setPosition(model.context.position, "Platform Context", {preset: "", history: false, run: false});
+      notice(model.contextError || "已导入完整来源局面；点击运行分析后才计算。", Boolean(model.contextError));
+    } catch (error) {
+      model.contextError = `无法导入 Platform Context：${error.message}`;
+      model.modelId = null; notice(model.contextError, true); controls();
+    }
+    return; // Invalid context must not fall through to an opening or legacy link.
+  }
   const encodedPosition = new URLSearchParams(window.location.search).get("position");
   if (encodedPosition) {
     try {
       const position = JSON.parse(decodeURIComponent(escape(atob(encodedPosition))));
-      await setPosition(position, "Dashboard Replay", {preset: "", history: false});
+      await setPosition(position, "Dashboard Replay", {preset: "", history: false, run: false});
       notice("已从 Training Dashboard 导入经回放记录还原的局面。");
       return;
     } catch {
       notice("无法导入 Dashboard Replay 局面。", true);
     }
   }
-  await setPosition(model.meta.presets[0].position, "标准开局", {preset: "opening", history: false});
+  await setPosition(model.meta.presets[0].position, "标准开局", {preset: "opening", history: false, run: false});
 }
 controls();
 init().catch(error => { $("connection").textContent = "连接失败"; notice(error.message, true); });
