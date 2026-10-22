@@ -60,7 +60,8 @@ try:
         for opponent, cell in report["matrix"][row["id"]].items():
             if cell is not None:
                 for key in ("score", "wins", "draws", "losses"):
-                    client.log_metric(child, f"vs_{opponent}_{key}", cell[key])
+                    if cell[key] is not None:
+                        client.log_metric(child, f"vs_{opponent}_{key}", cell[key])
         client.set_terminated(child)
         if version:
             for key, value in {
