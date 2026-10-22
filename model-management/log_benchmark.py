@@ -55,7 +55,8 @@ try:
         child = client.create_run(exp_id, tags=tags).info.run_id
         for key in ("score", "elo", "wins", "draws", "losses", "games", "forfeits",
                     "p1_score", "p2_score", "mean_decision_ms"):
-            client.log_metric(child, key, row[key])
+            if row[key] is not None:
+                client.log_metric(child, key, row[key])
         for opponent, cell in report["matrix"][row["id"]].items():
             if cell is not None:
                 for key in ("score", "wins", "draws", "losses"):
