@@ -150,7 +150,7 @@ export function StepAnalysis({position,actor,roster,onBranch,onAnalyze,actual}:{
  const payload={position,algorithm:algo,depth:selected?.spec?.algo?.params?.depth??1,...(algo==='dqn'?{model_id:selected.actual_sha256??selected.sha256}:{})}
  const positionKey=JSON.stringify({position,selected,comparison})
  useEffect(()=>()=>{gen.current++;abort.current?.abort()},[])
- useEffect(()=>{clear()},[positionKey])
+ useEffect(()=>{clear();setTab('decision')},[positionKey])
  function clear(){gen.current++;abort.current?.abort();setResult(null);setBranch(null);setTensor(null);setError('');setBusy(false);onBranch(null)}
  async function run(path:string,body:Obj,apply:(v:Obj)=>void){onAnalyze?.();abort.current?.abort();const c=new AbortController();abort.current=c;const token=++gen.current;setBusy(true);setError('');try{const d=await labRequest(path,body,c.signal);if(token===gen.current)apply(d)}catch(e:any){if(token===gen.current&&e.name!=='AbortError')setError(String(e))}finally{if(token===gen.current)setBusy(false)}}
  const score=(v:any)=>v==='+inf'?Infinity:v==='-inf'?-Infinity:Number(v??-Infinity)
