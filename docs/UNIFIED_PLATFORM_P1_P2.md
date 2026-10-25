@@ -3,6 +3,35 @@
 **Verified:** 2026-10-22. Implementation/acceptance record, not a replacement
 for the authoritative [system architecture](../documents/system/design/system-architecture.md).
 
+## Training list loading correction (2026-10-22)
+
+The 8751 Training page was reported stuck at `Loading runs`. Its runs endpoint
+returned 101 rows but took 26.808 seconds, and the UI waited for both runs and
+the optional summary. MLflow evidence merging unnecessarily resolved catalog
+source directories for unrelated checkpoint SHAs on every run.
+
+The correction makes summary loading independent and resolves catalog sources
+only for matching SHAs, retaining path/SHA conflict checks. Two UI regressions
+cover a pending and failed summary; a provider regression excludes unrelated
+catalog source resolution. The launcher port probe also uses `SO_REUSEADDR`
+so TIME_WAIT does not prevent a normal restart; embedded Python blocks were
+compiled in addition to the shell syntax check.
+
+Only transient user unit `quoridor-platform-p1-p2-preview.service` was restarted
+(8751 and its loopback Lab 8754). It is not reboot-autostart deployment.
+After restart, actual HTTP timings were 5.163 s for the first runs request,
+0.094 s for summary and 0.091 s for repeated runs, all HTTP 200 with 101 runs.
+The browser displayed 102 table rows including the header, no loading message,
+and both Legacy/MLflow filters. The 0.639 s browser measurement used warm data;
+it is not the cold-start time.
+
+Validation: 120 backend tests run (one optional skip), 20 React UI tests passed,
+16 gateway/launcher tests passed, TypeScript and production build passed.
+These corrections are intentionally uncommitted on
+`feature/unified-platform-p1-p2`; this follow-up request did not authorize a
+commit or promotion. No production service, model file, roster or alias changed.
+The remainder below is the original P1/P2 acceptance snapshot.
+
 ## Scope and source state
 
 - Worktree: `/home/jihua/workspace/boardgame-ai-arena-platform`.

@@ -147,6 +147,19 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(self.exp_mock.call_count, 1)
         self.assertEqual(self.runs_mock.call_count, 1)
 
+    def test_evidence_only_resolves_catalog_sources_for_matching_sha(self):
+        write(self.root / "unrelated-catalog.json", {"models": [
+            {"sha256": f"{index:064x}", "source_path": str(self.root / "models" / f"{index}.pt")}
+            for index in range(40)
+        ]})
+        provider = MLflowAdapter()
+        provider._refresh()
+        with patch.object(provider, "_catalog_source", wraps=provider._catalog_source) as source:
+            evidence = provider._evidence("registered")
+        self.assertEqual(evidence["checkpoints"][0]["sha256"], self.sha)
+        self.assertTrue(source.called)
+        self.assertTrue(all(call.args[0]["sha256"] == self.sha for call in source.call_args_list))
+
     def test_result_json_curve_is_not_heldout_curve(self):
         (self.source / "distillation-metrics.jsonl").unlink()
         write(self.source / "result.json", {"metrics": [{"update": 12000, "policy_cross_entropy": .4}]})

@@ -601,10 +601,11 @@ class MLflowAdapter:
                 if same_path and sha and catalog_sha and sha != catalog_sha:
                     warnings.append(f"Checkpoint SHA conflict for {row['run_id']}: source path catalog SHA disagrees with MLflow tag.")
                 same_sha = sha is not None and sha == catalog_sha
-                catalog_source = self._catalog_source(model)
-                explicit_source = self._explicit_source(values)
-                if same_sha and explicit_source and catalog_source and explicit_source != catalog_source:
-                    warnings.append(f"Source provenance conflict for {row['run_id']}: catalog SHA resolves to a different training directory.")
+                if same_sha:
+                    catalog_source = self._catalog_source(model)
+                    explicit_source = self._explicit_source(values)
+                    if explicit_source and catalog_source and explicit_source != catalog_source:
+                        warnings.append(f"Source provenance conflict for {row['run_id']}: catalog SHA resolves to a different training directory.")
                 if matched is None and ((same_path and catalog_sha and (sha is None or sha == catalog_sha)) or same_sha):
                     matched = model
                     sha = catalog_sha
