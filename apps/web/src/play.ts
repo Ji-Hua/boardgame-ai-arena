@@ -1,7 +1,7 @@
-import type { GameStateWire } from '../../../frontend/src/api/roomAPI'
-import { StateMapper } from '../../../frontend/src/core/StateMapper'
-import { ActionTranslator } from '../../../frontend/src/core/ActionTranslator'
-import type { Action } from '../../../frontend/src/types/Action'
+import type { GameStateWire } from '../../../packages/board-ui/src/api/roomAPI'
+import { StateMapper } from '../../../packages/board-ui/src/core/StateMapper'
+import { ActionTranslator } from '../../../packages/board-ui/src/core/ActionTranslator'
+import type { Action } from '../../../packages/board-ui/src/types/Action'
 
 export interface PlaySnapshot {
   game_id: string

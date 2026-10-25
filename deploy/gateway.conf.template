@@ -1,0 +1,23 @@
+server {
+    listen 8080;
+    client_max_body_size 1m;
+    location /classic-api/ {
+        proxy_pass http://${CLASSIC_UPSTREAM}/api/;
+        proxy_set_header Host $http_host;
+    }
+    location /ws/ {
+        proxy_pass http://${CLASSIC_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+        proxy_read_timeout 3600s;
+    }
+    location / {
+        proxy_pass http://${PLATFORM_UPSTREAM};
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 180s;
+        proxy_buffering off;
+    }
+}

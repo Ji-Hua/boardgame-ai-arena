@@ -1,12 +1,14 @@
 # syntax=docker/dockerfile:1
 ARG RUNTIME_IMAGE=quoridor-migration-runtime:20261025
 FROM node:22-bookworm-slim AS frontend
-WORKDIR /build/training-dashboard/frontend
-COPY training-dashboard/frontend/package.json training-dashboard/frontend/package-lock.json ./
+WORKDIR /build
+COPY package.json package-lock.json ./
+COPY apps/web/package.json apps/web/package.json
+COPY packages/board-ui/package.json packages/board-ui/package.json
 RUN npm ci --ignore-scripts
-COPY training-dashboard/frontend ./
-COPY frontend/src /build/frontend/src
-RUN ln -s /build/training-dashboard/frontend/node_modules /build/node_modules
+COPY apps/web apps/web
+COPY packages/board-ui packages/board-ui
+COPY frontend/src frontend/src
 RUN npm run typecheck && npm run test:ui && npm run build
 
 FROM ${RUNTIME_IMAGE}
@@ -15,7 +17,7 @@ LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
 COPY scripts/start_unified_platform.sh /app/scripts/start_unified_platform.sh
 COPY training-dashboard/backend /app/training-dashboard/backend
 COPY training-dashboard/platform_entry.py training-dashboard/platform_play.py /app/training-dashboard/
-COPY --from=frontend /build/training-dashboard/frontend/dist /app/training-dashboard/frontend/dist
-ENV PLATFORM_FRONTEND_DIST=/app/training-dashboard/frontend/dist     TRAINING_DASHBOARD_SOURCE_ROOT=/app     PLATFORM_LAB_UPSTREAM=http://lab:8744
+COPY --from=frontend /build/apps/web/dist /app/apps/web/dist
+ENV PLATFORM_FRONTEND_DIST=/app/apps/web/dist     TRAINING_DASHBOARD_SOURCE_ROOT=/app     PLATFORM_LAB_UPSTREAM=http://lab:8744
 EXPOSE 8741
 CMD ["python", "-m", "uvicorn", "platform_entry:create_app", "--factory", "--app-dir", "/app/training-dashboard", "--host", "0.0.0.0", "--port", "8741"]

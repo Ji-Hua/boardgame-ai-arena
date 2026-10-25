@@ -1,0 +1,13 @@
+{
+  "name": "quoridor-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/board-ui"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspace apps/web",
+    "test:ui": "npm run test:ui --workspace apps/web",
+    "build": "npm run build --workspace apps/web"
+  }
+}

@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { BrowserRouter } from 'react-router-dom'
 import App from '../src/App'
 import { api } from '../src/api'
+import * as lab from '../src/lab'
 import type { PlatformModel } from '../src/platform'
 
 const sha = '0faa' + 'a'.repeat(60)
@@ -26,6 +27,12 @@ function mount(route: string) {
 }
 beforeEach(() => {
   localStorage.clear()
+  vi.spyOn(lab, 'labRequest').mockImplementation(async (path, body:any) => {
+    if (path === 'meta') return {presets: []}
+    if (path === 'models') return {models: [{id: sha,sha256: sha,available:true}]}
+    if (path === 'position') return {position: {...lab.opening,...body}}
+    throw new Error('Unexpected analysis on navigation')
+  })
   vi.spyOn(api, 'models').mockResolvedValue({ models: [model, { ...model, id: 'b'.repeat(64), sha256: 'b'.repeat(64), aliases: ['Unsupported'], analyzable: false, reasons: { analyzable: ['unsupported_or_unknown_observation'] } }], count: 2, warnings: [], sources: [] })
   vi.spyOn(api, 'model').mockResolvedValue(model)
   vi.spyOn(api, 'listRuns').mockResolvedValue({ runs: [run], count: 1, warnings: [], artifact_roots_scanned: [] } as any)
@@ -155,26 +162,23 @@ describe('research shell and URL contracts', () => {
     expect(await screen.findByText(/Full recorded trajectory is unavailable/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Auto play' })).toBeNull()
   })
-  it('only resolves context on GET and passes exact safe context to the isolated Lab, never runs analysis', async () => {
+  it('resolves and validates exact context inside the native Lab without running analysis', async () => {
     const context = { position: { pawns: [[4, 1], [4, 8]], turn: 2, label: '分析' }, position_hash: 'f'.repeat(64), source: { run: { run_id: runId, source: 'mlflow' }, game: { id: 'actual-game-hash' }, evaluation: { id: 'eval-hash', evaluation_id: 'arena-v2' }, replay_path: replayPath, ply: 1 }, recorded_model: { sha256: sha }, analysis_model: model, return_route: `/replays/${encodeURIComponent(runId)}?${new URLSearchParams({ replay_path: replayPath, ply: '1' })}` }
     vi.spyOn(api, 'context').mockResolvedValue(context)
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     mount(`/lab?${new URLSearchParams({ run_id: runId, replay_path: replayPath, ply: '1', model_sha: sha })}`)
-    const launch = await screen.findByRole('link', { name: /Open isolated Lab/ })
-    const href = new URL(launch.getAttribute('href')!, 'http://localhost')
-    expect(href.pathname).toBe('/research-lab/')
-    const encoded = href.searchParams.get('context')!
-    expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/)
-    expect(JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))).toEqual(context)
+    await waitFor(()=>expect(screen.getByRole('button',{name:'Run analysis'}).hasAttribute('disabled')).toBe(false))
+    expect(screen.queryByRole('link',{name:/Open isolated Lab/})).toBeNull()
+    expect(vi.mocked(lab.labRequest).mock.calls.every(call=>['meta','models','position'].includes(call[0]))).toBe(true)
     expect(vi.mocked(api.context).mock.calls[0][0].get('replay_path')).toBe(replayPath)
     expect(fetchSpy).not.toHaveBeenCalled()
     const strip = screen.getByRole('complementary', { name: 'Research context' })
     expect(within(strip).getByText('actual-game-hash')).toBeTruthy()
     expect(within(strip).getByText('arena-v2')).toBeTruthy()
     expect(within(strip).getByText('Analysis model · recorded model')).toBeTruthy()
-    const provenance = screen.getByText('Full context provenance (JSON)').closest('details')!
+    const provenance = screen.getByText('Analysis provenance and exact response').closest('details')!
     expect(provenance.open).toBe(false)
-    fireEvent.click(screen.getByRole('link', { name: 'Return to source' }))
+    fireEvent.click(screen.getByRole('link', { name: /Return to source/ }))
     expect(await screen.findByText('Step 1 / 2')).toBeTruthy()
     expect(api.getEvalReplay).toHaveBeenCalledWith(runId, replayPath)
   })

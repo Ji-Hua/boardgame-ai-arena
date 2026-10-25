@@ -16,7 +16,8 @@
  */
 
 import React from 'react'
-import type { EvalReplayState } from '../types'
+import { PLAYER_COLORS } from './theme/playerColors'
+interface EvalReplayState { p1: [number, number]; p2: [number, number]; h_walls: [number, number][]; v_walls: [number, number][] }
 
 // -------------------------------------------------------------------------
 // Board geometry constants
@@ -54,13 +55,15 @@ interface EvalReplayBoardProps {
   lastActionX?: number
   lastActionY?: number
   lastActionPlayer?: 'P1' | 'P2'
+  onCellClick?: (x: number, y: number) => void
+  onWallClick?: (x: number, y: number, orientation: "horizontal" | "vertical") => void
   size?: number  // optional override for total SVG size (renders via viewBox scaling)
 }
 
-const P1_COLOR = '#4a90e2'
-const P2_COLOR = '#e24a4a'
-const P1_WALL_COLOR = '#2c6fad'
-const P2_WALL_COLOR = '#ad2c2c'
+const P1_COLOR = PLAYER_COLORS.P1.primary
+const P2_COLOR = PLAYER_COLORS.P2.primary
+const P1_WALL_COLOR = PLAYER_COLORS.P1.primary
+const P2_WALL_COLOR = PLAYER_COLORS.P2.primary
 const BOARD_BG = '#f5e6c8'
 const CELL_COLOR = '#fdf5e6'
 const CELL_GOAL_P1 = '#d4edda'   // light green — P1 goal row (y=8, top)
@@ -78,7 +81,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
   lastActionX,
   lastActionY,
   lastActionPlayer,
-  size,
+  size, onCellClick, onWallClick,
 }) => {
   const viewSize = BOARD_SVG_SIZE
 
@@ -93,6 +96,10 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
       cells.push(
         <rect
           key={`cell-${x}-${y}`}
+          onClick={()=>onCellClick?.(x,y)}
+          role={onCellClick?"button":undefined} tabIndex={onCellClick?0:undefined}
+          aria-label={onCellClick?`Cell ${String.fromCharCode(97+x)}${y+1}`:undefined}
+          onKeyDown={e=>{if(onCellClick && (e.key==="Enter"||e.key===" ")){e.preventDefault();onCellClick(x,y)}}}
           x={cellLeft(x)}
           y={cellTop(y)}
           width={CELL}
@@ -117,7 +124,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
     const color = isLast ? (lastActionPlayer === 'P1' ? P1_WALL_COLOR : P2_WALL_COLOR) : '#888'
     return (
       <rect
-        key={`hw-${i}`}
+        key={`hw-${i}`} onClick={()=>onWallClick?.(wx,wy,"horizontal")}
         x={left}
         y={top}
         width={width}
@@ -138,7 +145,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
     const color = isLast ? (lastActionPlayer === 'P1' ? P1_WALL_COLOR : P2_WALL_COLOR) : '#888'
     return (
       <rect
-        key={`vw-${i}`}
+        key={`vw-${i}`} onClick={()=>onWallClick?.(wx,wy,"vertical")}
         x={left}
         y={top}
         width={width}
@@ -159,7 +166,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
 
   const pawns = [
     <circle
-      key="pawn-p1"
+      key="pawn-p1" style={{pointerEvents:"none"}}
       cx={cellLeft(p1x) + CELL / 2}
       cy={cellTop(p1y) + CELL / 2}
       r={pawnRadius}
@@ -178,7 +185,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
       style={{ pointerEvents: 'none', userSelect: 'none' }}
     >1</text>,
     <circle
-      key="pawn-p2"
+      key="pawn-p2" style={{pointerEvents:"none"}}
       cx={cellLeft(p2x) + CELL / 2}
       cy={cellTop(p2y) + CELL / 2}
       r={pawnRadius}

@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { Flag, MousePointer2, RectangleHorizontal, RefreshCw, X } from 'lucide-react'
-import { Board, type WallPreview } from '../../../../frontend/src/components/board/Board'
-import { PLAYER_COLORS } from '../../../../frontend/src/theme/playerColors'
+import { Board, type WallPreview } from '../../../../packages/board-ui/src/components/board/Board'
+import { PLAYER_COLORS } from '../../../../packages/board-ui/src/theme/playerColors'
 import { api } from '../api'
 import { projectPlay, ResearchPlayController, type PlaySnapshot } from '../play'
 import type { PlatformModel } from '../platform'
@@ -10,6 +10,7 @@ import './PlayView.css'
 
 export function PlayView() {
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const sha = params.get('model_sha') ?? ''
   const game = params.get('game') ?? ''
   const [controller] = useState(() => new ResearchPlayController())
@@ -68,6 +69,17 @@ export function PlayView() {
     } catch (e) { setError(String(e)) }
     finally { setBusy(false) }
   }
+  async function analyzeSnapshot() {
+    if (!snapshot) return
+    try {
+      const fresh = await controller.snapshot(snapshot.game_id)
+      const key = crypto.randomUUID()
+      const state = fresh.state
+      const context = {position: {pawns: [[state.pawns['1'].col,state.pawns['1'].row],[state.pawns['2'].col,state.pawns['2'].row]], walls_remaining: [state.walls_remaining['1'],state.walls_remaining['2']],walls:state.walls,turn:state.current_player},source:{type:'live_snapshot',game:{id:fresh.game_id},ply:fresh.step_count},recorded_model:{sha256:fresh.identity.sha256},analysis_model:{sha256:fresh.identity.sha256},return_route:'/play?game='+fresh.game_id,warnings:['Snapshot analysis does not pause the live game.']}
+      sessionStorage.setItem('quoridor-lab:'+key,JSON.stringify(context))
+      navigate('/lab?snapshot='+key)
+    } catch(e) {setError(String(e))}
+  }
   async function close() {
     if (!snapshot) return
     setBusy(true)
@@ -82,7 +94,7 @@ export function PlayView() {
   let resumable = ''
   try { resumable = localStorage.getItem('quoridor-play-active') ?? '' } catch { /* Optional discovery only. */ }
   return <div className="unified-play">
-    <div className="page-heading"><div><p className="eyebrow">Research / Play</p><h1>Human vs Checkpoint</h1></div><Link to="/models">Model library</Link></div>
+    <div className="page-heading"><div><p className="eyebrow">Research / Play</p><h1>Human vs Checkpoint</h1></div><div className="action-bar"><Link to="/play/classic">Classic modes: human / registered agents</Link><Link to="/models">Model library</Link></div></div>
     {error && <div className="error" role="alert">{error}</div>}
     {connectionError && <div className="error" role="alert">{connectionError}</div>}
     {game && !snapshot && <div className="loading">Reconnecting to game {game}...</div>}
@@ -119,7 +131,7 @@ export function PlayView() {
           {snapshot.error && <div className="error" role="alert">{snapshot.error}{snapshot.phase === 'running' && <button disabled={busy || snapshot.pending} onClick={() => void perform(() => controller.command(game, 'retry'))}><RefreshCw size={16} /> Retry Agent</button>}</div>}
           {snapshot.phase === 'running' && <button disabled={busy || snapshot.pending} onClick={() => { if (window.confirm('Surrender this game?')) void perform(() => controller.command(game, 'surrender')) }}><Flag size={16} /> Surrender</button>}
           <button disabled={busy || snapshot.pending} onClick={() => { if (snapshot.phase !== 'running' || window.confirm('Close this game?')) void close() }}><X size={16} /> Close game</button>
-          <details><summary>Game identity & actions</summary><pre data-testid="game-evidence">{JSON.stringify(snapshot, null, 2)}</pre></details>
+          <button disabled={busy} onClick={()=>void analyzeSnapshot()}>Analyze snapshot (game continues)</button><details><summary>Game identity & actions</summary><pre data-testid="game-evidence">{JSON.stringify(snapshot, null, 2)}</pre></details>
         </aside>
       </div>
     </>}

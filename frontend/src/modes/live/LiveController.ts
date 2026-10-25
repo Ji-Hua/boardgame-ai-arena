@@ -235,13 +235,7 @@ export class LiveController {
 
   private async connectWebSocket(roomId: string): Promise<void> {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    let wsHost: string;
-    const port = window.location.port;
-    if (port === "8765") {
-      wsHost = `${window.location.hostname}:8764`;
-    } else {
-      wsHost = window.location.host;
-    }
+    const wsHost = window.location.host;
     const wsUrl = `${protocol}//${wsHost}/ws/${roomId}`;
 
     this.wsClient = new WebSocketClient(wsUrl);
