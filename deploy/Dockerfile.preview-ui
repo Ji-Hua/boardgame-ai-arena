@@ -1,0 +1,7 @@
+# Build apps/web with npm run build before invoking this image-only UI update.
+# Reuse the accepted preview gateway runtime and proxy configuration.
+ARG BASE_GATEWAY
+FROM ${BASE_GATEWAY}
+ARG SOURCE_COMMIT
+LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
+COPY apps/web/dist/ /usr/share/nginx/html/

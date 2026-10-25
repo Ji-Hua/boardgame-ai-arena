@@ -1,0 +1,17 @@
+/* Preview workspace: stable board and bounded inspector, no changes to legacy views. */
+.aw-workbench{grid-template-columns:minmax(300px,460px) minmax(0,1fr);align-items:start;gap:18px}
+.aw-board-column{position:sticky;top:12px}
+.aw-board-column>svg{margin:8px auto;width:min(100%,430px)}
+.aw-participant{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);position:relative;min-width:0}
+.aw-participant-name{flex:1;min-width:0}.aw-participant-name strong{display:block;overflow-wrap:anywhere}.aw-participant-name small{display:block;color:var(--text-muted);font-size:11px;margin-top:3px}
+.aw-seat-dot{color:white;padding:5px;border-radius:5px;font-size:12px;font-weight:600}.aw-p1 .aw-seat-dot{background:#4CAF50}.aw-p2 .aw-seat-dot{background:#2196F3}
+.aw-turn{font-size:11px;white-space:nowrap}.aw-participant details{font-size:11px}.aw-participant details[open]{position:absolute;top:100%;left:0;right:0;z-index:5;padding:12px;background:var(--surface);border:1px solid var(--border);box-shadow:0 6px 16px #0002;max-height:300px;overflow:auto}
+.aw-transport .aw-toolbar{gap:5px;margin:6px 0}.aw-transport button{padding:7px 9px;min-width:32px}.aw-transport input[type=number]{width:58px}.aw-transport select{padding:6px}.aw-transport input[type=range]{margin:8px 0 3px}
+.aw-inspector{height:clamp(450px,calc(100dvh - 180px),760px);display:flex;flex-direction:column;overflow:hidden;padding:12px}
+.aw-inspector-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:10px 2px;flex:1}
+.aw-play-inspector{display:block;overflow:auto}
+.aw-tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:7px;margin-bottom:10px}.aw-tabs button{border:0;background:transparent;color:var(--text-muted);padding:7px 9px}.aw-tabs button[aria-selected=true]{background:var(--surface2);color:var(--text);box-shadow:inset 0 -2px var(--accent)}
+.aw-record{padding-bottom:10px;margin-bottom:10px;font-size:12px}.aw-record small{display:block;color:var(--text-muted);margin-top:5px}
+.aw-move-list{display:grid;grid-template-columns:1fr 1fr;gap:5px}.aw-move-list button{display:flex;gap:14px;text-align:left}.aw-move-list button[aria-current=step]{outline:2px solid var(--accent);background:var(--surface2)}
+.aw-analysis .aw-candidates{max-height:none;margin-top:4px}.aw-analysis .aw-table{max-height:390px;overflow:auto}.aw-analysis .aw-toolbar{margin-bottom:8px}.aw-analysis .aw-json{max-height:none}.aw-seats .aw-participant{margin-bottom:12px}.aw-analysis .lab-tensor{max-width:100%}
+@media(max-width:760px){.aw-workbench{grid-template-columns:minmax(0,1fr)}.aw-board-column{position:static}.aw-inspector{height:580px;max-height:85dvh}.aw-main{padding:12px}.aw-transport .aw-toolbar{gap:4px}.aw-transport button{padding:8px}.aw-transport label{gap:4px}.aw-participant-name strong{font-size:13px}.aw-participant{padding:8px}.aw-inspector .aw-analysis select{max-width:100%}}
