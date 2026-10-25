@@ -10,6 +10,12 @@ Read [monorepo deployment design](documents/system/design/monorepo-deployment.md
 The accepted 2026-10-25 design supersedes conflicting older deployment assumptions.
 Record uncertain decisions without blocking independent authorized work.
 
+## Frontend workspace
+
+The active unified UI is `apps/web`; run npm workspace checks from the repository root.
+Shared board source is `packages/board-ui`. Read `apps/web/README.md` and
+`deploy/UNIFIED_WEB_RUNBOOK.md` before changing frontend or deployment.
+
 ## Read first
 
 1. Read [README.md](README.md) for module navigation.

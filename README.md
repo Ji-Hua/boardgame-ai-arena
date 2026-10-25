@@ -175,3 +175,6 @@ Quoridor is a registered trademark of Gigamic. This is an independent, unofficia
 ## Monorepo migration
 
 See [accepted design](documents/system/design/monorepo-deployment.md), [agent workflow](docs/AGENT_WORKFLOW.md), [migration status](docs/MIGRATION_STATUS.md), and [release operations](deploy/README.md).
+
+## Unified web workspace
+The active React application is [apps/web](apps/web/README.md). Shared board code lives in packages/board-ui. Run `npm ci`, `npm run typecheck`, `npm run test:ui` and `npm run build` at the repository root. The former training-dashboard/frontend path is a compatibility symlink.

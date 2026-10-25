@@ -15,6 +15,8 @@ export function PlayView() {
   const game = params.get('game') ?? ''
   const [controller] = useState(() => new ResearchPlayController())
   const [models, setModels] = useState<PlatformModel[]>([])
+  const [modelsLoading,setModelsLoading]=useState(true)
+  const [modelsRetry,setModelsRetry]=useState(0)
   const [snapshot, setSnapshot] = useState<PlaySnapshot | null>(null)
   const [seat, setSeat] = useState<1 | 2>(1)
   const [error, setError] = useState('')
@@ -27,9 +29,10 @@ export function PlayView() {
   useEffect(() => {
     if (game) return
     let active = true
-    api.models().then(data => { if (active) setModels(data.models) }).catch(e => { if (active) setError(String(e)) })
+    setModelsLoading(true)
+    api.models().then(data => { if (active) setModels(data.models) }).catch(e => { if (active) setError(String(e)) }).finally(()=>{if(active)setModelsLoading(false)})
     return () => { active = false }
-  }, [game])
+  }, [game,modelsRetry])
   useEffect(() => {
     const element = boardArea.current
     if (!element) return
@@ -98,7 +101,7 @@ export function PlayView() {
     {error && <div className="error" role="alert">{error}</div>}
     {connectionError && <div className="error" role="alert">{connectionError}</div>}
     {game && !snapshot && <div className="loading">Reconnecting to game {game}...</div>}
-    {!game && <section className="play-setup">
+    {!game && <section className="play-setup">{modelsLoading && <p role="status">Loading checkpoint identities and capabilities…</p>}{!modelsLoading && !models.length && <button onClick={()=>setModelsRetry(n=>n+1)}>Reload model catalog</button>}
       <label>Checkpoint<select aria-label="Play checkpoint" value={sha} onChange={e => updateSha(e.target.value)} disabled={busy}>
         <option value="">Select an approved CNN</option>
         {sha && !selected && <option value={sha}>{sha} - identity unavailable</option>}

@@ -13,11 +13,15 @@ server {
         proxy_set_header Host $http_host;
         proxy_read_timeout 3600s;
     }
-    location / {
+    location ~ ^/(api/|research-lab(/|$)|play-api/|health$) {
         proxy_pass http://${PLATFORM_UPSTREAM};
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 180s;
         proxy_buffering off;
     }
+    location /assets/ { try_files $uri =404; }
+    location = /index.html { add_header Cache-Control "no-cache"; }
+    location ~ \.(json|js|css|png|svg)$ { try_files $uri =404; }
+    location / { try_files $uri $uri/ /index.html; }
 }

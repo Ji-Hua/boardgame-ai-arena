@@ -1,5 +1,8 @@
+ARG WEB_IMAGE=quoridor-unified-web:20261025
+FROM ${WEB_IMAGE} AS web
 FROM nginx:stable-alpine
 ARG SOURCE_COMMIT
 LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
+COPY --from=web /app/apps/web/dist /usr/share/nginx/html
 COPY deploy/gateway.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 8080
