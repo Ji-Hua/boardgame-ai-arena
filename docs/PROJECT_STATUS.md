@@ -1,5 +1,7 @@
 # Project Status
 
+> Migration update 2026-10-25: use [MIGRATION_STATUS.md](MIGRATION_STATUS.md) for the current candidate baseline. The deployment/preview observations below are historical and do not establish current availability. Existing services have not been switched.
+
 **Last verified:** 2026-10-22
 
 ## Unified platform P3-A completed (isolated branch)

@@ -1,0 +1,8 @@
+# Direct dependency versions match the validated Training environment.
+# CPU torch is installed separately from its CPU-only index.
+fastapi==0.136.1
+uvicorn==0.46.0
+pydantic==2.13.3
+numpy==2.5.4
+PyYAML==6.0.3
+httpx==0.28.1
