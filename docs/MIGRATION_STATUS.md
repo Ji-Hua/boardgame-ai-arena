@@ -35,3 +35,12 @@ No live service replacement, deleted directories, merged main, new GitHub reposi
 - Dashboard unittest: 122 run, 1 skipped, successful.
 - React UI: 24 passed; TypeScript and production build passed.
 - Python tests used the existing Training venv and installed engine; independent image builds and actual model-load acceptance are not covered.
+
+## Independent image stage, 2026-10-25
+Runtime/Lab and unified Research images now build and pass isolated acceptance.
+See [image evidence and limits](IMAGE_ACCEPTANCE_20261025.md).
+The earlier venv-based validation above describes the initial stage only.
+No live switch, source-directory cleanup, main promotion or image publication has occurred.
+Next: Gameplay/cross-host acceptance and release distribution; then an explicit
+rollout/rollback checklist. Historical unique source and original dirty work
+remain preserved for semantic review, not discarded.

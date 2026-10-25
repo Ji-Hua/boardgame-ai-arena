@@ -1,5 +1,5 @@
 # Independent CPU runtime image
-Status: implementation and acceptance in progress.
+Status: verified local candidate; see docs/IMAGE_ACCEPTANCE_20261025.md.
 
 ## Scope
 Build Runtime and Decision Lab from the migration worktree, including a freshly

@@ -1,5 +1,5 @@
 # Unified research image
-Status: implementation and acceptance in progress.
+Status: verified local candidate; see docs/IMAGE_ACCEPTANCE_20261025.md.
 The old Dashboard image omits platform_entry and platform_play. Build the React
 SPA in a Node stage and serve it with the existing unified Python application.
 Reuse the accepted CPU image as the engine/dependency base; no source mounts.
