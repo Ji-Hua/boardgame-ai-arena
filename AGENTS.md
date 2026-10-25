@@ -3,6 +3,13 @@
 This is the shared entry point for Copilot, Codex, human developers, and other
 automation working in this repository.
 
+## Current design authority
+
+Read [monorepo deployment design](documents/system/design/monorepo-deployment.md),
+[agent workflow](docs/AGENT_WORKFLOW.md) and [migration status](docs/MIGRATION_STATUS.md) first.
+The accepted 2026-10-25 design supersedes conflicting older deployment assumptions.
+Record uncertain decisions without blocking independent authorized work.
+
 ## Read first
 
 1. Read [README.md](README.md) for module navigation.

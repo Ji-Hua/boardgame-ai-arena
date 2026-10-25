@@ -171,3 +171,7 @@ Apache License 2.0. See LICENSE.
 ## Trademark Notice
 
 Quoridor is a registered trademark of Gigamic. This is an independent, unofficial reimplementation for research and educational purposes.
+
+## Monorepo migration
+
+See [accepted design](documents/system/design/monorepo-deployment.md), [agent workflow](docs/AGENT_WORKFLOW.md), [migration status](docs/MIGRATION_STATUS.md), and [release operations](deploy/README.md).

@@ -1,0 +1,31 @@
+services:
+  runtime:
+    image: ${RUNTIME_IMAGE:?validated release required}
+    command: ["python", "-m", "uvicorn", "agent_system.runtime.service.server:app", "--host", "0.0.0.0", "--port", "8743"]
+    ports: ["8743:8743"]
+    environment:
+      QUORIDOR_AGENT_DEFS_DIR: /data/quoridor/agent_defs
+    volumes: ["${QUORIDOR_DATA_DIR:?data root required}:/data/quoridor:ro", "${QUORIDOR_DATA_DIR:?data root required}:${QUORIDOR_DATA_DIR:?data root required}:ro"]
+    restart: unless-stopped
+  lab:
+    image: ${LAB_IMAGE:?validated release required}
+    command: ["python", "-m", "uvicorn", "agent_system.analysis.app:app", "--host", "0.0.0.0", "--port", "8744"]
+    ports: ["8744:8744"]
+    environment:
+      LAB_MODEL_CATALOG: /data/quoridor/catalog-cnn-alphazero-lite-20261021.json
+    volumes: ["${QUORIDOR_DATA_DIR:?data root required}:/data/quoridor:ro", "${QUORIDOR_DATA_DIR:?data root required}:${QUORIDOR_DATA_DIR:?data root required}:ro"]
+    restart: unless-stopped
+  research:
+    image: ${RESEARCH_IMAGE:?validated release required}
+    ports: ["8740:8740", "8741:8741"]
+    environment:
+      QUORIDOR_DATA_ROOT: /data/quoridor
+      TRAINING_DASHBOARD_ARTIFACT_ROOTS: /data/training_artifacts/dqn:/data/training_artifacts
+      MLFLOW_TRACKING_URI: http://mlflow:8742
+    volumes: ["${QUORIDOR_DATA_DIR:?data root required}:/data/quoridor:ro", "${TRAINING_ARTIFACTS_DIR:?artifact root required}:/data/training_artifacts:ro"]
+    restart: unless-stopped
+  mlflow:
+    image: ${MLFLOW_IMAGE:?validated release required}
+    ports: ["8742:8742"]
+    volumes: ["${QUORIDOR_DATA_DIR:?data root required}/mlflow:/data", "${QUORIDOR_DATA_DIR:?data root required}:/quoridor-data:ro"]
+    restart: unless-stopped

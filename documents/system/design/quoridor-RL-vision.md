@@ -1,3 +1,5 @@
+> Deployment and repository organization: [accepted monorepo design](monorepo-deployment.md) takes precedence where this document conflicts. Domain semantics remain applicable.
+
 # Quoridor RL — Target State Blueprint
 
 Author: Ji Hua

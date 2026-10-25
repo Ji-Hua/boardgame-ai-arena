@@ -1,3 +1,5 @@
+> Historical MVP draft. The accepted [monorepo design](../../system/design/monorepo-deployment.md) supersedes the requirement that research Arena depend on Gameplay Backend. Full service-chain tests remain a separate acceptance path.
+
 # Quoridor Arena Evaluation System — MVP Design
 
 Author: Ji Hua  

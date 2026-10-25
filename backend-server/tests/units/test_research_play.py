@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 from unittest.mock import patch
 import unittest
 
@@ -138,7 +139,7 @@ class ResearchPlayTests(unittest.IsolatedAsyncioTestCase):
         await self.create()
         unauthorized = await self.client.get(self.url, headers={"Authorization": "Bearer wrong"})
         self.assertEqual(unauthorized.status_code, 404)
-        self.app.state.research_games[self.identifier].created = 0
+        self.app.state.research_games[self.identifier].created = time.monotonic() - 14401
         self.assertEqual((await self.client.get(self.url, headers=self.headers)).status_code, 410)
 
     async def test_research_step_limit_is_explicit_and_releases_instance(self):

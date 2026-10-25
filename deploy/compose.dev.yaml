@@ -1,0 +1,11 @@
+services:
+  web:
+    image: ${WEB_IMAGE:?validated release required}
+    ports: ["8765:8765"]
+    restart: unless-stopped
+  backend:
+    image: ${GAMEPLAY_IMAGE:?validated release required}
+    ports: ["8764:8764"]
+    environment:
+      AGENT_SERVICE_URL: ${AGENT_SERVICE_URL:?Training Runtime URL required}
+    restart: unless-stopped
