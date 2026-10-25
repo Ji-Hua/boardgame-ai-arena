@@ -1,4 +1,8 @@
-# Unified Quoridor web app
+# Agent workspace
+
+Current preview navigation is Ladder and Play. Agent detail contains pair records and exact-SHA training runs; replay embeds per-ply analysis. Global training records remain at /training. See [preview release](../../docs/AGENT_LADDER_PREVIEW_20261025.md).
+
+# Earlier unified web baseline
 This is the single active React application. Run npm ci, npm run typecheck,
 npm run test:ui and npm run build from the repository root. Root package-lock.json
 is the workspace dependency authority; the migrated nested lock is historical.

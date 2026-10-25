@@ -1,5 +1,5 @@
 # Agent ladder preview
-Status: implementation in progress.
+Status: implemented; isolated preview deployed for acceptance.
 User authorizes an isolated preview only. Preserve all running service containers/configs/images and old data.
 
 ## Product contract
@@ -10,3 +10,6 @@ Build separate immutable images; use a new Docker project/network, bounded CPU/m
 
 ## Acceptance
 Backend: manifest/hash/path isolation, pair filtering, training identity, replay validation, token/revision/legality, actual inference. Frontend: loading/errors, Agent types, exact-context navigation, race cancellation, training records, two-seat Play. Browser: real ladder -> pair -> replay -> per-ply analysis, linked training metrics, human/Agent and Agent/Agent play, mobile width. Observe protected container IDs and health unchanged.
+
+## Handoff
+See [preview delivery and evidence](../AGENT_LADDER_PREVIEW_20261025.md).
