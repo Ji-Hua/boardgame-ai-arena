@@ -85,7 +85,7 @@ function CheckpointPage({season}:{season:string}){
  {!loading&&params.get('agent')&&!selected&&<p role="alert">所选 Agent 不属于此 checkpoint</p>}
  {selected&&<section className="aw-section"><div className="aw-toolbar"><h2>{selected.agent.name}</h2><Link to={route('/agents/'+enc(selected.agent.id),selected.roster.season)}>Agent 详情</Link>{selected.agent.playable&&<Link className="button-link" to={route('/play',selected.roster.season,{p1:selected.agent.id,p2:'human'})}>发起对战</Link>}<label>回放对手<select aria-label="Checkpoint 对手" value={opponent??''} onChange={e=>{const p=new URLSearchParams(params);p.set('season',selected.roster.season);p.set('agent',selected.agent.id);p.set('opponent',e.target.value);setParams(p)}}>{opponents.map(id=><option key={id} value={id}>{selected.roster.agents.find((a:Obj)=>a.id===id)?.name??id}</option>)}</select></label></div>
  {selected.roster.warning&&<details><summary>评测范围</summary>{selected.roster.warning}</details>}
- {opponent?<Matches key={selected.roster.season+':'+selected.agent.id+':'+opponent} season={selected.roster.season} agent={selected.agent} opponent={opponent} roster={selected.roster}/>:<p>没有已记录的交手对局</p>}
+ {opponent?<div className="aw-checkpoint-matches"><Matches key={selected.roster.season+':'+selected.agent.id+':'+opponent} season={selected.roster.season} agent={selected.agent} opponent={opponent} roster={selected.roster}/></div>:<p>没有已记录的交手对局</p>}
  </section>}</>
 }
 
