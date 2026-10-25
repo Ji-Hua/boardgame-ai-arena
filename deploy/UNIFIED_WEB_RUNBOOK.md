@@ -31,7 +31,7 @@ If any gate fails, stop the new entry and start the saved original container.
 Do not restart or restore MLflow, overwrite a database, or prune Docker images.
 
 ## Rollback
-Each host's private release directory contains rollback.sh. It stops only the
+Each host's private release directory contains rollback-entry.sh. It stops only the
 new public gateway and starts the original preserved frontend container. This
 restores the prior entry without changing old source or data. New research games
 remain in the new Gameplay process until explicitly closed; keep that process
@@ -42,3 +42,5 @@ Live pause/resume and durable human game history are not implemented. Play-to-La
 is explicitly a frozen snapshot; the live game continues. Old standalone Lab
 remains available, while normal navigation uses native React Lab.
 Public GitHub synchronization is separate from the user's deployment permission.
+
+Actual release, exact image IDs and tested commands: [2026-10-25 release](../docs/UNIFIED_WEB_RELEASE_20261025.md).

@@ -1,5 +1,5 @@
 # Unified web implementation and preserved rollout
-Status: in progress. User authorizes replacement of running components while preserving old code, configurations and data.
+Status: implemented and deployed. User authorizes replacement of running components while preserving old code, configurations and data.
 
 ## Contract
 One React application in apps/web, six workspaces, native React Lab without
@@ -18,3 +18,6 @@ images, configs, catalogs, datasets and MLflow. Start candidates on isolated por
 then change the user entry only after acceptance, retain rollback commands.
 Public GitHub push remains blocked pending separate public-information consent;
 private host-to-host Git synchronization may be used for authorized deployment.
+
+## Delivery
+See [release evidence, topology, preservation and rollback](../UNIFIED_WEB_RELEASE_20261025.md). LAN HTTP regression fixed and final live native/Classic flows passed.

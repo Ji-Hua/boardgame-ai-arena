@@ -1,4 +1,6 @@
 # Monorepo migration status
+
+> Current update: the unified frontend is deployed on both hosts. See [2026-10-25 release](UNIFIED_WEB_RELEASE_20261025.md) for exact source/images, preserved dependencies, evidence and rollback. Sections below record earlier migration stages; their no-switch statements are historical.
 Reference host: Training (192.168.68.88).
 Branch: codex/monorepo-migration-20261025.
 Worktree: /home/jihua/worktrees/quoridor/monorepo-migration-20261025.
@@ -16,7 +18,7 @@ Dev backup: /home/jihua/quoridor-backups/20261025T162123Z.
 Dev: 18,382,295,040 bytes; SHA256 273496effdbeac3b3e9f8707f0c60ac3b08d8b1c1087ff6b535683a44f804cd9.
 Training: 24,083,200,000 bytes; SHA256 82a3c24c686081f7c7ca1fc16813404b8d3ed2690be6eb5a792ca63788453987.
 Both tar creation and full source comparison returned exit 0.
-The external /home/jihua/quoridor-data tree is outside this source backup and remains untouched.
+The external /home/jihua/quoridor-data tree is outside this source backup and has not had existing model/data bytes replaced; this release added immutable research catalog files.
 Backups are same-host recovery copies, not independent disaster-recovery storage.
 
 ## Deferred decisions

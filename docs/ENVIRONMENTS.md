@@ -1,6 +1,6 @@
 # Environments
 
-> Migration update 2026-10-25: use [MIGRATION_STATUS.md](MIGRATION_STATUS.md) for the current candidate baseline. The deployment/preview observations below are historical and do not establish current availability. Existing services have not been switched.
+> Migration update 2026-10-25: use [MIGRATION_STATUS.md](MIGRATION_STATUS.md) for the current candidate baseline. The deployment/preview observations below are historical and do not establish current availability. Frontend entries have now been switched; see [the current release](UNIFIED_WEB_RELEASE_20261025.md) for authoritative paths, ports and remaining old-service dependencies.
 
 **Last verified:** 2026-10-22 (P3-A cross-host play, P1/P2 and protected service health; other facts retain their original verification)
 
