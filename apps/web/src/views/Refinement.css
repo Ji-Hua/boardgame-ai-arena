@@ -1,7 +1,8 @@
 /* Preview workspace: stable board and bounded inspector, no changes to legacy views. */
+.agent-workspace .aw-main{margin:0 auto}
 .aw-workbench{grid-template-columns:minmax(300px,460px) minmax(0,1fr);align-items:start;gap:18px}
 .aw-board-column{position:sticky;top:12px}
-.aw-board-column>svg{margin:8px auto;width:min(100%,430px)}
+.aw-board-column>svg{margin:8px auto;width:min(100%,clamp(260px,calc(100dvh - 410px),430px))}
 .aw-participant{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);position:relative;min-width:0}
 .aw-participant-name{flex:1;min-width:0}.aw-participant-name strong{display:block;overflow-wrap:anywhere}.aw-participant-name small{display:block;color:var(--text-muted);font-size:11px;margin-top:3px}
 .aw-seat-dot{color:white;padding:5px;border-radius:5px;font-size:12px;font-weight:600}.aw-p1 .aw-seat-dot{background:#4CAF50}.aw-p2 .aw-seat-dot{background:#2196F3}
@@ -14,4 +15,5 @@
 .aw-record{padding-bottom:10px;margin-bottom:10px;font-size:12px}.aw-record small{display:block;color:var(--text-muted);margin-top:5px}
 .aw-move-list{display:grid;grid-template-columns:1fr 1fr;gap:5px}.aw-move-list button{display:flex;gap:14px;text-align:left}.aw-move-list button[aria-current=step]{outline:2px solid var(--accent);background:var(--surface2)}
 .aw-analysis .aw-candidates{max-height:none;margin-top:4px}.aw-analysis .aw-table{max-height:390px;overflow:auto}.aw-analysis .aw-toolbar{margin-bottom:8px}.aw-analysis .aw-json{max-height:none}.aw-seats .aw-participant{margin-bottom:12px}.aw-analysis .lab-tensor{max-width:100%}
+@media(max-width:760px){.aw-board-column>svg{width:min(100%,430px)}}
 @media(max-width:760px){.aw-workbench{grid-template-columns:minmax(0,1fr)}.aw-board-column{position:static}.aw-inspector{height:580px;max-height:85dvh}.aw-main{padding:12px}.aw-transport .aw-toolbar{gap:4px}.aw-transport button{padding:8px}.aw-transport label{gap:4px}.aw-participant-name strong{font-size:13px}.aw-participant{padding:8px}.aw-inspector .aw-analysis select{max-width:100%}}

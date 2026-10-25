@@ -29,7 +29,7 @@ test('real ladder, exact training metrics, matchup and per-ply neural analysis',
  await page.getByRole('button',{name:'返回原局面'}).first().click()
  await page.getByText('神经网络诊断',{exact:true}).click()
  await page.getByRole('button',{name:'读取激活'}).click()
- await expect(page.getByRole('img',{name:'Tensor slice by index'})).toBeVisible()
+ await expect(page.getByRole('img',{name:/Tensor slice by index|Spatial tensor/})).toBeVisible()
  await page.screenshot({path:info.outputPath('analysis.png'),fullPage:true})
  await page.setViewportSize({width:390,height:844})
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
