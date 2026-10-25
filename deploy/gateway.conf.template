@@ -1,5 +1,7 @@
 server {
     listen 8080;
+    root /usr/share/nginx/html;
+    index index.html;
     client_max_body_size 1m;
     location /classic-api/ {
         proxy_pass http://${CLASSIC_UPSTREAM}/api/;
