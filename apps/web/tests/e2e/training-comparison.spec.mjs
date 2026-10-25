@@ -65,6 +65,7 @@ test('Run selections survive refresh; evidence and comparison fit mobile',async(
  await page.screenshot({path:info.outputPath('training-evidence-mobile.png'),fullPage:true})
  await page.getByRole('tab',{name:'配置对比',exact:true}).click()
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
- await page.getByLabel('选择 C-resnet_seed-43',{exact:true}).uncheck()
+ await page.getByLabel('选择 C-resnet_seed-43',{exact:true}).click()
+ await expect(page.getByLabel('选择 C-resnet_seed-43',{exact:true})).not.toBeChecked()
  await expect(page.getByRole('heading',{name:'C-resnet_seed-42',exact:true})).toBeVisible()
 })

@@ -75,7 +75,7 @@ function CheckpointPage({season}:{season:string}){
  evidence('/seasons',{signal:c.signal}).then(async d=>{const results=await Promise.allSettled(d.seasons.map((s:Obj)=>evidence('/seasons/'+enc(s.id),{signal:c.signal})));if(c.signal.aborted)return;setCatalog(results.flatMap(r=>r.status==='fulfilled'?[r.value]:[]));setErrors([...(d.warnings??[]),...results.flatMap((r,i)=>r.status==='rejected'?[d.seasons[i].id+': '+String(r.reason)]:[])])}).catch(e=>{if(!c.signal.aborted)setErrors([String(e)])}).finally(()=>{if(!c.signal.aborted)setLoading(false)});return()=>c.abort()},[sha,retry])
  const rows=catalog.flatMap(r=>r.agents.filter((a:Obj)=>a.sha256===sha).map((agent:Obj)=>({roster:r,agent})))
  const selected=params.get('agent')?rows.find(r=>r.roster.season===season&&r.agent.id===params.get('agent')):rows.find(r=>r.roster.season===season)??rows[0]
- const opponents=selected?Object.entries(selected.roster.matrix[selected.agent.id]??{}).filter(([,v])=>(v as Obj).games>0).map(([id])=>id):[]
+ const opponents=selected?Object.entries(selected.roster.matrix[selected.agent.id]??{}).filter(([,v])=>(v as Obj)?.games>0).map(([id])=>id):[]
  const opponent=opponents.includes(params.get('opponent')??'')?params.get('opponent')!:opponents[0]
  function choose(r:Obj){const p=new URLSearchParams(params);p.set('season',r.roster.season);p.set('agent',r.agent.id);p.delete('opponent');setParams(p)}
  return <><div className="aw-breadcrumb"><Link to={trainingUrl(season,params.get('run')?[params.get('run')!]:[])}>训练记录</Link> / Checkpoint</div><div className="aw-toolbar"><h1>Checkpoint</h1><span className="aw-hash">{sha}</span></div>

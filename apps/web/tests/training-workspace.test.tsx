@@ -52,3 +52,12 @@ it('never associates a checkpoint with an Agent having a different SHA',async()=
  await waitFor(()=>expect(screen.getByText('已完成评测中没有此 checkpoint；暂不可从评测 Agent 发起对战')).toBeTruthy())
  expect(screen.queryByRole('link',{name:'发起对战'})).toBeNull()
 })
+it('opens exact checkpoint matches while ignoring null matrix cells',async()=>{
+ const agent={id:'cnn',name:'CNN',sha256:sha,kind:'neural',playable:true,spec:{algo:{type:'dqn'},policy:{type:'top_k',k:1}}}
+ const roster={season:'s',agents:[agent,{id:'greedy',name:'Greedy'}],matrix:{cnn:{cnn:null,greedy:{games:2}}}}
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>({ok:true,json:async()=>url.endsWith('/seasons')?{seasons:[{id:'s'}]}:url.includes('/games?')?{games:[]}:roster})))
+ render(<MemoryRouter initialEntries={['/checkpoints/'+sha+'?season=s']}><AgentWorkspace/></MemoryRouter>)
+ expect(await screen.findByLabelText('Checkpoint 对手')).toBeTruthy()
+ expect(screen.getByRole('option',{name:'Greedy'})).toBeTruthy()
+ expect(screen.getByRole('link',{name:'发起对战'}).getAttribute('href')).toContain('p1=cnn')
+})
