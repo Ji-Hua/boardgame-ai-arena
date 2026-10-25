@@ -17,12 +17,13 @@ services:
     restart: unless-stopped
   research:
     image: ${RESEARCH_IMAGE:?validated release required}
-    ports: ["8740:8740", "8741:8741"]
+    ports: ["8741:8741"]
     environment:
+      PLATFORM_LAB_UPSTREAM: http://lab:8744
       QUORIDOR_DATA_ROOT: /data/quoridor
       TRAINING_DASHBOARD_ARTIFACT_ROOTS: /data/training_artifacts/dqn:/data/training_artifacts
       MLFLOW_TRACKING_URI: http://mlflow:8742
-    volumes: ["${QUORIDOR_DATA_DIR:?data root required}:/data/quoridor:ro", "${TRAINING_ARTIFACTS_DIR:?artifact root required}:/data/training_artifacts:ro"]
+    volumes: ["${QUORIDOR_DATA_DIR:?data root required}:/data/quoridor:ro", "${TRAINING_ARTIFACTS_DIR:?artifact root required}:/data/training_artifacts:ro", "${QUORIDOR_DATA_DIR:?data root required}:${QUORIDOR_DATA_DIR:?data root required}:ro"]
     restart: unless-stopped
   mlflow:
     image: ${MLFLOW_IMAGE:?validated release required}

@@ -122,12 +122,13 @@ def research_catalog(directory: Path, *, index=None) -> Path:
 
 def loopback_upstream(value: str) -> str:
     parsed = urlsplit(value)
-    if (parsed.scheme != "http" or parsed.hostname != "127.0.0.1"
+    if (parsed.scheme != "http" or parsed.hostname not in ("127.0.0.1", "lab")
             or parsed.username is not None or parsed.password is not None
             or parsed.path not in ("", "/") or parsed.query or parsed.fragment
-            or parsed.port is None or not 1024 <= parsed.port <= 65535):
-        raise ValueError("Lab upstream must be http://127.0.0.1:<unprivileged-port>")
-    return f"http://127.0.0.1:{parsed.port}"
+            or parsed.port is None or not 1024 <= parsed.port <= 65535
+            or (parsed.hostname == "lab" and parsed.port != 8744)):
+        raise ValueError("Lab upstream must be loopback or the fixed Compose service http://lab:8744")
+    return f"http://{parsed.hostname}:{parsed.port}"
 
 
 def create_app(*, backend_app=None, dist=None, lab_upstream=None, transport=None) -> FastAPI:
