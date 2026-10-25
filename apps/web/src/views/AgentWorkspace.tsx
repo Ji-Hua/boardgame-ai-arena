@@ -1,14 +1,13 @@
 import React, {useEffect, useRef, useState} from 'react'
 import {Link, Navigate, Route, Routes, useParams, useSearchParams} from 'react-router-dom'
-import {api} from '../api'
 import {labRequest, positionBoard, type Position} from '../lab'
 import {EvalReplayBoard} from '../components/EvalReplayBoard'
 import {Tensor} from './LabView'
-import {MetricsView} from './MetricsView'
-import type {RunDetail, RunSummary} from '../types'
 import '../App.css'
 import './AgentWorkspace.css'
 import './Refinement.css'
+import {TrainingWorkspace,RunInspector,trainingUrl} from './TrainingWorkspace'
+import {EvidenceViewer} from './EvidenceViewer'
 
 type Obj = Record<string, any>
 export async function evidence(path:string, options:RequestInit={}) {
@@ -43,7 +42,7 @@ export default function AgentWorkspace(){
  {!seasons.data&&!seasons.error&&<p role="status">加载评测批次…</p>}
  {seasons.data?.seasons?.length===0&&<p>暂无已完成的天梯报告</p>}
  {season&&!roster.data&&!roster.error&&<p role="status">加载 Agent…</p>}
- {roster.data&&<Routes><Route path="/" element={<Navigate replace to={route('/ladder',season)}/>}/><Route path="/ladder" element={<Ladder season={season} roster={roster.data} seasons={seasons.data?.seasons??[]}/>}/><Route path="/agents/:agentId" element={<AgentDetail season={season} roster={roster.data}/>}/><Route path="/games/:gameId" element={<Replay season={season} roster={roster.data}/>}/><Route path="/play" element={<Play season={season} roster={roster.data}/>}/><Route path="/training" element={<TrainingIndex season={season}/>}/><Route path="*" element={<Navigate replace to={route('/ladder',season)}/>}/></Routes>}
+ {roster.data&&<Routes><Route path="/" element={<Navigate replace to={route('/ladder',season)}/>}/><Route path="/ladder" element={<Ladder season={season} roster={roster.data} seasons={seasons.data?.seasons??[]}/>}/><Route path="/agents/:agentId" element={<AgentDetail season={season} roster={roster.data}/>}/><Route path="/games/:gameId" element={<Replay season={season} roster={roster.data}/>}/><Route path="/play" element={<Play season={season} roster={roster.data}/>}/><Route path="/checkpoints/:sha" element={<CheckpointPage season={season}/>}/><Route path="/training" element={<TrainingWorkspace season={season}/>}/><Route path="*" element={<Navigate replace to={route('/ladder',season)}/>}/></Routes>}
  </main></div>
 }
 
@@ -64,20 +63,30 @@ function AgentDetail({season,roster}:{season:string;roster:Obj}){
  return <><div className="aw-breadcrumb"><Link to={route('/ladder',season)}>天梯</Link> / {a.name}</div><div className="aw-toolbar"><h1>{a.name}</h1><Tag agent={a}/><small>{agentVersion(a)}</small><Link className="button-link" to={route('/play',season,{p1:a.id,p2:'human'})}>发起对战</Link></div><div className="aw-toolbar"><span>Elo {fmt(a.ranking?.elo,0)}</span><span>排名 {a.ranking?.rank??'—'}</span><span>胜 / 平 / 负 {a.ranking?`${a.ranking.wins} / ${a.ranking.draws} / ${a.ranking.losses}`:'—'}</span></div>
  <div className="aw-detail-grid"><section><h2>交手关系</h2><div className="aw-table"><table><thead><tr><th>对手</th><th>胜 / 平 / 负</th><th>得分率</th><th></th></tr></thead><tbody>{Object.entries(pairs).filter(([,v])=>(v as Obj)?.games>0).map(([id,value])=>{const v=value as Obj;return <tr key={id}><td><Link to={route('/agents/'+enc(id),season)}>{roster.agents.find((x:Obj)=>x.id===id)?.name??id}</Link><small>P1 {v.p1_games??'—'} / P2 {v.p2_games??'—'}</small></td><td>{v.wins} / {v.draws} / {v.losses}</td><td>{pct(v.score)}</td><td><button onClick={()=>{const p=new URLSearchParams(params);p.set('opponent',id);setParams(p)}}>交手记录</button></td></tr>})}</tbody></table></div></section><section className="aw-panel"><h2>{a.kind==='neural'?'模型配置':'搜索 / 策略配置'}</h2><dl><dt>算法</dt><dd>{a.spec.algo.type}</dd><dt>策略</dt><dd>{JSON.stringify(a.spec.policy)}</dd><dt>Spec</dt><dd className="aw-hash">{a.identity}</dd>{a.sha256&&<><dt>SHA</dt><dd className="aw-hash">{a.sha256}</dd></>}</dl><details><summary>完整配置</summary><Json value={a.spec}/></details></section></div>
  {opponent&&<Matches key={season+agentId+opponent} season={season} agent={a} opponent={opponent} roster={roster}/>}
- <section className="aw-section"><h2>训练记录</h2><ErrorBox text={training.error} retry={training.retry}/>{!training.data&&!training.error&&<p role="status">查找 SHA 关联记录…</p>}{training.data?.reason&&<p>{training.data.reason}</p>}{training.data&&[...new Set<string>(training.data.runs.map((r:Obj)=>r.run_id))].map(id=><TrainingRun key={id} runId={id} sha={a.sha256}/>)}</section>
+ <section className="aw-section"><h2>训练记录</h2><ErrorBox text={training.error} retry={training.retry}/>{!training.data&&!training.error&&<p role="status">查找 SHA 关联记录…</p>}{training.data?.reason&&<p>{training.data.reason}</p>}{training.data&&[...new Set<string>(training.data.runs.map((r:Obj)=>r.run_id))].map(id=><TrainingRun key={id} runId={id} sha={a.sha256} season={season}/>)}</section>
  </>
 }
 
-function TrainingRun({runId,sha}:{runId:string;sha?:string}){
- const [data,setData]=useState<RunDetail|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0)
- useEffect(()=>{let active=true;setError('');setData(null);api.getRun(runId).then(d=>{if(active)setData(d)}).catch(e=>{if(active)setError(String(e))});return()=>{active=false}},[runId,retry])
- return <div className="aw-panel aw-training"><ErrorBox text={error} retry={()=>setRetry(n=>n+1)}/>{!data&&!error&&<p role="status">加载训练运行…</p>}{data&&<><div className="aw-toolbar"><h3>{data.run_name??runId}</h3><small>{data.source} · {data.status??'状态未知'} · {data.algorithm}</small></div><small className="aw-hash">Run {runId}</small>{data.source==='mlflow'&&data.experiment_id&&<a target="_blank" rel="noreferrer" href={'http://192.168.68.88:8742/#/experiments/'+enc(data.experiment_id)+'/runs/'+enc(runId)}>在 MLflow 查看 ↗</a>}<div className="aw-toolbar"><span>创建 {data.created_at??'—'}</span><span>版本 {data.checkpoints.length}</span></div>{data.warnings.map((w,i)=><details key={i}><summary>来源提示</summary>{w}</details>)}<details><summary>训练指标</summary><MetricsOnOpen runId={runId}/></details><details><summary>训练配置与来源</summary><Json value={{config:data.config,provenance:data.provenance,summary:data.summary_stats}}/></details><details><summary>Checkpoint 记录</summary><div className="aw-table"><table><thead><tr><th>文件</th><th>进度</th><th>SHA</th></tr></thead><tbody>{data.checkpoints.map((c,i)=><tr key={i} className={sha&&c.sha256===sha?'aw-selected':''}><td>{c.filename}{sha&&c.sha256===sha?' · 当前 Agent':''}</td><td>{c.progress_type??'未知'} {c.step??c.episode??'—'}</td><td className="aw-hash">{c.sha256??'未记录'}</td></tr>)}</tbody></table></div></details>{data.notes&&<details><summary>运行备注</summary><pre>{data.notes}</pre></details>}</>}</div>
-}
-function MetricsOnOpen({runId}:{runId:string}){const ref=useRef<HTMLDivElement>(null);const [open,setOpen]=useState(false);useEffect(()=>{const d=ref.current?.closest('details');const fn=()=>{if(d?.open)setOpen(true)};d?.addEventListener('toggle',fn);fn();return()=>d?.removeEventListener('toggle',fn)},[]);return <div ref={ref}>{open&&<MetricsView runId={runId} embedded/>}</div>}
-function TrainingIndex({season}:{season:string}){
- const [runs,setRuns]=useState<RunSummary[]|null>(null),[error,setError]=useState(''),[q,setQ]=useState('');const [params,setParams]=useSearchParams()
- useEffect(()=>{let active=true;api.listRuns().then(d=>{if(active)setRuns(d.runs)}).catch(e=>{if(active)setError(String(e))});return()=>{active=false}},[])
- return <><div className="aw-breadcrumb"><Link to={route('/ladder',season)}>天梯</Link> / 训练记录</div><div className="aw-toolbar"><h1>训练记录</h1><input aria-label="搜索训练" value={q} onChange={e=>setQ(e.target.value)} placeholder="名称 / Run ID"/></div><ErrorBox text={error}/>{!runs&&!error&&<p role="status">加载训练记录…</p>}<div className="aw-table"><table><thead><tr><th>运行</th><th>来源</th><th>算法</th><th>状态</th><th></th></tr></thead><tbody>{runs?.filter(r=>[r.run_id,r.run_name].join(' ').toLowerCase().includes(q.toLowerCase())).map(r=><tr key={r.run_id}><td>{r.run_name??r.run_id}</td><td>{r.source}</td><td>{r.algorithm}</td><td>{r.status??'—'}</td><td><button onClick={()=>setParams({season,run:r.run_id})}>详情</button></td></tr>)}</tbody></table></div>{params.get('run')&&<TrainingRun key={params.get('run')} runId={params.get('run')!}/>}</>
+function TrainingRun({runId,sha,season}:{runId:string;sha?:string;season:string}){return <><div className="aw-training-open"><Link to={trainingUrl(season,[runId])}>打开训练工作区 / 添加 Run 对比</Link></div><RunInspector ids={[runId]} season={season} sha={sha}/></>}
+
+function CheckpointPage({season}:{season:string}){
+ const {sha=''}=useParams();const [params,setParams]=useSearchParams();const [catalog,setCatalog]=useState<Obj[]>([]),[errors,setErrors]=useState<string[]>([]),[loading,setLoading]=useState(true),[retry,setRetry]=useState(0)
+ useEffect(()=>{const c=new AbortController();setCatalog([]);setErrors([]);setLoading(true)
+ evidence('/seasons',{signal:c.signal}).then(async d=>{const results=await Promise.allSettled(d.seasons.map((s:Obj)=>evidence('/seasons/'+enc(s.id),{signal:c.signal})));if(c.signal.aborted)return;setCatalog(results.flatMap(r=>r.status==='fulfilled'?[r.value]:[]));setErrors([...(d.warnings??[]),...results.flatMap((r,i)=>r.status==='rejected'?[d.seasons[i].id+': '+String(r.reason)]:[])])}).catch(e=>{if(!c.signal.aborted)setErrors([String(e)])}).finally(()=>{if(!c.signal.aborted)setLoading(false)});return()=>c.abort()},[sha,retry])
+ const rows=catalog.flatMap(r=>r.agents.filter((a:Obj)=>a.sha256===sha).map((agent:Obj)=>({roster:r,agent})))
+ const selected=params.get('agent')?rows.find(r=>r.roster.season===season&&r.agent.id===params.get('agent')):rows.find(r=>r.roster.season===season)??rows[0]
+ const opponents=selected?Object.entries(selected.roster.matrix[selected.agent.id]??{}).filter(([,v])=>(v as Obj).games>0).map(([id])=>id):[]
+ const opponent=opponents.includes(params.get('opponent')??'')?params.get('opponent')!:opponents[0]
+ function choose(r:Obj){const p=new URLSearchParams(params);p.set('season',r.roster.season);p.set('agent',r.agent.id);p.delete('opponent');setParams(p)}
+ return <><div className="aw-breadcrumb"><Link to={trainingUrl(season,params.get('run')?[params.get('run')!]:[])}>训练记录</Link> / Checkpoint</div><div className="aw-toolbar"><h1>Checkpoint</h1><span className="aw-hash">{sha}</span></div>
+ {loading&&<p role="status">查找确切 SHA 评测…</p>}{errors.length>0&&<div className="error" role="alert">{errors.map(e=><div key={e}>{e}</div>)}<button onClick={()=>setRetry(v=>v+1)}>重试</button></div>}
+ {!loading&&!rows.length&&<p>{errors.length?'部分评测来源不可用，尚未找到确切关联':'已完成评测中没有此 checkpoint；暂不可从评测 Agent 发起对战'}</p>}
+ {rows.length>0&&<><h2>评测</h2><div className="aw-table"><table><thead><tr><th>批次 / 协议</th><th>Agent / 策略</th><th>胜 / 平 / 负</th><th>Elo</th><th></th></tr></thead><tbody>{rows.map(r=><tr key={r.roster.season+':'+r.agent.id} className={selected===r?'aw-selected':''}><td>{r.roster.season}<small>{r.roster.protocol}</small></td><td>{r.agent.name}<small>{r.agent.spec.policy.type} · k={r.agent.spec.policy.k??'—'}</small></td><td>{r.agent.ranking?`${r.agent.ranking.wins} / ${r.agent.ranking.draws} / ${r.agent.ranking.losses}`:'—'}</td><td>{fmt(r.agent.ranking?.elo,0)}</td><td><button onClick={()=>choose(r)}>交手记录</button></td></tr>)}</tbody></table></div></>}
+ {!loading&&params.get('agent')&&!selected&&<p role="alert">所选 Agent 不属于此 checkpoint</p>}
+ {selected&&<section className="aw-section"><div className="aw-toolbar"><h2>{selected.agent.name}</h2><Link to={route('/agents/'+enc(selected.agent.id),selected.roster.season)}>Agent 详情</Link>{selected.agent.playable&&<Link className="button-link" to={route('/play',selected.roster.season,{p1:selected.agent.id,p2:'human'})}>发起对战</Link>}<label>回放对手<select aria-label="Checkpoint 对手" value={opponent??''} onChange={e=>{const p=new URLSearchParams(params);p.set('season',selected.roster.season);p.set('agent',selected.agent.id);p.set('opponent',e.target.value);setParams(p)}}>{opponents.map(id=><option key={id} value={id}>{selected.roster.agents.find((a:Obj)=>a.id===id)?.name??id}</option>)}</select></label></div>
+ {selected.roster.warning&&<details><summary>评测范围</summary>{selected.roster.warning}</details>}
+ {opponent?<Matches key={selected.roster.season+':'+selected.agent.id+':'+opponent} season={selected.roster.season} agent={selected.agent} opponent={opponent} roster={selected.roster}/>:<p>没有已记录的交手对局</p>}
+ </section>}</>
 }
 
 function Matches({season,agent,opponent,roster}:{season:string;agent:Obj;opponent:string;roster:Obj}){
@@ -122,10 +131,10 @@ function Replay({season,roster}:{season:string;roster:Obj}){
  <div className="aw-toolbar"><small>{derived?'候选分支 · 原始第 '+ply+' 步':'原始回放'}</small>{derived&&<button onClick={()=>setDerived(null)}>返回原局面</button>}</div></div>
  </section><section className="aw-panel aw-inspector">
  <div className="aw-tabs" role="tablist" aria-label="回放视图">{[['analysis','逐步分析'],['moves','棋谱'],['source','证据']].map(([id,label])=><button key={id} role="tab" aria-selected={panel===id} onClick={()=>setPanel(id)}>{label}</button>)}</div>
- <div className="aw-inspector-body"><div hidden={panel!=='analysis'}><h2>第 {ply} 步 · P{position.turn}</h2><div className="aw-record"><strong>{actor?.name}</strong> · 实际动作 {actual?notation(actual):'终局'}<small>耗时 {fmt(latency)} ms · 候选分数 / 搜索树：未记录</small></div>
+ <div className={'aw-inspector-body '+(panel==='source'?'aw-evidence-body':'')}><div hidden={panel!=='analysis'}><h2>第 {ply} 步 · P{position.turn}</h2><div className="aw-record"><strong>{actor?.name}</strong> · 实际动作 {actual?notation(actual):'终局'}<small>耗时 {fmt(latency)} ms · 候选分数 / 搜索树：未记录</small></div>
  <div hidden={!actual}><StepAnalysis key={gameId} position={position} actor={actor} roster={roster} onBranch={setDerived} onAnalyze={()=>setPlaying(false)}/></div>{!actual&&<p>对局已结束</p>}</div>
  {panel==='moves'&&<div className="aw-move-list">{r.data.actions.map((a:Obj,i:number)=><button key={i} aria-current={ply===i?'step':undefined} onClick={()=>seek(i)}><span>{i+1}</span><span>P{a.player}</span><strong>{notation(a)}</strong></button>)}</div>}
- {panel==='source'&&<><h3>原始证据</h3><Json value={{source:r.data.source,decision_diagnostics:r.data.decision_diagnostics,scope:r.data.diagnostics_scope}}/></>}
+ {panel==='source'&&<EvidenceViewer filename={gameId.replace(':','-')+'-evidence.json'} value={{replay:r.data,evaluation:{season,protocol:roster.protocol,manifest_sha256:roster.manifest_sha256},participants:[participant(r.data.p1),participant(r.data.p2)],view:{ply,position,branch_preview:derived}}}/>}
  </div></section></div></>}</>
 }
 
