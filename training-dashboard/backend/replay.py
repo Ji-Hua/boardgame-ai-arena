@@ -41,7 +41,7 @@ def _dependencies():
     return adapter, Player, RuleEngine, _build_state, encode_state_snapshot
 
 
-def arena_replay(manifest, block, game_index, agent_id, run_id, checkpoint):
+def arena_replay(manifest, block, game_index, agent_id, run_id, checkpoint, *, allow_non_neural=False):
     """Validate immutable evidence and reconstruct every state with RuleEngine.
 
     Invalid or incomplete evidence raises ValueError, never a partial replay.
@@ -50,12 +50,12 @@ def arena_replay(manifest, block, game_index, agent_id, run_id, checkpoint):
     cycles, ply limits); these do not require an engine goal winner.
     """
     try:
-        return _arena_replay(manifest, block, game_index, agent_id, run_id, checkpoint)
+        return _arena_replay(manifest, block, game_index, agent_id, run_id, checkpoint, allow_non_neural=allow_non_neural)
     except (KeyError, TypeError, IndexError, OverflowError) as exc:
         raise ValueError(f"Malformed Arena replay evidence: {exc}") from exc
 
 
-def _arena_replay(manifest, block, game_index, agent_id, run_id, checkpoint):
+def _arena_replay(manifest, block, game_index, agent_id, run_id, checkpoint, *, allow_non_neural=False):
     digest = manifest.get("manifest_sha256")
     _require(isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest), "Missing manifest SHA256")
     _require(digest == block.get("manifest_sha256"), "Block manifest SHA mismatch")
@@ -67,9 +67,13 @@ def _arena_replay(manifest, block, game_index, agent_id, run_id, checkpoint):
     specs = {a["id"]: a for a in roster}
     _require(agent_id in specs, "Agent identity absent from manifest roster")
     sha = checkpoint.get("sha256")
-    _require(isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{64}", sha), "Missing checkpoint SHA256")
-    _require(specs[agent_id]["algo"]["params"].get("sha256") == sha,
-             "Checkpoint SHA does not match exact roster agent identity")
+    neural = specs[agent_id]["algo"]["type"] == "dqn"
+    if neural or not allow_non_neural:
+        _require(isinstance(sha, str) and re.fullmatch(r"[0-9a-f]{64}", sha), "Missing checkpoint SHA256")
+        _require(specs[agent_id]["algo"].get("params", {}).get("sha256") == sha,
+                 "Checkpoint SHA does not match exact roster agent identity")
+    elif sha is not None:
+        raise ValueError("Non-neural Agent cannot claim checkpoint SHA")
     pair = [block["a"], block["b"]]
     _require(pair[0] != pair[1] and all(i in specs for i in pair) and agent_id in pair,
              "Invalid block agent identities")

@@ -1,0 +1,37 @@
+services:
+  platform:
+    image: ${PREVIEW_IMAGE:?required}
+    environment:
+      QUORIDOR_DATA_ROOT: /home/jihua/quoridor-data
+      TRAINING_DASHBOARD_ARTIFACT_ROOTS: /data/training_artifacts/dqn:/data/training_artifacts
+      MLFLOW_TRACKING_URI: http://192.168.68.88:8742
+      PLATFORM_LAB_UPSTREAM: http://lab:8744
+    volumes:
+      - /home/jihua/quoridor-data:/home/jihua/quoridor-data:ro
+      - /home/jihua/workspace/boardgame-ai-arena/agent_system/training/artifacts:/data/training_artifacts:ro
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 3g
+    cpus: 2
+    restart: unless-stopped
+  lab:
+    image: sha256:5746cf19c0c0eb126759cfe24a77d60953bdf6d4d64fa3c06409db5055a4ee7f
+    environment:
+      LAB_MODEL_CATALOG: ${LAB_MODEL_CATALOG:?required}
+    command: [python, -m, uvicorn, 'agent_system.analysis.app:app', --host, '0.0.0.0', --port, '8744']
+    volumes:
+      - /home/jihua/quoridor-data:/home/jihua/quoridor-data:ro
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 2g
+    cpus: 1
+    restart: unless-stopped
+  gateway:
+    image: ${GATEWAY_IMAGE:?required}
+    environment:
+      PLATFORM_UPSTREAM: platform:8741
+      CLASSIC_UPSTREAM: platform:8741
+    ports: ['192.168.68.88:8790:8080']
+    mem_limit: 128m
+    cpus: 1
+    restart: unless-stopped

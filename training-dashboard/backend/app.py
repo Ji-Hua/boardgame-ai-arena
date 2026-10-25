@@ -53,6 +53,9 @@ def create_app(*, unified_run_service=None, model_index=None) -> FastAPI:
     app.state.runs = unified_run_service if unified_run_service is not None else UnifiedRunService()
     app.state.models = model_index if model_index is not None else ModelIndex(unified_run_service=app.state.runs)
 
+    from .agent_arena import install
+    install(app)
+
     def platform_call(operation, *args, **kwargs):
         try:
             return operation(*args, **kwargs)
