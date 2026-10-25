@@ -55,6 +55,7 @@ try:
     for address, port in [(host, ports[0]), ('127.0.0.1', ports[1])]:
         sock = socket.socket()
         sockets.append(sock)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((address, port))
 finally:
     for sock in sockets:

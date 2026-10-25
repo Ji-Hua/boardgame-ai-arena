@@ -39,6 +39,18 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe('research shell and URL contracts', () => {
+  it('shows Training runs while the optional summary is still pending', async () => {
+    vi.mocked(api.summary).mockImplementation(() => new Promise(() => {}))
+    mount('/training')
+    expect(await screen.findByRole('table')).toBeTruthy()
+    expect(screen.queryByText('Loading runs…')).toBeNull()
+  })
+  it('keeps Training runs visible when the optional summary fails', async () => {
+    vi.mocked(api.summary).mockRejectedValue(new Error('Summary offline'))
+    mount('/training')
+    expect(await screen.findByRole('table')).toBeTruthy()
+    expect(await screen.findByText(/Run summary unavailable:.*Summary offline/)).toBeTruthy()
+  })
   it('offers all six navigation sections and persists accessible theme toggles', async () => {
     mount('/play')
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })

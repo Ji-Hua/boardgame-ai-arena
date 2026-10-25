@@ -47,6 +47,7 @@ export function RunListView({ onSelectRun }: Props) {
   const [summary, setSummary] = useState<SummaryResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [summaryError, setSummaryError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filterAlg, setFilterAlg] = useState('')
   const [filterSource, setFilterSource] = useState('')
@@ -60,10 +61,11 @@ export function RunListView({ onSelectRun }: Props) {
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([api.listRuns(), api.summary()])
-      .then(([r, s]) => { setRuns(r.runs); setSummary(s); setWarnings(r.warnings) })
+    api.listRuns()
+      .then(r => { setRuns(r.runs); setWarnings(r.warnings) })
       .catch(e => setError(String(e)))
       .finally(() => setLoading(false))
+    api.summary().then(setSummary).catch(e => setSummaryError(String(e)))
   }, [])
 
   const algorithms = useMemo(() => [...new Set(runs.map(r => r.algorithm).filter(Boolean))].sort(), [runs])
@@ -128,6 +130,7 @@ export function RunListView({ onSelectRun }: Props) {
       <h2>Training Runs</h2>
       <p className="muted">Legacy and MLflow runs · read-only recorded evidence</p>
       {warnings.map((w, i) => <div className="warning" key={i}>{w}</div>)}
+      {summaryError && <div className="warning">Run summary unavailable: {summaryError}</div>}
 
       {summary && (
         <div className="summary-bar">
