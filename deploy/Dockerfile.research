@@ -12,6 +12,7 @@ RUN npm run typecheck && npm run test:ui && npm run build
 FROM ${RUNTIME_IMAGE}
 ARG SOURCE_COMMIT
 LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
+COPY scripts/start_unified_platform.sh /app/scripts/start_unified_platform.sh
 COPY training-dashboard/backend /app/training-dashboard/backend
 COPY training-dashboard/platform_entry.py training-dashboard/platform_play.py /app/training-dashboard/
 COPY --from=frontend /build/training-dashboard/frontend/dist /app/training-dashboard/frontend/dist

@@ -28,7 +28,8 @@ class PlayGatewayTests(unittest.TestCase):
         with patch.dict(os.environ, PLATFORM_GAMEPLAY_UPSTREAM="http://192.168.68.102:8774",
                         QUORIDOR_RESEARCH_SERVICE_KEY="private-service-key"):
             app = FastAPI()
-            install_play_gateway(app, transport=httpx.MockTransport(upstream))
+            install_play_gateway(app, lab_upstream="http://127.0.0.1:8754",
+                                      transport=httpx.MockTransport(upstream))
             with TestClient(app) as client:
                 result = client.post("/play-api/games", json={"sha256": "a" * 64},
                     headers={"Authorization": "Bearer game-capability", "Cookie": "secret=1"})
@@ -89,6 +90,7 @@ class GatewayTests(unittest.TestCase):
                                   headers=self.reply_headers)
 
         self.app = gateway.create_app(backend_app=self.backend, dist=self.dist,
+                                      lab_upstream="http://127.0.0.1:8754",
                                       transport=httpx.MockTransport(upstream))
         self.client = self.enterContext(TestClient(self.app))
 
