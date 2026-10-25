@@ -1,3 +1,5 @@
 FROM nginx:stable-alpine
+ARG SOURCE_COMMIT
+LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
 COPY deploy/gateway.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 8080

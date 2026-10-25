@@ -28,6 +28,7 @@ export function Tensor({data}: {data: Data}) {
 }
 export function LabView() {
   const [params] = useSearchParams(); const query = params.toString()
+  const [retry,setRetry]=useState(0)
   const [context,setContext] = useState<AnalysisContext|null>(null)
   const [position,setPosition] = useState<Position>(opening)
   const [root,setRoot] = useState<Position>(opening)
@@ -51,7 +52,7 @@ export function LabView() {
     const controller=new AbortController(); const version=++generation.current
     pending.current?.abort();setBusy(false);setReady(false);setError('');setResult(null);setBranch(null);setTensor(null);setSearch(null);setComparison(null)
     Promise.all([labRequest('meta',undefined,controller.signal),labRequest('models',undefined,controller.signal),
-      params.get('snapshot') ? Promise.resolve(JSON.parse(sessionStorage.getItem('quoridor-lab:'+params.get('snapshot')) ?? 'null')) : api.context(new URLSearchParams(query))
+      params.get('snapshot') ? Promise.resolve().then(()=>JSON.parse(sessionStorage.getItem('quoridor-lab:'+params.get('snapshot')) ?? 'null')) : api.context(new URLSearchParams(query))
     ]).then(async ([meta,catalog,ctx])=>{
       if (!ctx?.position) throw new Error('Analysis context is missing')
       if (!safeReturnRoute(ctx.return_route) && !(ctx.source?.type==='live_snapshot' && /^\/play\?game=[a-f0-9-]{36}$/.test(ctx.return_route))) throw new Error('Unsafe context return route')
@@ -63,7 +64,7 @@ export function LabView() {
       if (sha && !selected) setError('Exact selected SHA is not available in the Lab catalog; no substitute model was selected.')
     }).catch(e=>{if (version===generation.current && e.name!=='AbortError') setError(String(e))})
     return ()=>{controller.abort();generation.current++;pending.current?.abort()}
-  },[query])
+  },[query,retry])
   async function run(operation: (signal: AbortSignal)=>Promise<any>, apply: (value:any)=>void) {
     pending.current?.abort();const controller=new AbortController();pending.current=controller
     const version=++generation.current;setBusy(true);setError('')
@@ -101,7 +102,7 @@ export function LabView() {
     {returnRoute && <Link to={returnRoute}>Return to source{context?.source?.ply!==undefined?` · ply ${context.source.ply}`:''}</Link>}
     {context?.source?.type==='live_snapshot' && <p className="warning">Frozen snapshot only. The live game is not paused.</p>}
     {context?.warnings?.map((w,i)=><p className="warning" key={i}>{w}</p>)}
-    {error && <div className="error" role="alert">{error}</div>}
+    {error && <div className="error" role="alert">{error}{!ready && <button onClick={()=>setRetry(n=>n+1)}>Retry connection</button>}</div>}
     {!ready && !error && <p role="status">Resolving validated context…</p>}
     <div className="lab-workspace">
       <section className="panel lab-controls"><h2>Agent and position</h2>
@@ -125,7 +126,7 @@ export function LabView() {
       {tab==='inputs' && <div className="lab-tensors">{result.neural.input.views.map((v:Data)=><Tensor key={v.name} data={v}/>)}</div>}
       {(tab==='layers'||tab==='weights') && <><div className="lab-tensor-controls"><label>Layer<select aria-label="Network layer" value={layer} onChange={e=>{setLayer(e.target.value);setTensor(null);setChannel(0);setInputChannel(0);setOffset(0)}}>{layers.map(l=><option key={l.name} value={l.name}>{l.name} · {l.type} [{l.shape.join(',')}]</option>)}</select></label><label>Output channel<input aria-label="Output channel" type="number" min="0" value={channel} onChange={e=>setChannel(+e.target.value)}/></label>{tab==='weights' && <label>Input channel<input type="number" min="0" value={inputChannel} onChange={e=>setInputChannel(+e.target.value)}/></label>}<label>Vector offset<input type="number" min="0" value={offset} onChange={e=>setOffset(+e.target.value)}/></label><button disabled={busy||!layer||(tab==='weights'&&!layers.find(l=>l.name===layer)?.weight)} onClick={()=>void run(signal=>labRequest('neural/tensor',{position,model_id:model,kind:tab==='layers'?'activation':'weight',layer,channel,input_channel:tab==='weights'?inputChannel:0,offset},signal),setTensor)}>Load tensor slice</button></div><details><summary>Layer statistics</summary><Json value={layers.find(l=>l.name===layer)}/></details>{tensor && <><Tensor data={tensor}/><Json value={{stats:tensor.stats,window:tensor.window}}/></>}</>}
       {tab==='sensitivity' && <><p>Inspect a candidate action first. Input gradients measure local sensitivity, not causal contribution or a legal counterfactual.</p>{branch?.neural?.sensitivities?.map((s:Data)=><section key={s.objective}><h3>{s.objective} · {fmt(s.value)}</h3><div className="lab-tensors">{s.views.map((v:Data)=><Tensor key={v.name} data={v}/>)}</div></section>)}</>}
-      {tab==='search' && <><p>PUCT requires a trained or calibrated value head. Search Q is distinct from DQN Q.</p><label>Simulations<input type="number" min="1" max="200" value={simulations} onChange={e=>setSimulations(+e.target.value)}/></label><button disabled={busy||!canSearch} onClick={()=>void run(signal=>labRequest('neural/search',{position,model_id:model,simulations,c_puct:1.5},signal),setSearch)}>Run PUCT</button>{!canSearch && <p className="warning">This model has no verified trained/calibrated value head.</p>}{search && <Json value={search}/>}</>}
+      {tab==='search' && <><p>PUCT requires a trained or calibrated value head. Search Q is distinct from DQN Q.</p><label>Simulations<input type="number" min="1" max="200" value={simulations} onChange={e=>setSimulations(+e.target.value)}/></label><button disabled={busy||!canSearch} onClick={()=>void run(signal=>labRequest('neural/search',{position,model_id:model,simulations,c_puct:1.5},signal),setSearch)}>Run PUCT</button>{!canSearch && <p className="warning">This model has no verified trained/calibrated value head.</p>}{search && <><p>Value {fmt(search.root_value)} · {search.stats?.simulations} simulations</p><div className="lab-scroll"><table><thead><tr><th>Action</th><th>Prior</th><th>Visits</th><th>Visit share</th><th>Search Q</th></tr></thead><tbody>{search.actions?.map((r:Data)=><tr key={r.id}><td>{r.label}</td><td>{fmt(r.prior)}</td><td>{r.visits}</td><td>{fmt(r.visit_probability)}</td><td>{fmt(r.q)}</td></tr>)}</tbody></table></div><details><summary>Search evidence</summary><Json value={search}/></details></>}</>}
       {tab==='compare' && <><label>Compare models (up to 8)<select multiple aria-label="Compare models" value={multi} onChange={e=>setMulti(Array.from(e.target.selectedOptions,o=>o.value).slice(0,8))}>{models.filter(m=>m.available).map(m=><option key={m.id} value={m.id}>{m.aliases?.join(' / ')||m.id}</option>)}</select></label><button disabled={busy||!multi.length} onClick={()=>void run(signal=>labRequest('multi-compare',{position,model_ids:multi,actual_action:context?.actual_action??null},signal),setComparison)}>Compare selected models</button></>}
     </section>}
     <details className="panel"><summary>Analysis provenance and exact response</summary><Json value={{context,result}}/></details>

@@ -67,7 +67,7 @@ const P2_WALL_COLOR = PLAYER_COLORS.P2.primary
 const BOARD_BG = '#f5e6c8'
 const CELL_COLOR = '#fdf5e6'
 const CELL_GOAL_P1 = '#d4edda'   // light green — P1 goal row (y=8, top)
-const CELL_GOAL_P2 = '#fcd4d4'   // light red   — P2 goal row (y=0, bottom)
+const CELL_GOAL_P2 = '#dbeafe'   // light red   — P2 goal row (y=0, bottom)
 const GRID_COLOR = '#c8a96e'
 
 /** Build a CSS colour from a wall array element's owner. */
@@ -214,7 +214,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
       textAnchor="middle"
       fontSize={9}
       fill="#8a7050"
-    >{x}</text>
+    >{String.fromCharCode(97+x)}</text>
   ))
   const rowLabels = Array.from({ length: 9 }, (_, y) => (
     <text
@@ -224,7 +224,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
       textAnchor="middle"
       fontSize={9}
       fill="#8a7050"
-    >{y}</text>
+    >{y+1}</text>
   ))
 
   const svgProps: React.SVGProps<SVGSVGElement> = size

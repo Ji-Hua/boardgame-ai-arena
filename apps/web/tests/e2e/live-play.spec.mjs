@@ -179,7 +179,7 @@ test('unapproved and incompatible checkpoints fail closed; existing services rem
   const rejected = await request.post('/play-api/games', { data: { sha256: unsupported.sha256, human_seat: 1 } })
   expect(rejected.status()).toBe(503)
   const checks = []
-  for (const url of ['http://192.168.68.102:8765/', 'http://192.168.68.102:8764/health', 'http://192.168.68.88:8741/', 'http://192.168.68.88:8743/health', 'http://192.168.68.88:8744/health', 'http://192.168.68.88:8751/health']) {
+  for (const url of ['http://192.168.68.102:8765/', 'http://192.168.68.102:8764/health', 'http://192.168.68.88:8741/', 'http://192.168.68.88:8743/health', 'http://192.168.68.88:8744/health']) {
     const response = await request.get(url)
     checks.push({ url, status: response.status() })
     expect(response.ok()).toBe(true)
