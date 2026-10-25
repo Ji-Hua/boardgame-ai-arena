@@ -20,6 +20,7 @@ test('Lab editor, native diagnostics, mobile layout and classic configuration',a
  expect(errors).toEqual([])
 })
 test('Play snapshot enters native Lab without changing the live game identity',async({page},info)=>{
+ await page.addInitScript(()=>Object.defineProperty(window.crypto,'randomUUID',{value:undefined,configurable:true}))
  await page.goto('/play?model_sha='+SHA)
  await expect(page.getByRole('button',{name:'Start game',exact:true})).toBeEnabled()
  await page.getByRole('button',{name:'Start game',exact:true}).click()

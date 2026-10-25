@@ -76,7 +76,8 @@ export function PlayView() {
     if (!snapshot) return
     try {
       const fresh = await controller.snapshot(snapshot.game_id)
-      const key = crypto.randomUUID()
+      // getRandomValues is available on LAN HTTP; randomUUID requires a secure context.
+      const key = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('')
       const state = fresh.state
       const context = {position: {pawns: [[state.pawns['1'].col,state.pawns['1'].row],[state.pawns['2'].col,state.pawns['2'].row]], walls_remaining: [state.walls_remaining['1'],state.walls_remaining['2']],walls:state.walls,turn:state.current_player},source:{type:'live_snapshot',game:{id:fresh.game_id},ply:fresh.step_count},recorded_model:{sha256:fresh.identity.sha256},analysis_model:{sha256:fresh.identity.sha256},return_route:'/play?game='+fresh.game_id,warnings:['Snapshot analysis does not pause the live game.']}
       sessionStorage.setItem('quoridor-lab:'+key,JSON.stringify(context))
