@@ -19,6 +19,7 @@ test('real ladder, exact training metrics, matchup and per-ply neural analysis',
  await page.getByLabel('回放步数').fill('7')
  await expect(page.getByRole('heading',{name:/第 7 步/})).toBeVisible()
  await expect(page.getByText('候选分数 / 搜索树：未记录',{exact:false})).toBeVisible()
+ await page.getByRole('button',{name:'对照分析',exact:true}).click()
  await page.getByLabel('分析 Agent').selectOption('C-resnet_seed-42')
  const request=page.waitForRequest(r=>r.url().endsWith('/research-lab/api/analyze')&&r.method()==='POST')
  await page.getByRole('button',{name:'运行分析',exact:true}).click()

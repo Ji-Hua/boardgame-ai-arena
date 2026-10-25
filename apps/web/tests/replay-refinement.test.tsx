@@ -28,7 +28,8 @@ it('supports transport, stops at end, keeps identity and ignores shortcuts in in
 })
 it('keeps selected analyst across seeking and terminal position',async()=>{
  fixture();render(<MemoryRouter initialEntries={['/games/g?season=s']}><AgentWorkspace/></MemoryRouter>)
- await screen.findByLabelText('分析 Agent')
+ await screen.findByRole('button',{name:'对照分析'})
+ fireEvent.click(screen.getByRole('button',{name:'对照分析'}))
  fireEvent.change(screen.getByLabelText('分析 Agent'),{target:{value:'greedy'}})
  fireEvent.click(screen.getByRole('button',{name:'跳到结束'}))
  fireEvent.click(screen.getByRole('button',{name:'回到开头'}))
@@ -38,6 +39,7 @@ it('invalidates in-flight results when the position changes without changing ana
  let resolve:(value:any)=>void=()=>{}
  vi.spyOn(lab,'labRequest').mockImplementation(()=>new Promise(r=>{resolve=r}))
  const onBranch=vi.fn();const view=render(<StepAnalysis position={lab.opening} actor={agents[0]} roster={{agents}} onBranch={onBranch}/>)
+ fireEvent.click(screen.getByRole('button',{name:'对照分析'}))
  fireEvent.change(screen.getByLabelText('分析 Agent'),{target:{value:'cnn'}})
  fireEvent.click(screen.getByRole('button',{name:'运行分析'}))
  view.rerender(<StepAnalysis position={{...lab.opening,turn:2}} actor={agents[0]} roster={{agents}} onBranch={onBranch}/>)

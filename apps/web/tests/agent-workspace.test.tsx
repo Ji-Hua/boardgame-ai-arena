@@ -22,6 +22,7 @@ it('invalidates old analysis when Agent changes and never auto-runs',async()=>{
  render(<StepAnalysis position={lab.opening} actor={agents[0]} roster={{agents}} onBranch={()=>{}}/>)
  expect(request).not.toHaveBeenCalled()
  fireEvent.click(screen.getByRole('button',{name:'运行分析'}))
+ fireEvent.click(screen.getByRole('button',{name:'对照分析'}))
  fireEvent.change(screen.getByLabelText('分析 Agent'),{target:{value:'cnn'}})
  resolve({candidates:[{id:'stale',label:'STALE',value:999}]})
  await waitFor(()=>expect(screen.queryByText('STALE')).toBeNull())

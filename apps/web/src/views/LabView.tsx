@@ -11,20 +11,16 @@ type Data = Record<string, any>
 const fmt = (value: any) => typeof value === 'number' ? Number(value.toPrecision(5)).toString() : String(value ?? 'unknown')
 function Json({value}: {value: unknown}) { return <pre className="lab-json">{JSON.stringify(value, null, 2)}</pre> }
 export function Tensor({data}: {data: Data}) {
-  const values: number[][] = data.values ?? []
-  if (!values.length) return null
-  const xy = data.layout === 'board_xy'
-  const rows = xy ? values[0].length : values.length
-  const cols = xy ? values.length : Math.max(...values.map(r => r.length))
-  const limit = Math.max(1e-12, ...values.flat().map(Math.abs))
-  return <figure className="lab-tensor"><svg viewBox={`0 0 ${cols*32} ${rows*32}`} role="img" aria-label={xy ? 'Spatial tensor, a1 bottom left' : 'Tensor slice by index'}>
-    {Array.from({length: rows}, (_,r) => Array.from({length: cols}, (_,c) => {
-      const value = xy ? values[c]?.[rows-1-r] : values[r]?.[c]
-      if (value === undefined) return null
-      const alpha = Math.abs(value)/limit
-      return <g key={`${r}:${c}`}><rect x={c*32} y={r*32} width="31" height="31" fill={value >= 0 ? `rgba(35,108,86,${.1+.9*alpha})` : `rgba(181,89,54,${.1+.9*alpha})`}><title>{xy ? `[${c},${rows-1-r}]` : `[${r},${c}]`}: {value}</title></rect><text x={c*32+16} y={r*32+18} textAnchor="middle" fill={alpha>.65?'white':'currentColor'} fontSize="7">{fmt(value)}</text></g>
-    }))}
-  </svg><figcaption>{data.name ?? data.layer} · {data.layout} · symmetric range ±{fmt(limit)} (this slice only)</figcaption></figure>
+ const [numbers,setNumbers]=useState(true)
+ const values:number[][]=data.values??[]
+ if(!values.length)return null
+ const xy=data.layout==='board_xy',rows=xy?values[0].length:values.length,cols=xy?values.length:Math.max(...values.map(r=>r.length))
+ const flat=values.flat().filter(Number.isFinite),signed=flat.some(v=>v<0),limit=Math.max(1e-12,...flat.map(Math.abs)),cell=44
+ const color=(value:number)=>{const t=Math.min(1,Math.abs(value)/limit),end=value<0?[185,85,49]:[36,110,153],start=[239,244,250];return `rgb(${start.map((v,i)=>Math.round(v+(end[i]-v)*t)).join(',')})`}
+ const number=(v:number)=>v===0?'0':Math.abs(v)<.001||Math.abs(v)>=10000?v.toExponential(2):Number(v.toPrecision(3)).toString()
+ return <figure className="lab-tensor"><div className="aw-tensor-tools"><strong>{data.name??data.layer}</strong><label><input type="checkbox" checked={numbers} onChange={e=>setNumbers(e.target.checked)}/>显示数值</label></div><svg viewBox={`0 0 ${cols*cell} ${rows*cell}`} role="img" aria-label={xy?'Spatial tensor, a1 bottom left':'Tensor slice by index'}>
+ {Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>{const value=xy?values[c]?.[rows-1-r]:values[r]?.[c];if(value===undefined||!Number.isFinite(value))return null;return <g key={`${r}:${c}`}><title>{xy?`[${c},${rows-1-r}]`:`[${r},${c}]`}: {String(value)}</title><rect x={c*cell} y={r*cell} width={cell-1} height={cell-1} rx={2} fill={color(value)}/>{numbers&&<text x={c*cell+cell/2} y={r*cell+cell/2+3} textAnchor="middle" fill={Math.abs(value)/limit>.65?'#fff':'#23354e'} fontSize={9}>{number(value)}</text>}</g>}))}
+ </svg><div className="aw-tensor-scale"><i style={{background:signed?'linear-gradient(90deg,#b95531,#eff4fa,#246e99)':'linear-gradient(90deg,#eff4fa,#246e99)'}}/><div><span>{signed?'-'+number(limit):'0'}</span>{signed&&<span>0</span>}<span>{number(limit)}</span></div></div><figcaption>{data.layout} · {signed?'正负值 / 零中心':'非负值'} · 本切片色标 · 悬停查看完整值</figcaption></figure>
 }
 export function LabView() {
   const [params] = useSearchParams(); const query = params.toString()
