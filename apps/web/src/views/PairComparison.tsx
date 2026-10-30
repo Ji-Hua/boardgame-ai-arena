@@ -47,7 +47,7 @@ export function PairComparison({position,actor,result,actual,bId,onB,onBranch,on
  const left=pair?.a??a,right=pair?.b??b,gap=numeric(left)&&numeric(right)?left.value-right.value:null
  const fmt=(r:Obj|undefined)=>r?(r.bound==='upper'?'≤ ':r.bound==='lower'?'≥ ':'')+briefNumber(r.value):'—'
  return <section className="aw-pair" aria-label="动作 A B 比较"><div className="aw-toolbar"><strong>A · {actual?'实际动作':'复算首选'}：{a?.label??actionKey(actual)??'—'}</strong><label>B<select aria-label="对照动作 B" value={b?.id??''} onChange={e=>{onBranch(null);onView('原局面 · 落子前');onB(e.target.value)}}>{rows.filter(r=>r.id!==a?.id).map(r=><option key={r.id} value={r.id}>{r.label??r.id}{r.route_eligible===false?' · 类型未选':''}</option>)}</select></label></div>
- <div className="aw-pair-scores"><span>A <b>{fmt(left)}</b></span><span>B <b>{fmt(right)}</b></span><span>A−B <b>{gap===null?'—':briefNumber(gap)}</b></span><small>{result.neural?.model?.output_semantics??'启发式分'} · 复算</small></div>
+ <div className="aw-pair-scores"><span>A <b title={String(left?.value??'')}>{fmt(left)}</b></span><span>B <b title={String(right?.value??'')}>{fmt(right)}</b></span><span>A−B <b title={gap===null?'':String(gap)}>{gap===null?'—':briefNumber(gap)}</b></span><small>{result.neural?.model?.output_semantics??'启发式分'} · 复算</small></div>
  {(a?.route_eligible===false||b?.route_eligible===false)&&<small className="aw-proof-note">包含未被类型路由选中的动作；动作头分差不能单独解释最终选择。</small>}
  <div className="aw-tabs" role="tablist" aria-label="A B 证据">{[['scores','评分'],['input','输入证据'],['branches','分支比较']].map(([id,label])=><button key={id} role="tab" aria-selected={mode===id} onClick={()=>view(id)}>{label}</button>)}</div>
  {!a&&<p>实际动作不在当前合法候选中，无法建立 A/B 比较。</p>}{!b&&<p>没有其他合法候选。</p>}

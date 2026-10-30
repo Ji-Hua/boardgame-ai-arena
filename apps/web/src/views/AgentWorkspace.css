@@ -2,3 +2,5 @@
 @media(max-width:760px){.aw-main{padding:14px}.aw-header{padding:10px 14px;gap:14px;flex-wrap:wrap}.aw-detail-grid,.aw-replay,.aw-seats{grid-template-columns:1fr}.aw-table td,.aw-table th{padding:8px 6px}.aw-main h1{font-size:19px;overflow-wrap:anywhere}.aw-main .aw-toolbar{gap:10px}.aw-table{max-width:100%}.aw-main input,.aw-main select{font-size:16px}.aw-analysis select{max-width:100%}.aw-replay .aw-panel{padding:12px}}
 
 .aw-pair{border:1px solid var(--border,#334155);border-radius:8px;padding:10px;margin:8px 0;min-width:0}.aw-pair-scores{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:8px 0}.aw-pair-input,.aw-pair-branches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.aw-pair-input>div,.aw-pair-branches>div{min-width:0;overflow:auto}.aw-pair h3{font-size:12px;margin:8px 0}.aw-pair select{max-width:100%}.aw-pair-branches button{margin:4px}.aw-pair .aw-proof-note{display:block;margin:6px 0}@media(max-width:620px){.aw-pair-input,.aw-pair-branches{grid-template-columns:1fr}}
+
+.aw-pair .lab-tensor{margin:0}.aw-pair .lab-tensor svg{max-height:260px;width:100%;display:block}.aw-pair .aw-tensor-tools{flex-wrap:wrap;gap:4px}
