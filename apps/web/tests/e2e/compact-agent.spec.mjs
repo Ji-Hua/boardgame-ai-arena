@@ -8,6 +8,8 @@ test('compact Agent detail links opponents, config, training and replay',async({
  await expect(page.locator('.aw-opponent')).toHaveCount(1)
  await page.locator('.aw-opponent').click()
  await expect(page.locator('.aw-agent-content h2')).toContainText('C-resnet')
+ await expect(page.getByRole('link',{name:'回放',exact:true}).first()).toBeVisible()
+ await page.getByLabel('筛选对手').fill('')
  await page.screenshot({path:info.outputPath('compact-matches.png'),fullPage:true})
  await page.getByRole('tab',{name:'配置',exact:true}).click()
  await expect(page.getByRole('heading',{name:'搜索 / 策略配置'})).toBeVisible()
