@@ -1,4 +1,11 @@
 # Cycle diagnosis — 2026-10-30
-Status: implementing; gateway 8790 only. No live game advancement, restart or policy change.
+Status: verified; gateway 8790 only. No live game advancement, restart or policy change.
 Compare recorded full positions including side, pawn positions, walls and stock. Identify latest cycle of period <=16. Recompute each unique phase once on explicit diagnostic entry; show actual/Top1, rank, score semantics, distance and highest-scoring distance-reducing pawn alternative. Preserve current game and export evidence. Partial/unsupported failures remain explicit; historical logits absent.
 User transcript independently validated via Rust engine; evidence external at /home/jihua/quoridor-backups/cycle-diagnosis-20261030/reconstructed.json. Browser connector unavailable; original token-protected game not fetched. Reconstruction must not be called its live snapshot.
+
+## Acceptance and observed case
+Runtime source 44a481d, feature/agent-ladder-preview (not pushed). 51 UI tests, typecheck/build/diff check passed. Four browser scenarios passed: loop diagnosis with real model APIs and engine-validated transcript (4 analyze requests, zero step requests, export and mobile), automatic replay, replay controls, Agent-origin Play. Original live session token was not accessed; browser fixture is explicitly reconstructed evidence, not a captured live snapshot.
+Transcript positions repeat every 4 plies from position after move 37 through move 73 (9 rounds). Recomputed moves 39 c6, 40 a2, 41 b6, 42 b2 all match the exact checkpoint's Top1. Their own-distance transitions are 4->4, 2->3, 4->4, 3->2. At 40, a2 logit 2.3223 exceeds c2 logit 1.1278 (c2 distance 2->1). Model metadata: policy distillation, no value head, 7-plane current-state input; runtime encoder consumes RawState, not history. This supports a deterministic policy loop, not a proven dataset/training cause. Distances ignore opponent pawn; never equate them with game-theoretic optimality.
+Evidence: /home/jihua/quoridor-backups/cycle-diagnosis-20261030, reconstructed.json and browser/.
+Image sha256:8f1a3bdccb3656c70c6552467d728b9065d1440a32cb19acfc7a5f9a44babe2b.
+Rollback config: /home/jihua/quoridor-releases/agent-ladder-preview/ui-refinement-20261030T170443Z; restore saved GATEWAY_IMAGE and run manage.sh up -d --no-deps gateway. Only preview gateway changed; other running containers retained ID/image/start. Formal Training 8741, MLflow 8742, Dev 8765 returned HTTP 200. No original game advancement, backend restart, policy, training or data changes.

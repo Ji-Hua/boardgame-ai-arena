@@ -1,7 +1,9 @@
 import {test,expect} from '@playwright/test'
-import {readFileSync} from 'node:fs'
+import {readFileSync,existsSync} from 'node:fs'
 test('cycle report on engine-validated transcript uses real model analysis without live writes',async({page},info)=>{
- const data=JSON.parse(readFileSync('/home/jihua/quoridor-backups/cycle-diagnosis-20261030/reconstructed.json','utf8'))
+ const fixture=process.env.CYCLE_FIXTURE??'/home/jihua/quoridor-backups/cycle-diagnosis-20261030/reconstructed.json'
+ test.skip(!existsSync(fixture),'Set CYCLE_FIXTURE to the external engine-validated transcript')
+ const data=JSON.parse(readFileSync(fixture,'utf8'))
  let steps=0,analyzes=0
  page.on('request',r=>{if(r.url().endsWith('/step'))steps++;if(r.url().endsWith('/api/analyze'))analyzes++})
  await page.route('**/api/agents/play/cycle-fixture',r=>r.fulfill({json:{position:data.positions.at(-1),positions:data.positions.slice(0,-1),identities:data.identities,actions:data.actions,revision:73,winner:null,limit:false,legal_actions:[]}}))
