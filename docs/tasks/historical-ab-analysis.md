@@ -1,0 +1,5 @@
+# General historical decision comparison
+Status: implementing, 2026-10-30. Preview gateway 8790 only; preserve all live sessions/backends.
+Scope: select any recorded live-game pre-action position, automatically analyze acting identity and actual A, pin arbitrary legal B across decision/network views. Compare scores, raw input and local gradient of A-B, and engine-generated branches with matching algorithm/budget. Use existing two branch calls; subtract raw score gradients (not automatically selected margin targets). No new backend, policy, or symptom-specific tools.
+Evidence: current-code recomputation, not historical logits. Gradient is local sensitivity under relaxed inputs, not causal attribution; global broadcast stocks are aggregated scalar derivatives. Hypothetical branch board explicitly separated from root input. Neural branches are one ply, not search.
+Acceptance: numeric gradient subtraction, stale requests, B changes, history actor/actual/position, latest position without historical action, finished game history, zero live mutations during diagnosis, actual model APIs, responsive layout and existing replay regressions.
