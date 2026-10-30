@@ -110,5 +110,3 @@
 .aw-opponent-link{font-size:11px;display:inline-block;margin-bottom:4px}
 @media(max-width:900px){.aw-agent-desk{grid-template-columns:260px minmax(0,1fr)}}
 @media(max-width:760px){.aw-agent-desk{grid-template-columns:minmax(0,1fr)}.aw-agent-desk>.aw-opponents{height:260px}.aw-agent-desk>.aw-agent-inspector{height:660px;max-height:90dvh}.aw-agent-content .aw-table table{min-width:500px}}
-
-.aw-cycle .aw-table{overflow:auto;margin:12px 0}.aw-cycle .aw-table table{min-width:580px}.aw-cycle .aw-table td{white-space:normal;overflow-wrap:anywhere}.aw-cycle .aw-table td small{font-size:10px}.aw-cycle .aw-toolbar{margin-top:12px}.aw-cycle>h3{margin-top:14px}

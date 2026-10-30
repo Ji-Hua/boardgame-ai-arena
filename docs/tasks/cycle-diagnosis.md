@@ -9,3 +9,8 @@ Transcript positions repeat every 4 plies from position after move 37 through mo
 Evidence: /home/jihua/quoridor-backups/cycle-diagnosis-20261030, reconstructed.json and browser/.
 Image sha256:8f1a3bdccb3656c70c6552467d728b9065d1440a32cb19acfc7a5f9a44babe2b.
 Rollback config: /home/jihua/quoridor-releases/agent-ladder-preview/ui-refinement-20261030T170443Z; restore saved GATEWAY_IMAGE and run manage.sh up -d --no-deps gateway. Only preview gateway changed; other running containers retained ID/image/start. Formal Training 8741, MLflow 8742, Dev 8765 returned HTTP 200. No original game advancement, backend restart, policy, training or data changes.
+
+## Withdrawn by user clarification — 2026-10-30
+The symptom-specific Cycle Diagnosis UI and helper/tests were removed. Historical investigation and external evidence remain preserved. The intended tool is the existing general Decision Lab/StepAnalysis: select any actual game step, inspect the acting Agent input, actual action, candidate values and selection policy, and compare alternative moves/Agents. A repeated move sequence is a use case, not a separate diagnostic product. Distinguish current recomputation from historical traces and explanatory evidence from unproven training causes.
+This correction restores pre-cycle UI behavior including dark compact Agent details, replay auto-analysis and manual live snapshot analysis. It does not add live historical-step navigation or claim that gap is solved. Only gateway 8790 is authorized for this removal.
+Validation before deployment: 48 UI tests, typecheck, production build and diff check passed.
