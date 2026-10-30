@@ -1,0 +1,4 @@
+# Cycle diagnosis — 2026-10-30
+Status: implementing; gateway 8790 only. No live game advancement, restart or policy change.
+Compare recorded full positions including side, pawn positions, walls and stock. Identify latest cycle of period <=16. Recompute each unique phase once on explicit diagnostic entry; show actual/Top1, rank, score semantics, distance and highest-scoring distance-reducing pawn alternative. Preserve current game and export evidence. Partial/unsupported failures remain explicit; historical logits absent.
+User transcript independently validated via Rust engine; evidence external at /home/jihua/quoridor-backups/cycle-diagnosis-20261030/reconstructed.json. Browser connector unavailable; original token-protected game not fetched. Reconstruction must not be called its live snapshot.
