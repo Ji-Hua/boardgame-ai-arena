@@ -87,3 +87,26 @@
  .aw-metrics{row-gap:8px!important}.aw-metrics>span{padding:0 10px;font-size:12px}
  .agent-workspace .aw-main input,.agent-workspace .aw-main select{font-size:16px}
 }
+
+/* Agent master/detail: keep the chosen opponent and research context together. */
+.aw-agent-desk{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;align-items:start}
+.aw-agent-desk>section{margin:0;height:clamp(480px,calc(100dvh - 250px),740px);display:flex;flex-direction:column;min-height:0}
+.aw-opponents h2{margin:0}.aw-opponents>input{width:100%;margin-bottom:10px}
+.aw-opponent-list{overflow:auto;min-height:0;flex:1;overscroll-behavior:contain}
+.agent-workspace .aw-opponent{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px;text-align:left;background:transparent;border:1px solid transparent;border-bottom-color:var(--border);border-radius:5px;padding:10px;margin-bottom:3px}
+.aw-opponent strong{font-size:12px;overflow-wrap:anywhere}.aw-opponent b{font:12px ui-monospace,monospace;color:var(--text)}
+.aw-opponent small{font-size:10px;color:var(--text-muted)}.aw-opponent span{font-size:10px;color:var(--accent)}
+.agent-workspace .aw-opponent[aria-pressed=true]{border-color:var(--accent);background:var(--accent-bg)}
+.aw-agent-content{min-height:0;flex:1;overflow:auto;overscroll-behavior:contain}
+.aw-agent-content>.aw-section{margin:8px 0 0;padding:0;border:0}
+.aw-agent-content .aw-section>.aw-toolbar h2{width:100%;overflow-wrap:anywhere;font-size:13px;margin:4px 0}
+.aw-agent-content .aw-table{max-height:440px;overflow:auto}
+.aw-agent-content .aw-table table{table-layout:fixed;min-width:520px}
+.aw-agent-content .aw-table th{position:sticky;top:0;z-index:1}
+.aw-agent-content .aw-table td{white-space:normal;overflow-wrap:anywhere;font-size:12px}
+.aw-agent-content .aw-table th:nth-child(2){width:30%}.aw-agent-content .aw-table th:nth-child(4),.aw-agent-content .aw-table th:nth-child(5){width:60px}
+.aw-agent-content .aw-run-inspector{height:auto;min-height:480px;border:0;padding:0;box-shadow:none}
+.aw-agent-content .aw-run-body{overflow:visible}.aw-agent-content .aw-json{max-height:none}
+.aw-opponent-link{font-size:11px;display:inline-block;margin-bottom:4px}
+@media(max-width:900px){.aw-agent-desk{grid-template-columns:260px minmax(0,1fr)}}
+@media(max-width:760px){.aw-agent-desk{grid-template-columns:minmax(0,1fr)}.aw-agent-desk>.aw-opponents{height:260px}.aw-agent-desk>.aw-agent-inspector{height:660px;max-height:90dvh}.aw-agent-content .aw-table table{min-width:500px}}
