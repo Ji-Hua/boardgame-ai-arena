@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react'
-import {Link, Navigate, Route, Routes, useParams, useSearchParams} from 'react-router-dom'
+import {Link, Navigate, Route, Routes, useLocation, useParams, useSearchParams} from 'react-router-dom'
+import {Grid3X3, Trophy, Swords, Sun, Moon} from 'lucide-react'
 import {labRequest, positionBoard, type Position} from '../lab'
 import {EvalReplayBoard} from '../components/EvalReplayBoard'
 import {Tensor} from './LabView'
@@ -37,9 +38,10 @@ function agentVersion(a:Obj){const sha=a.actual_sha256??a.sha256;return sha?'che
 export default function AgentWorkspace(){
  const [params]=useSearchParams();const seasons=useData('/seasons');const season=params.get('season')??seasons.data?.seasons?.[0]?.id??''
  const roster=useData(season?'/seasons/'+enc(season):null)
- const [theme,setTheme]=useState(()=>localStorage.getItem('quoridor-theme')??'light')
- useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('quoridor-theme',theme)},[theme])
- return <div className="app agent-workspace"><header className="aw-header"><Link to={route('/ladder',season)} className="aw-brand">Quoridor</Link><nav aria-label="主要入口"><Link to={route('/ladder',season)}>天梯</Link><Link to={route('/play',season)}>对战</Link></nav><span className="aw-preview">独立预览</span><button onClick={()=>setTheme(t=>t==='light'?'dark':'light')}>{theme==='light'?'深色':'浅色'}</button></header><main className="aw-main">
+ const location=useLocation()
+ const [theme,setTheme]=useState(()=>localStorage.getItem('quoridor-workbench-theme')==='light'?'light':'dark')
+ useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('quoridor-workbench-theme',theme)},[theme])
+ return <div className="app agent-workspace"><header className="aw-header"><Link to={route('/ladder',season)} className="aw-brand"><Grid3X3 aria-hidden="true"/>Quoridor</Link><nav aria-label="主要入口"><Link to={route('/ladder',season)} aria-current={location.pathname!=='/play'?'page':undefined}><Trophy aria-hidden="true"/>天梯</Link><Link to={route('/play',season)} aria-current={location.pathname==='/play'?'page':undefined}><Swords aria-hidden="true"/>对战</Link></nav><span className="aw-preview">独立预览</span><button className="aw-theme-toggle" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}>{theme==='light'?<Moon aria-hidden="true"/>:<Sun aria-hidden="true"/>}{theme==='light'?'深色':'浅色'}</button></header><main className="aw-main">
  <ErrorBox text={seasons.error||roster.error} retry={seasons.error?seasons.retry:roster.retry}/>
  {!seasons.data&&!seasons.error&&<p role="status">加载评测批次…</p>}
  {seasons.data?.seasons?.length===0&&<p>暂无已完成的天梯报告</p>}
@@ -54,7 +56,7 @@ function Ladder({season,roster,seasons}:{season:string;roster:Obj;seasons:Obj[]}
  function update(k:string,v:string){const p=new URLSearchParams(params);p.set(k,v);setParams(p)}
  return <><div className="aw-toolbar"><h1>天梯榜</h1><label>评测批次<select aria-label="评测批次" value={season} onChange={e=>setParams({season:e.target.value})}>{seasons.map(s=><option key={s.id} value={s.id}>{s.id}</option>)}</select></label><Link to={route('/training',season)}>训练记录</Link></div><div className="aw-toolbar"><label>类型<select aria-label="Agent 类型" value={type} onChange={e=>update('type',e.target.value)}><option value="all">全部</option><option value="neural">神经网络</option><option value="heuristic">启发式</option><option value="random">随机</option></select></label><input aria-label="搜索 Agent" placeholder="名称 / SHA" value={q} onChange={e=>update('q',e.target.value)}/><small>{roster.protocol} · {rows.length} Agent</small></div>
  {roster.warning&&<details className="aw-note"><summary>排名适用范围</summary>{roster.warning}<p>{roster.rating}</p></details>}
- <div className="aw-table"><table><thead><tr><th>#</th><th>Agent / 版本</th><th>类型</th><th>Elo</th><th>胜 / 平 / 负</th><th></th></tr></thead><tbody>{rows.map(a=><tr key={a.id}><td>{a.ranking?.rank??'—'}</td><td><Link to={route('/agents/'+enc(a.id),season)}>{a.name}</Link><small>{agentVersion(a)}</small></td><td><Tag agent={a}/></td><td>{fmt(a.ranking?.elo,0)}</td><td>{a.ranking?`${a.ranking.wins} / ${a.ranking.draws} / ${a.ranking.losses}`:'—'}</td><td><Link to={route('/play',season,{p1:a.id,p2:'human'})}>对战</Link></td></tr>)}</tbody></table></div>{rows.length===0&&<p>没有匹配的 Agent</p>}</>
+ <div className="aw-table aw-ladder-table"><table><thead><tr><th>#</th><th>Agent / 版本</th><th>类型</th><th>Elo</th><th>胜 / 平 / 负</th><th></th></tr></thead><tbody>{rows.map(a=><tr key={a.id}><td>{a.ranking?.rank??'—'}</td><td><Link to={route('/agents/'+enc(a.id),season)}>{a.name}</Link><small>{agentVersion(a)}</small></td><td><Tag agent={a}/></td><td>{fmt(a.ranking?.elo,0)}</td><td>{a.ranking?`${a.ranking.wins} / ${a.ranking.draws} / ${a.ranking.losses}`:'—'}</td><td><Link to={route('/play',season,{p1:a.id,p2:'human'})}>对战</Link></td></tr>)}</tbody></table></div>{rows.length===0&&<p>没有匹配的 Agent</p>}</>
 }
 
 function AgentDetail({season,roster}:{season:string;roster:Obj}){
@@ -62,7 +64,7 @@ function AgentDetail({season,roster}:{season:string;roster:Obj}){
  const training=useData(a?'/seasons/'+enc(season)+'/training/'+enc(agentId):null)
  if(!a)return <p>Agent 不存在于此评测批次</p>
  const pairs=roster.matrix[agentId]??{}
- return <><div className="aw-breadcrumb"><Link to={route('/ladder',season)}>天梯</Link> / {a.name}</div><div className="aw-toolbar"><h1>{a.name}</h1><Tag agent={a}/><small>{agentVersion(a)}</small><Link className="button-link" to={route('/play',season,{p1:a.id,p2:'human'})}>发起对战</Link></div><div className="aw-toolbar"><span>Elo {fmt(a.ranking?.elo,0)}</span><span>排名 {a.ranking?.rank??'—'}</span><span>胜 / 平 / 负 {a.ranking?`${a.ranking.wins} / ${a.ranking.draws} / ${a.ranking.losses}`:'—'}</span></div>
+ return <><div className="aw-breadcrumb"><Link to={route('/ladder',season)}>天梯</Link> / {a.name}</div><div className="aw-toolbar"><h1>{a.name}</h1><Tag agent={a}/><small>{agentVersion(a)}</small><Link className="button-link" to={route('/play',season,{p1:a.id,p2:'human'})}>发起对战</Link></div><div className="aw-toolbar aw-metrics"><span>Elo {fmt(a.ranking?.elo,0)}</span><span>排名 {a.ranking?.rank??'—'}</span><span>胜 / 平 / 负 {a.ranking?`${a.ranking.wins} / ${a.ranking.draws} / ${a.ranking.losses}`:'—'}</span></div>
  <div className="aw-detail-grid"><section><h2>交手关系</h2><div className="aw-table"><table><thead><tr><th>对手</th><th>胜 / 平 / 负</th><th>得分率</th><th></th></tr></thead><tbody>{Object.entries(pairs).filter(([,v])=>(v as Obj)?.games>0).map(([id,value])=>{const v=value as Obj;return <tr key={id}><td><Link to={route('/agents/'+enc(id),season)}>{roster.agents.find((x:Obj)=>x.id===id)?.name??id}</Link><small>P1 {v.p1_games??'—'} / P2 {v.p2_games??'—'}</small></td><td>{v.wins} / {v.draws} / {v.losses}</td><td>{pct(v.score)}</td><td><button onClick={()=>{const p=new URLSearchParams(params);p.set('opponent',id);setParams(p)}}>交手记录</button></td></tr>})}</tbody></table></div></section><section className="aw-panel"><h2>{a.kind==='neural'?'模型配置':'搜索 / 策略配置'}</h2><dl><dt>算法</dt><dd>{a.spec.algo.type}</dd><dt>策略</dt><dd>{JSON.stringify(a.spec.policy)}</dd><dt>Spec</dt><dd className="aw-hash">{a.identity}</dd>{a.sha256&&<><dt>SHA</dt><dd className="aw-hash">{a.sha256}</dd></>}</dl><details><summary>完整配置</summary><Json value={a.spec}/></details></section></div>
  {opponent&&<Matches key={season+agentId+opponent} season={season} agent={a} opponent={opponent} roster={roster}/>}
  <section className="aw-section"><h2>训练记录</h2><ErrorBox text={training.error} retry={training.retry}/>{!training.data&&!training.error&&<p role="status">查找 SHA 关联记录…</p>}{training.data?.reason&&<p>{training.data.reason}</p>}{training.data&&[...new Set<string>(training.data.runs.map((r:Obj)=>r.run_id))].map(id=><TrainingRun key={id} runId={id} sha={a.sha256} season={season}/>)}</section>

@@ -5,6 +5,7 @@ test('acting Agent follows each ply; actual decision, contrast, neural formattin
  const errors=[];page.on('pageerror',e=>errors.push(e.message))
  const data=await (await request.get('/api/agents/seasons/'+season+'/replay/049f457b806f4604720d%3A0')).json()
  const roster=await (await request.get('/api/agents/seasons/'+season)).json()
+ await page.addInitScript(()=>localStorage.setItem('quoridor-workbench-theme','light'))
  await page.goto(replay)
  await expect(page.getByRole('button',{name:'当前 Agent',exact:true})).toHaveAttribute('aria-pressed','true')
  await expect(page.getByLabel('分析 Agent')).toHaveCount(0)

@@ -64,11 +64,11 @@ const P1_COLOR = PLAYER_COLORS.P1.primary
 const P2_COLOR = PLAYER_COLORS.P2.primary
 const P1_WALL_COLOR = PLAYER_COLORS.P1.primary
 const P2_WALL_COLOR = PLAYER_COLORS.P2.primary
-const BOARD_BG = '#f5e6c8'
-const CELL_COLOR = '#fdf5e6'
-const CELL_GOAL_P1 = '#d4edda'   // light green — P1 goal row (y=8, top)
-const CELL_GOAL_P2 = '#dbeafe'   // light red   — P2 goal row (y=0, bottom)
-const GRID_COLOR = '#c8a96e'
+const BOARD_BG = 'var(--board-bg, #f5e6c8)'
+const CELL_COLOR = 'var(--board-cell, #fdf5e6)'
+const CELL_GOAL_P1 = 'var(--board-goal-p1, #d4edda)'   // light green — P1 goal row (y=8, top)
+const CELL_GOAL_P2 = 'var(--board-goal-p2, #dbeafe)'   // light red   — P2 goal row (y=0, bottom)
+const GRID_COLOR = 'var(--board-grid, #c8a96e)'
 
 /** Build a CSS colour from a wall array element's owner. */
 function wallColor(player: 'P1' | 'P2' | null): string {
@@ -213,7 +213,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
       y={BOARD_SVG_SIZE - 1}
       textAnchor="middle"
       fontSize={9}
-      fill="#8a7050"
+      fill="var(--board-coordinates, #8a7050)"
     >{String.fromCharCode(97+x)}</text>
   ))
   const rowLabels = Array.from({ length: 9 }, (_, y) => (
@@ -223,7 +223,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
       y={cellTop(y) + CELL / 2 + 3}
       textAnchor="middle"
       fontSize={9}
-      fill="#8a7050"
+      fill="var(--board-coordinates, #8a7050)"
     >{y+1}</text>
   ))
 
@@ -236,7 +236,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
       {...svgProps}
       role="img"
       aria-label="Recorded Quoridor position"
-      style={{ background: BOARD_BG, borderRadius: 8, border: '2px solid #c8a96e', maxWidth: '100%', height: 'auto', display: 'block' }}
+      style={{ background: BOARD_BG, borderRadius: 8, border: '1px solid var(--board-grid, #c8a96e)', maxWidth: '100%', height: 'auto', display: 'block' }}
     >
       {/* Background */}
       <rect x={0} y={0} width={viewSize} height={viewSize} fill={BOARD_BG} />
