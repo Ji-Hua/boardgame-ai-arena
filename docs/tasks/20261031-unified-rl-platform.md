@@ -1,5 +1,5 @@
 # Unified RL platform: single entry for training, diagnosis and play
-Status: implementing (P0-P5 code verified on branch; P4 deploy, retirement and P5 cutover packages ready; nothing deployed)
+Status: deployed 2026-10-31 (P4 deploy.sh and P5 cutover.sh run at the user request; entry http://192.168.68.102:8790; Training 8790 redirects; old-service retirement not yet run)
 Owner: Ji Hua (decisions), Claude (design and implementation)
 Branch: feature/unified-rl-platform (from feature/agent-ladder-preview bbc6e28)
 Design/contract: documents/system/design/unified-rl-platform.md
