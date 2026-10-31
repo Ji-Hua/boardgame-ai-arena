@@ -31,8 +31,13 @@ Patch: `~/quoridor-backups/workspace-tidy-20261031/`.
 Removed (clean, unused): `quoridor-architecture-benchmark`, `quoridor-platform-p1-p2`.
 Patches: `~/quoridor-backups/workspace-tidy-20261031/`.
 
+## Platform Jobs data (Training)
+
+`/home/jihua/quoridor-data/jobs/jobs.sqlite` (records), `jobs/<id>/` (job.json, source snapshot, stdout.log), `jobs/runs/<id>/` (run directory, Training artifact root), `catalog-jobs.json` and `models/<sha>.pt` (registered checkpoints). The write token is `~/quoridor-releases/jobs/private/token`. Only one controller may use this data at a time.
+
 ## Tests in a worktree
 
 - Frontend (repository root): `npm ci`, `npm run typecheck`, `npm run test:ui`, `npm run build`.
 - Platform backend (repository root): `PYTHONPATH=training-dashboard:.:backend-server:engine ~/workspace/boardgame-ai-arena/.venv/bin/python -m unittest discover -s training-dashboard/backend -p "test_*.py"`. `training-dashboard` must be on the path: `test_mlflow.py` imports the local adapter `backend/mlflow.py` as `mlflow`, not the MLflow package. Add `ARENA_REPLAY_TEST_ROOT=/home/jihua/quoridor-data/experiments/cnn-architecture-20261021-213018/arena-v2` to run the optional real-replay test.
-- Browser: `npm run build`, `scripts/verify_stack.sh start` (Platform 18793, Lab 18794, gateway 18795 on loopback; never the live 8790), then in `apps/web` `E2E_BASE_URL=http://127.0.0.1:18795 E2E_RESULTS_DIR=<external dir> npx playwright test --config tests/e2e/playwright.config.mjs`, then `scripts/verify_stack.sh stop`.
+- Jobs: `PYTHONPATH=.:backend-server:engine ~/workspace/boardgame-ai-arena/.venv/bin/python -m unittest discover -s apps/jobs/tests -t .` and `-m unittest agent_system.training.tests.test_jobs`.
+- Browser: `npm run build`, `JOBS_IMAGE=quoridor-train-gpu:39aba9c scripts/verify_stack.sh start` (also starts a Job controller on 127.0.0.1:18796; `jobs.spec.mjs` needs `E2E_PLATFORM_TOKEN` and runs a real GPU Job) (Platform 18793, Lab 18794, gateway 18795 on loopback; never the live 8790), then in `apps/web` `E2E_BASE_URL=http://127.0.0.1:18795 E2E_RESULTS_DIR=<external dir> npx playwright test --config tests/e2e/playwright.config.mjs`, then `scripts/verify_stack.sh stop`.
