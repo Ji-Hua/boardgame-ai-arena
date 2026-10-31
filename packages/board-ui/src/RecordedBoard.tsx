@@ -17,7 +17,7 @@
 
 import React from 'react'
 import { PLAYER_COLORS } from './theme/playerColors'
-interface EvalReplayState { p1: [number, number]; p2: [number, number]; h_walls: [number, number][]; v_walls: [number, number][]; wall_owners?: Record<string, 1 | 2> }
+interface EvalReplayState { p1: [number, number]; p2: [number, number]; h_walls: [number, number][]; v_walls: [number, number][]; wall_owners?: Record<string, 1 | 2>; wall_history?: Record<string,{player:1|2;ply:number}> }
 
 // -------------------------------------------------------------------------
 // Board geometry constants
@@ -56,6 +56,7 @@ interface EvalReplayBoardProps {
   lastActionY?: number
   lastActionPlayer?: 'P1' | 'P2'
   onCellClick?: (x: number, y: number) => void
+  onWallInspect?: (ply:number) => void
   onWallClick?: (x: number, y: number, orientation: "horizontal" | "vertical") => void
   size?: number  // optional override for total SVG size (renders via viewBox scaling)
 }
@@ -81,7 +82,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
   lastActionX,
   lastActionY,
   lastActionPlayer,
-  size, onCellClick, onWallClick,
+  size, onCellClick, onWallClick, onWallInspect,
 }) => {
   const viewSize = BOARD_SVG_SIZE
 
@@ -121,17 +122,20 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
     const height = GAP
     const isLast = lastActionType === 'hwall' && lastActionX === wx && lastActionY === wy
     const owner = state.wall_owners?.[`horizontal:${wx}:${wy}`] ?? (isLast ? (lastActionPlayer === 'P1' ? 1 : lastActionPlayer === 'P2' ? 2 : undefined) : undefined)
+    const entry=state.wall_history?.[`horizontal:${wx}:${wy}`]
+    const inspect=entry&&onWallInspect?()=>onWallInspect(entry.ply):undefined
+    const label=entry?`P${entry.player} · 第 ${entry.ply+1} 手${inspect?' · 点击查看决策':''}`:`${owner?'P'+owner:'归属未知'} · 无历史落子记录`
     const color = wallColor(owner)
     return (
       <rect
-        data-wall={`horizontal:${wx}:${wy}`} data-owner={owner??'unknown'} aria-label={`${owner?'P'+owner:'归属未知'} · horizontal ${String.fromCharCode(97+wx)}${wy+1}`} key={`hw-${i}`} onClick={()=>onWallClick?.(wx,wy,"horizontal")}
+        data-wall={`horizontal:${wx}:${wy}`} data-owner={owner??'unknown'} aria-label={label} data-ply={entry?.ply} key={`hw-${i}`} role={inspect?'button':undefined} tabIndex={inspect?0:undefined} style={{cursor:inspect?'pointer':undefined}} onKeyDown={e=>{if(inspect&&(e.key==='Enter'||e.key===' ')){e.preventDefault();inspect()}}} onClick={()=>{if(inspect)inspect();else onWallClick?.(wx,wy,"horizontal")}}
         x={left}
         y={top}
         width={width}
         height={height}
         fill={color}
         rx={2}
-      />
+      ><title>{label}</title></rect>
     )
   })
 
@@ -143,17 +147,20 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
     const height = 2 * CELL + GAP
     const isLast = lastActionType === 'vwall' && lastActionX === wx && lastActionY === wy
     const owner = state.wall_owners?.[`vertical:${wx}:${wy}`] ?? (isLast ? (lastActionPlayer === 'P1' ? 1 : lastActionPlayer === 'P2' ? 2 : undefined) : undefined)
+    const entry=state.wall_history?.[`vertical:${wx}:${wy}`]
+    const inspect=entry&&onWallInspect?()=>onWallInspect(entry.ply):undefined
+    const label=entry?`P${entry.player} · 第 ${entry.ply+1} 手${inspect?' · 点击查看决策':''}`:`${owner?'P'+owner:'归属未知'} · 无历史落子记录`
     const color = wallColor(owner)
     return (
       <rect
-        data-wall={`vertical:${wx}:${wy}`} data-owner={owner??'unknown'} aria-label={`${owner?'P'+owner:'归属未知'} · vertical ${String.fromCharCode(97+wx)}${wy+1}`} key={`vw-${i}`} onClick={()=>onWallClick?.(wx,wy,"vertical")}
+        data-wall={`vertical:${wx}:${wy}`} data-owner={owner??'unknown'} aria-label={label} data-ply={entry?.ply} key={`vw-${i}`} role={inspect?'button':undefined} tabIndex={inspect?0:undefined} style={{cursor:inspect?'pointer':undefined}} onKeyDown={e=>{if(inspect&&(e.key==='Enter'||e.key===' ')){e.preventDefault();inspect()}}} onClick={()=>{if(inspect)inspect();else onWallClick?.(wx,wy,"vertical")}}
         x={left}
         y={top}
         width={width}
         height={height}
         fill={color}
         rx={2}
-      />
+      ><title>{label}</title></rect>
     )
   })
 

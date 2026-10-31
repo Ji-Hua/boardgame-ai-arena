@@ -31,6 +31,7 @@ test('historical A/B uses real model evidence without mutating a game',async({pa
  await page.screenshot({path:info.outputPath('historical-mobile.png'),fullPage:true})
  await page.getByLabel('诊断历史步').selectOption('38');await expect(page.locator('.aw-actor-context')).toContainText(f.identities[0].name);await expect(pair).toContainText('实际动作：c6')
  await page.getByLabel('诊断历史步').selectOption('73');await expect(pair).toContainText('复算首选')
+ const wall=page.locator('[data-wall="horizontal:4:2"]');await expect(wall.locator('title')).toHaveText('P1 · 第 7 手 · 点击查看决策');await wall.click();await expect(page.getByLabel('诊断历史步')).toHaveValue('6');await expect(page.locator('.aw-actor-context')).toContainText(f.identities[0].name);await expect(pair).toContainText('实际动作：e3h');await expect(page.locator('[data-wall="horizontal:4:2"]')).toHaveCount(0)
  expect(mutations).toEqual([]);expect(errors).toEqual([])
 })
 
@@ -43,4 +44,5 @@ test('archived replay shares A/B evidence and bounded heuristic branches',async(
  await page.getByRole('button',{name:'下一步',exact:true}).click();await expect(page.locator('.aw-actor-context')).toContainText('greedy')
  await expect(pair).toContainText('启发式分');await pair.getByRole('tab',{name:'分支比较',exact:true}).click();await expect(pair.getByRole('button',{name:'查看 B 分支'})).toBeVisible()
  await expect(pair).toContainText('相同算法与深度');await pair.getByRole('tab',{name:'输入证据',exact:true}).click();await expect(pair).toContainText('无神经网络输入')
+ const wall=page.locator('[data-wall][data-ply]').first();const target=await wall.getAttribute('data-ply');await wall.focus();await wall.press('Enter');await expect(page).toHaveURL(new RegExp('ply='+target+'(?:&|$)'));await expect(page.getByRole('tab',{name:'逐步分析',exact:true})).toHaveAttribute('aria-selected','true');await expect(pair).toContainText('实际动作')
 })

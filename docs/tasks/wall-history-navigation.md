@@ -1,0 +1,2 @@
+# Wall history navigation
+2026-10-31. Preview 8790 only. Native compact wall tooltip: owner + one-based game move. Click/Enter/Space navigates to pre-action snapshot and automatic Agent diagnostics, pauses replay/autoplay, never steps game. Explicit wall provenance only; hypothetical or unknown walls cannot navigate to an invented historical move. Preserve existing wall editing callback. Verify history index, branch exclusion, keyboard, no game mutation and deployed flows.
