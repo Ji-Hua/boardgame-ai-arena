@@ -73,7 +73,9 @@ class ModelIndex:
                         "LAB_MODEL_CATALOG", str(self.data_root / LAB_CATALOG))},
                     {"name": "architecture", "path": os.environ.get(
                         "PLATFORM_MODEL_ARCHITECTURE_CATALOG", str(self.data_root / ARCHITECTURE_CATALOG))}]
-        if catalog_paths == "discover":
+        # Discovery is repeated for every index build, so catalogs written later (e.g. by Jobs) appear.
+        self.discover = catalog_paths == "discover"
+        if self.discover:
             catalog_paths = discover_catalogs(self.data_root)
         if not isinstance(catalog_paths, (list, tuple)):
             raise ValueError("Catalog manifest must be a list")
@@ -110,6 +112,8 @@ class ModelIndex:
 
     def _sources(self):
         entries, manifest, warnings = [], [], []
+        if self.discover:
+            self.catalogs = discover_catalogs(self.data_root)
         sources = [*(dict(s, kind="catalog") for s in self.catalogs),
                    dict(name="registry", path=self.registry_path, kind="registry")]
         for source in sources:

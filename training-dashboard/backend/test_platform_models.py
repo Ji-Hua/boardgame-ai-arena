@@ -194,6 +194,12 @@ class ModelIndexTests(unittest.TestCase):
         self.assertEqual(len(result["models"][0]["evidence"]), 3)
         with patch.dict("os.environ", {"PLATFORM_MODEL_CATALOGS": "discover"}):
             self.assertEqual([c["name"] for c in ModelIndex(data_root=self.root).catalogs], names)
+        index = ModelIndex(data_root=self.root, catalog_paths="discover")
+        late = self.root / "late.pt"
+        late.write_bytes(b"late")
+        digest = hashlib.sha256(b"late").hexdigest()
+        self.write("catalog-jobs.json", dict(models=[dict(id="job-model", sha256=digest, checkpoint=str(late), metadata=self.metadata)]))
+        self.assertIn(digest, [m["sha256"] for m in index.listing()["models"]])
 
     def test_invalid_sha_is_not_a_model_and_detail_rejects_alias(self):
         self.write("catalog.json", dict(models=[dict(id="invalid", sha256="short")]))
