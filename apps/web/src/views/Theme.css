@@ -1,0 +1,75 @@
+/* Visual refinement layer, loaded last. Colors come only from the theme tokens. */
+.agent-workspace{font-family:Inter,'Segoe UI','PingFang SC','Noto Sans SC','Microsoft YaHei',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.agent-workspace .aw-header{position:sticky;top:0;z-index:20;backdrop-filter:blur(8px);background:color-mix(in srgb,var(--surface) 88%,transparent)}
+.agent-workspace .aw-header nav a{border-radius:8px;transition:color .15s,background .15s}
+.agent-workspace .aw-header nav a:hover{color:var(--text);background:var(--surface2)}
+
+/* Links: quiet by default, underline only on hover. */
+.agent-workspace .aw-main a{text-decoration:none}
+.agent-workspace .aw-main a:hover{text-decoration:underline;text-underline-offset:3px}
+.agent-workspace .aw-main .button-link:hover,.agent-workspace .aw-main .pf-kpi:hover,.agent-workspace .aw-main .pf-primary:hover{text-decoration:none}
+
+/* Buttons. */
+.agent-workspace .aw-main button,.agent-workspace .aw-main .button-link{border-radius:8px;transition:border-color .15s,background .15s,color .15s}
+.agent-workspace .aw-main button:not(:disabled):hover,.agent-workspace .aw-main .button-link:hover{border-color:var(--accent);color:var(--accent)}
+.agent-workspace .pf-primary,.agent-workspace .aw-main button.pf-primary{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--bg);font-weight:650}
+.agent-workspace .aw-main button.pf-primary:not(:disabled):hover,.agent-workspace .pf-primary:hover{color:var(--bg);filter:brightness(1.08)}
+.agent-workspace .aw-main button:disabled{opacity:.5;cursor:not-allowed}
+.agent-workspace .aw-main :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Panels and tables. */
+.agent-workspace .aw-panel{border-color:var(--border);transition:border-color .15s}
+.agent-workspace .aw-table tbody tr{transition:background .12s}
+.agent-workspace .aw-table tbody tr:hover{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
+
+/* Loading text gets a small spinner; errors stay plain alerts. */
+.agent-workspace [role=status]{display:flex;align-items:center;gap:8px;color:var(--text-muted)}
+.agent-workspace p[role=status]::before{content:'';width:12px;height:12px;flex:none;border-radius:50%;border:2px solid var(--border);border-top-color:var(--accent);animation:pf-spin .8s linear infinite}
+@keyframes pf-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.agent-workspace p[role=status]::before{animation:none}}
+
+/* Capability chips: off states are faint, not struck through. */
+.pf-state{border-radius:999px;padding:2px 8px}
+.pf-state.off{text-decoration:none;opacity:.38;border-style:dashed}
+
+/* Overview. */
+.pf-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.pf-hero p{margin:4px 0 0;color:var(--text-muted);font-size:13px}
+.pf-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pf-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.pf-kpi{display:flex;flex-direction:column;gap:6px;min-width:0;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:linear-gradient(160deg,var(--surface2),var(--surface) 70%);color:var(--text);transition:border-color .15s,transform .15s}
+.pf-kpi:hover{border-color:var(--accent);transform:translateY(-1px)}
+.pf-kpi-label{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-muted)}
+.pf-kpi-label svg{width:15px;height:15px;color:var(--accent)}
+.pf-kpi b{font-size:28px;font-weight:650;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1}
+.pf-kpi small{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-capabilities{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 18px}
+.pf-capabilities a{display:inline-flex;gap:6px;align-items:baseline;padding:4px 11px;border:1px solid var(--border);border-radius:999px;font-size:12px;color:var(--text-muted)}
+.pf-capabilities b{color:var(--text);font-variant-numeric:tabular-nums}
+.agent-workspace .pf-overview{gap:16px;align-items:stretch}
+.pf-card{display:flex;flex-direction:column;margin:0}
+.pf-card>header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+.pf-card>header h2{margin:0}
+.pf-card>header a{font-size:12px}
+.pf-sub{display:block;color:var(--text-muted);font-size:11px;margin-bottom:8px;overflow-wrap:anywhere}
+.pf-empty{color:var(--text-muted)}
+.agent-workspace .pf-list li{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.agent-workspace .pf-list li>div{min-width:0}
+.agent-workspace .pf-list li>small{flex:none;margin:0}
+.pf-ranks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.pf-ranks li{display:grid;grid-template-columns:24px minmax(0,1.3fr) minmax(60px,1fr) 48px;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)}
+.pf-ranks li:last-child{border:0}
+.pf-ranks a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-weight:550}
+.pf-rank{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--text-muted);text-align:center}
+.pf-ranks li:first-child .pf-rank{color:var(--warn);font-weight:700}
+.pf-bar{height:6px;border-radius:999px;background:var(--surface2);overflow:hidden}
+.pf-bar i{display:block;height:100%;border-radius:inherit;background:var(--accent);opacity:.75}
+.pf-ranks b{text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+
+/* Play setup: two seats facing each other. */
+.aw-seats{position:relative}
+.agent-workspace .aw-seats{margin:18px 0 14px}
+.pf-play-actions{display:flex;justify-content:center;gap:10px;margin:0 0 20px}
+
+@media(max-width:1100px){.pf-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.pf-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.pf-kpi:last-child{grid-column:span 2}.pf-kpi b{font-size:24px}.pf-hero{align-items:flex-start}.agent-workspace .aw-header{position:static}}

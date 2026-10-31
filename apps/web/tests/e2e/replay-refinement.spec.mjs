@@ -60,7 +60,7 @@ test('Agent-origin play clearly labels both seats and allows swap',async({page},
  await expect(page.getByLabel('P1 身份')).toContainText('A-baseline')
  await expect(page.getByLabel('P1 身份')).toContainText('神经网络')
  await expect(page.getByLabel('P2 身份')).toContainText('你控制此方')
- await page.getByRole('button',{name:'交换',exact:true}).click()
+ await page.getByRole('button',{name:'交换先后手',exact:true}).click()
  await expect(page.getByLabel('P1 身份')).toContainText('你控制此方')
  await expect(page.getByLabel('P2 身份')).toContainText('A-baseline')
  await page.screenshot({path:info.outputPath('play-seats.png'),fullPage:true})

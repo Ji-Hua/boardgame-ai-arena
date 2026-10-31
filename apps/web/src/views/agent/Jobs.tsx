@@ -29,7 +29,7 @@ function useLive<T=Obj>(url:string|null,active:boolean,ms=3000,text=false){
 export function JobList(){
  const jobs=useLive('/api/v1/jobs',true,5000),system=useV1('/jobs/system')
  const rows:Obj[]=jobs.data?.jobs??[];const gpu=system.data?.gpu?.gpus?.[0]
- return <><div className="aw-toolbar"><h1>任务</h1><small>训练、评测在独立容器中运行，固定到已提交的源码版本</small><Link className="button-link" to="/jobs/new">新建任务</Link></div>
+ return <><div className="aw-toolbar"><h1>任务</h1><small>训练、评测在独立容器中运行，固定到已提交的源码版本</small><Link className="pf-primary" to="/jobs/new">新建任务</Link></div>
  <div className="aw-toolbar aw-metrics"><span>{gpu?`${gpu.name} · 显存 ${gpu.memory_used_mib}/${gpu.memory_total_mib} MiB · 利用率 ${gpu.utilization}%`:system.data?'GPU 不可用':'读取 GPU…'}</span>{jobs.data&&Object.entries(jobs.data.counts as Record<string,number>).filter(([,n])=>n>0).map(([s,n])=><span key={s}>{STATUS[s]} {n}</span>)}{system.data&&!system.data.writes_enabled&&<span>未配置写入令牌</span>}</div>
  <ErrorBox text={jobs.error||system.error}/>{!jobs.data&&!jobs.error&&<p role="status">加载任务…</p>}
  {jobs.data&&<div className="aw-table"><table><thead><tr><th>任务</th><th>入口</th><th>状态</th><th>创建</th><th>用时</th></tr></thead><tbody>{rows.map(j=><tr key={j.id}><td><Link to={'/jobs/'+enc(j.id)}>{j.name}</Link><small>{j.id}{j.experiment?' · '+j.experiment:''}</small></td><td>{j.entrypoint}<small>{j.spec.resources.gpu?'GPU':'CPU'} · {j.spec.source.commit.slice(0,8)}</small></td><td><JobStatus status={j.status}/>{j.error&&<small>{j.error}</small>}</td><td>{when(j.created)}</td><td>{duration(j)}</td></tr>)}</tbody></table></div>}

@@ -162,7 +162,7 @@ describe('research shell and URL contracts', () => {
   it('summarizes models, runs and experiments on the overview', async () => {
     mockV1()
     mount('/')
-    expect(await screen.findByRole('link', { name: /2\s*已登记/ })).toBeTruthy()
+    expect(await screen.findByRole('link', { name: /已登记模型\s*2/ })).toBeTruthy()
     expect(screen.getByRole('link', { name: /1\s*已上天梯/ }).getAttribute('href')).toBe('/models?state=ranked')
     expect(await screen.findByRole('link', { name: 'cnn-test' })).toBeTruthy()
     expect(await screen.findByRole('link', { name: 'C-resnet training' })).toBeTruthy()

@@ -53,7 +53,7 @@ it('shows the selected model and locally controlled player before starting',asyn
  await screen.findByLabelText('P1 身份')
  expect(screen.getByLabelText('P1 身份').textContent).toContain('checkpoint aaaaaaaaaaaa')
  expect(screen.getByLabelText('P2 身份').textContent).toContain('你控制此方')
- fireEvent.click(screen.getByRole('button',{name:'交换'}))
+ fireEvent.click(screen.getByRole('button',{name:'交换先后手'}))
  expect(screen.getByLabelText('P1 身份').textContent).toContain('你控制此方')
  expect(screen.getByLabelText('P2 身份').textContent).toContain('CNN')
 })

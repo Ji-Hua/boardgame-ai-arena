@@ -16,7 +16,8 @@ function useRequest(url:string|null){
 export const useData=(path:string|null)=>useRequest(path?'/api/v1'+path:null)
 export const useV1=(path:string|null)=>useRequest(path?'/api/v1'+path:null)
 export const useRuns=()=>useRequest('/api/v1/research/runs')
-export const when=(seconds?:number|null)=>typeof seconds==='number'?new Date(seconds*1000).toLocaleString('zh-CN',{hour12:false}):'—'
+/** Epoch seconds or an ISO timestamp, shown in local time. */
+export const when=(t?:number|string|null)=>{const ms=typeof t==='number'?t*1000:typeof t==='string'?Date.parse(t):NaN;return Number.isFinite(ms)?new Date(ms).toLocaleString('zh-CN',{hour12:false}):'—'}
 export const STATES:[string,string][]=[['analyzable','可分析'],['playable','可对战'],['research_playable','研究对战'],['ranked','已上天梯'],['deployed','已上线']]
 export function States({model}:{model:Obj}){return <span className="pf-states">{STATES.map(([k,label])=><span key={k} className={'pf-state '+(model[k]?'on':'off')} title={(model.reasons?.[k]??[]).join(' · ')}>{label}</span>)}</span>}
 export const enc=encodeURIComponent
