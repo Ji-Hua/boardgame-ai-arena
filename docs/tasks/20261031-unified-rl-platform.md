@@ -1,5 +1,5 @@
 # Unified RL platform: single entry for training, diagnosis and play
-Status: implementing (P0-P2 verified on branch; deployment package ready, not deployed)
+Status: implementing (P0-P2 verified; P3 research loop partly delivered; nothing deployed)
 Owner: Ji Hua (decisions), Claude (design and implementation)
 Branch: feature/unified-rl-platform (from feature/agent-ladder-preview bbc6e28)
 Design/contract: documents/system/design/unified-rl-platform.md
@@ -25,6 +25,11 @@ P2 (2026-10-31), `87e9a28` plus fixes through `ae293ca`:
 - `deploy/Dockerfile.train-gpu`: python 3.12 + torch 2.11.0+cu126 + engine wheel, image `quoridor-train-gpu:39aba9c` (10.3 GB).
 - Web: 任务 section (list with GPU state, templated submission with token, live curves/evaluations/logs/events, cancel), model detail links to a prefilled evaluation Job. Gateway template routes `/api/v1/jobs` to `JOBS_UPSTREAM`, which every deployment of this template must now set.
 - Deviations from the design: the UI polls (3-5 s) instead of SSE; the controller is a host process from an exported source snapshot because it needs git and Docker; every checkpoint in a successful Job is registered.
+P3 (2026-10-31), `020eba4`, `1c807f2`, `84282eb`, `e52c034`:
+- `train_cnn_experiment` runs `scripts/train_cnn_repair.py` (distillation, PPO, DAgger, DDQN transfer, AlphaZero-lite, teacher, CNN DQN) with any committed experiment JSON (34 templates under `agent_system/training/configs/cnn_*`), keeping its per-checkpoint diagnosis; the runner records the Job commit through `QUORIDOR_SOURCE_COMMIT`. Job detail shows research metrics and diagnoses.
+- `run_arena_matrix` evaluates registered checkpoints against `agent_system/evaluation/arena/gates/gate-v1.json` (the opponents, 25 openings and settings of `cnn-architecture-20261021-213018`) and publishes a complete report as ladder season `arena/<job id>`. Training Jobs may request a gate follow-up on their final checkpoint. Gate seasons are labelled and are not the ladder default.
+- Experiments list their Jobs (also Job-only experiments) and Job-registered models by Job; model detail links to the producing Job; Training `run_ref` is only recorded for runs the Training workspace can list.
+- Not yet delivered from P3: versioned probe suites and failure mining (design section 7).
 ## Verification commands and observed results
 - `npm run typecheck`, `npm run test:ui` (55 passed), `npm run build`: passed before and after the split.
 - Backend (documented command, see docs/WORKSPACES.md): 134 run, all passed, 1 optional skip; with `ARENA_REPLAY_TEST_ROOT` set, 0 skipped. An earlier run reported a `backend.test_mlflow` import error only because `training-dashboard` was missing from `PYTHONPATH`; the test imports the local adapter, not the MLflow package. Five new tests pass.
@@ -39,6 +44,10 @@ P2 (2026-10-31), `87e9a28` plus fixes through `ae293ca`:
 - P2 real Jobs on Training through the isolated stack (controller on 127.0.0.1:18796): smoke training ran with `resolved_device=cuda` and registered its checkpoints, which appear in `/api/v1/models` (mlp, q_values, analyzable, SHA verified, run_ref to the Job) and as a run in `/api/runs`; an evaluation Job recorded per-opponent W/D/L with zero illegal actions; restarting the whole stack while a 300-episode Job ran kept the container and the new controller finalized it as succeeded (15 checkpoints); cancelling a running Job ends it in 5 s (exit 143) without registration. Two early runs failed and are kept as records: the image had no passwd entry for uid 1000 (fixed with USER/LOGNAME), and the evaluation script import needed `sys.modules` registration.
 - P2 browser: 18 of 18 passed (`.../unified-rl-platform-p2/e2e-final`), including a real GPU Job submitted, followed and opened through the UI.
 - Acceptance data left in `/home/jihua/quoridor-data`: `jobs/` (9 records, 74 MB), 21 `catalog-jobs.json` entries from 4 smoke Jobs and their `models/<sha>.pt` copies. The first smoke Job's 2 entries predate `run_ref`.
+- P3 reproduction acceptance (`/home/jihua/quoridor-backups/unified-rl-platform-p3/reproduction-shaping-A.json`): the reward-shaping arm A config submitted unchanged as `job-20261031-161625-b2fc26`. Initialization weights equal; training games identical through batch 11; loss values differ by up to 7e-8 in batch 0 (GPU floating-point nondeterminism) and the drift changes a sampled action in batch 12, so the run is not bitwise reproducible. Learner win rate 0.367 vs 0.371; development diagnosis wins 38/39/38 vs 37/38/38 of 50, tactical 18/18 and no missed immediate wins in both.
+- P3 gate acceptance (`gate-shaping-A-season.json`): historical and reproduced final checkpoints in one gate Job (`job-20261031-162303-62e284`, 260 blocks in 10 s, published as a season). Versus random/greedy/D1/D2/frozen D2 CNN: historical 48-2-0, 38-0-12, 38-0-12, 0-12-38, 6-43-1; reproduction 49-1-0, 36-0-14, 36-0-14, 0-14-36, 3-43-4 (Elo 2179 vs 2154); differences are within 50-game sampling error.
+- P3 tests: Jobs controller 13, entrypoints 9, platform backend 141, React 61; all passed.
+- The reproduction Job's three catalog entries were registered before `1c807f2` and still carry a Training run_ref that the Training workspace cannot list.
 ## External artifacts and deployment impact
 Evidence: `/home/jihua/quoridor-backups/unified-rl-platform-p0/`, `.../p1/` and `.../p2/` (logs, browser results, `jobctl.py`). Deployment package: `/home/jihua/quoridor-releases/agent-ladder-preview/unified-p2-20261031/` (`deploy.sh`, `rollback.sh`, compose, user unit, README). Deploying needs the user: the automated session was not permitted to replace the running preview. Platform image `sha256:148ed964…`, gateway `sha256:dac0bcc2…`, both from `ae293ca`. (`e2e/`, `e2e-baseline/`, logs, temporary gateway config). Nothing deployed; 8790 and all other services unchanged. Not pushed to GitHub.
 ## Deferred decisions
