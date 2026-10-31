@@ -1,5 +1,5 @@
 # Unified RL platform: single entry for training, diagnosis and play
-Status: implementing (P0-P3 verified on branch; deployment package ready; nothing deployed)
+Status: implementing (P0-P4 code verified on branch; deployment and retirement packages ready; nothing deployed)
 Owner: Ji Hua (decisions), Claude (design and implementation)
 Branch: feature/unified-rl-platform (from feature/agent-ladder-preview bbc6e28)
 Design/contract: documents/system/design/unified-rl-platform.md
@@ -53,7 +53,41 @@ P3 (2026-10-31), `020eba4`, `1c807f2`, `84282eb`, `e52c034`:
 - P3 browser at `ba7adbb` (`/home/jihua/quoridor-backups/unified-rl-platform-p3/e2e-final-3*`): 18 of 18 passed, including a real GPU Job. The first run failed the 390 px overflow check on the ladder: eight navigation links and the long gate-season option widened the page; fixed in `ba7adbb`.
 - P3 tests at `728dd73`: Jobs controller 11, entrypoints 9, platform backend 143 run with 1 optional skip, React 62; all passed.
 - The reproduction Job's three catalog entries were registered before `1c807f2` and still carry a Training run_ref that the Training workspace cannot list.
+
+P4 (2026-10-31), `ddef780`. Classic play is not kept (user decision 2026-10-31), so no Classic feature is ported.
+- `apps/gameplay` is the only owner of game state:
+  - It stores actions in SQLite (`quoridor-data/games/games.sqlite`); every position is recomputed by the Rust engine.
+  - It keeps a player token (moves, close, publish) and a read-only watch token, both stored as SHA-256 digests.
+  - After a restart, Agents are rebuilt from the recorded identity with the exact SHA check.
+  - A finished game can be published to an unranked list, which anyone can open read-only.
+  - Limits: 64 active games, abandonment after 14 idle days, 500 plies.
+  - The in-memory `Sessions` were removed from `agent_arena.py`.
+- `/api/v1` is the only prefix the SPA uses:
+  - `/api/v1/research/{runs,summary,arena,mlflow,context,catalog}` and `/api/v1/seasons/*` reuse the legacy handlers (`alias_legacy`).
+  - The old `/api/*` paths still answer.
+  - `/api/v1/lab/*` goes through the existing Lab allowlist.
+  - `/api/v1/play` goes to the gameplay service.
+- The gateway drops the Classic `/classic-api`, `/ws` and `/play-api` proxies, and `platform_play.py` is deleted. `GAMEPLAY_UPSTREAM` is required wherever the template is used.
+- The Play page gained watch links, a read-only watch view that polls every 2 s, and the published-games list.
+- P4 tests at `ddef780`: gameplay 6, platform backend 141 (1 optional skip), React 65; all passed.
+- Browser, isolated loopback stack with gameplay on 18797: 18/18 passed, including a new watch-link test (`~/quoridor-backups/unified-rl-platform-p4/e2e-1`).
+- Restart durability (`.../p4/restart.txt`): a human-vs-`C-resnet_seed-42` game, with the gameplay process killed and restarted after 2 plies, returned the same actions and position; the CNN then reloaded by SHA and moved.
+- Image check (`.../p4/image-verify`, `e2e-image`):
+  - The new platform and gateway images, plus the gameplay container, ran as an isolated compose project on 127.0.0.1:18890 (since removed).
+  - All `/api/v1` routes returned 200.
+  - A CNN game resumed after `docker restart` of the gameplay container; the SQLite file is owned by uid 1000.
+  - Browser 18/18 passed.
+  - The nested read-write `games` mount needs the directory to exist on the host; `deploy.sh` creates it, and `~/quoridor-data/games` now exists (empty).
+- Retirement: see below. Before retirement, the old entries logged only curl probes in the last 72 h, and the gameplay and Classic backends logged no requests.
 ## External artifacts and deployment impact
+P4 packages (prepared, not run):
+- `/home/jihua/quoridor-releases/agent-ladder-preview/unified-platform-ddef780/` deploys platform `sha256:47de7af6…`, gateway `sha256:671598fd…` and the gameplay container, and installs the Job controller unit if it is missing. `ba7adbb` is marked SUPERSEDED.
+- `/home/jihua/quoridor-releases/retire-legacy-20261031/` exists on Training and on Dev:
+  - `retire-dev.sh`: 8765 entry, 8776, 8774, Classic 8764 and 8090; 8765 then redirects to 8790.
+  - `retire-training.sh`: 8740/8741 entry, 8781, 8783, the old Lab, `quoridor-agent.service` 8743 and `quoridor-decision-lab.service` 8744; 8740/8741 then redirect.
+  - Containers are stopped with restart policy `no`, units are disabled, and the state is saved once.
+  - `rollback.sh` restores each host.
+  - `selftest.sh` ran retire → check → rollback with a throwaway container on both hosts (`selftest.log`).
 Evidence: `/home/jihua/quoridor-backups/unified-rl-platform-p0/`, `.../p1/` and `.../p2/` (logs, browser results, `jobctl.py`). Deployment package (current): `/home/jihua/quoridor-releases/agent-ladder-preview/unified-platform-ba7adbb/`; the earlier p1, p2 and p3 packages are marked SUPERSEDED. Original P2 package: `/home/jihua/quoridor-releases/agent-ladder-preview/unified-p2-20261031/` (`deploy.sh`, `rollback.sh`, compose, user unit, README). Deploying needs the user: the automated session was not permitted to replace the running preview. Current images: platform `sha256:54635638…`, gateway `sha256:4e0d7e8b…`, both from `ba7adbb`; Job controller snapshot `~/quoridor-releases/jobs/src-ba7adbb`. (`e2e/`, `e2e-baseline/`, logs, temporary gateway config). Nothing deployed; 8790 and all other services unchanged. Not pushed to GitHub.
 ## Deferred decisions
-Classic Play feature retention (design section 12, item 5). All other section-12 items were decided on 2026-10-31 (design section 0).
+All section-12 items are decided (design section 0); Classic play is not kept. Still open: MLflow `/mlflow/` proxy, versioned probe suites, P5 move to Dev.
