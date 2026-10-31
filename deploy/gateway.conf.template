@@ -6,6 +6,7 @@ server {
     # Every deployment using this template must set PLATFORM_UPSTREAM, JOBS_UPSTREAM and GAMEPLAY_UPSTREAM.
     # Job controller (host process).
     location ^~ /api/v1/jobs {
+        proxy_connect_timeout 5s;
         proxy_pass http://${JOBS_UPSTREAM};
         proxy_set_header Host $http_host;
         proxy_read_timeout 120s;
@@ -13,11 +14,13 @@ server {
     }
     # Gameplay service: the only owner of game state.
     location ^~ /api/v1/play {
+        proxy_connect_timeout 5s;
         proxy_pass http://${GAMEPLAY_UPSTREAM};
         proxy_set_header Host $http_host;
         proxy_read_timeout 120s;
     }
     location ~ ^/(api/|research-lab(/|$)|health$) {
+        proxy_connect_timeout 5s;
         proxy_pass http://${PLATFORM_UPSTREAM};
         proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-Proto $scheme;
