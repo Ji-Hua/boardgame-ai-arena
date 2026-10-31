@@ -38,6 +38,24 @@ class ArenaTests(unittest.TestCase):
         (self.base/'report.json').write_text(json.dumps(v))
         with self.assertRaises(ValueError):self.ev.season('test')
 
+    def test_rankings_join_exact_sha_per_season(self):
+        rows, warnings = self.ev.rankings()
+        self.assertEqual(warnings, [])
+        self.assertEqual(list(rows), ['a'*64])
+        self.assertEqual(rows['a'*64][0]['season'], 'test')
+        self.assertEqual(rows['a'*64][0]['agent'], 'policy')
+        self.assertIsNone(rows['a'*64][0]['elo'])
+        v = json.loads((self.base/'report.json').read_text())
+        v['ranking'] = [{'id':'policy','rank':1,'elo':1530.0,'wins':3,'draws':1,'losses':0}]
+        (self.base/'report.json').write_text(json.dumps(v))
+        entry = self.ev.rankings()[0]['a'*64][0]
+        self.assertEqual((entry['rank'], entry['elo'], entry['wins']), (1, 1530.0, 3))
+        (self.root/'arena'/'broken').mkdir()
+        (self.root/'arena'/'broken'/'report.json').write_text('{}')
+        rows, warnings = self.ev.rankings()
+        self.assertEqual(len(rows['a'*64]), 1)
+        self.assertTrue(any(w.startswith('broken:') for w in warnings))
+
     def test_pair_replay_exact_turn_and_source(self):
         result=self.ev.games('test','policy','minimax')
         self.assertEqual(len(result['games']),1)

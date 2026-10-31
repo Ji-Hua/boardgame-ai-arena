@@ -25,12 +25,26 @@ def _sha(value: Any) -> str | None:
     return value if isinstance(value, str) and SHA.fullmatch(value) else None
 
 
+def discover_catalogs(data_root) -> list[dict]:
+    """Every top-level ``catalog*.json`` and experiment catalog, in a stable order.
+
+    Catalogs overlap; the index groups them by full SHA, so a model listed in
+    several catalogs is still one row with all of its evidence.
+    """
+    root = Path(data_root).resolve()
+    top = sorted(root.glob("catalog*.json"))
+    nested = sorted(root.glob("experiments/*/*catalog*.json"))
+    return [dict(name=p.stem, path=str(p)) for p in top] + [
+        dict(name=f"{p.parent.name}/{p.stem}", path=str(p)) for p in nested]
+
+
 class ModelIndex:
     """Index explicit catalogs, registry and one flat AgentSpec directory.
 
     Environment: QUORIDOR_DATA_ROOT, PLATFORM_MODEL_BASELINE_CATALOG,
     LAB_MODEL_CATALOG, PLATFORM_MODEL_ARCHITECTURE_CATALOG,
-    PLATFORM_MODEL_CATALOGS (JSON list of paths or {name,path} objects),
+    PLATFORM_MODEL_CATALOGS (JSON list of paths or {name,path} objects, or
+    ``discover`` for every catalog found by ``discover_catalogs``),
     PLATFORM_MODEL_REGISTRY, PLATFORM_AGENT_SPEC_DIR and
     PLATFORM_MODEL_APPROVED_ROOTS (os.pathsep-separated extra read roots).
     Explicit ``catalog_paths`` replaces, rather than extends, defaults.
@@ -49,13 +63,18 @@ class ModelIndex:
         self.roots = tuple(Path(p).resolve() for p in roots)
         if catalog_paths is None:
             configured = os.environ.get("PLATFORM_MODEL_CATALOGS")
-            catalog_paths = json.loads(configured) if configured else [
-                {"name": "baseline", "path": os.environ.get(
-                    "PLATFORM_MODEL_BASELINE_CATALOG", str(self.data_root / "catalog.json"))},
-                {"name": "lab", "path": os.environ.get(
-                    "LAB_MODEL_CATALOG", str(self.data_root / LAB_CATALOG))},
-                {"name": "architecture", "path": os.environ.get(
-                    "PLATFORM_MODEL_ARCHITECTURE_CATALOG", str(self.data_root / ARCHITECTURE_CATALOG))}]
+            if configured == "discover":
+                catalog_paths = configured
+            else:
+                catalog_paths = json.loads(configured) if configured else [
+                    {"name": "baseline", "path": os.environ.get(
+                        "PLATFORM_MODEL_BASELINE_CATALOG", str(self.data_root / "catalog.json"))},
+                    {"name": "lab", "path": os.environ.get(
+                        "LAB_MODEL_CATALOG", str(self.data_root / LAB_CATALOG))},
+                    {"name": "architecture", "path": os.environ.get(
+                        "PLATFORM_MODEL_ARCHITECTURE_CATALOG", str(self.data_root / ARCHITECTURE_CATALOG))}]
+        if catalog_paths == "discover":
+            catalog_paths = discover_catalogs(self.data_root)
         if not isinstance(catalog_paths, (list, tuple)):
             raise ValueError("Catalog manifest must be a list")
         self.catalogs = [dict(name=str(p.get("name", "catalog")), path=str(p["path"]))

@@ -55,6 +55,8 @@ def create_app(*, unified_run_service=None, model_index=None) -> FastAPI:
 
     from .agent_arena import install
     install(app)
+    from .platform_v1 import install as install_v1
+    install_v1(app)
 
     def platform_call(operation, *args, **kwargs):
         try:

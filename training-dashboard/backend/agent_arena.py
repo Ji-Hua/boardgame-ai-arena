@@ -75,6 +75,25 @@ class Evidence:
                     protocol=report.get('protocol'), rating=report.get('rating'),
                     warning=report.get('ranking_warning'), manifest_sha256=manifest['manifest_sha256'])
 
+    def rankings(self):
+        """Exact checkpoint SHA -> every Agent appearance in complete seasons; never pooled."""
+        listing = self.seasons()
+        rows, warnings = {}, list(listing['warnings'])
+        for season in listing['seasons']:
+            try:
+                roster = self.roster(season['id'])
+            except (ValueError, OSError, KeyError) as exc:
+                warnings.append(f"{season['id']}: {exc}"); continue
+            for agent in roster['agents']:
+                if not agent['sha256']:
+                    continue
+                rank = agent['ranking'] or {}
+                rows.setdefault(agent['sha256'], []).append(dict(season=season['id'],
+                    agent=agent['id'], name=agent['name'], protocol=roster['protocol'],
+                    policy=agent['spec'].get('policy'), rank=rank.get('rank'), elo=rank.get('elo'),
+                    wins=rank.get('wins'), draws=rank.get('draws'), losses=rank.get('losses')))
+        return rows, warnings
+
     def spec(self, season, agent):
         rows = self.roster(season)['agents']
         return next(x for x in rows if x['id'] == agent)
@@ -235,7 +254,7 @@ class Sessions:
 
 
 def install(app):
-    evidence = Evidence(os.environ.get('QUORIDOR_DATA_ROOT', '/data/quoridor'), app.state.models)
+    evidence = app.state.evidence = Evidence(os.environ.get('QUORIDOR_DATA_ROOT', '/data/quoridor'), app.state.models)
     sessions = Sessions(evidence)
     router = APIRouter(prefix='/api/agents')
 

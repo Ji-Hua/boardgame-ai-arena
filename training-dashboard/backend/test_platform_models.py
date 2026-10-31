@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backend.platform_models import ARCHITECTURE_CATALOG, ModelIndex
+from backend.platform_models import ARCHITECTURE_CATALOG, ModelIndex, discover_catalogs
 
 
 class ModelIndexTests(unittest.TestCase):
@@ -178,6 +178,22 @@ class ModelIndexTests(unittest.TestCase):
         self.assertEqual(result["sources"][2]["status"], "unavailable")
         with patch.dict("os.environ", {"PLATFORM_MODEL_CATALOGS": json.dumps([str(self.root / "catalog.json")])}):
             self.assertEqual(len(ModelIndex(data_root=self.root).catalogs), 1)
+
+    def test_discovery_reads_every_catalog_and_groups_overlap_by_sha(self):
+        later = self.model()
+        later["id"] = "later-alias"
+        self.write("catalog-later.json", dict(models=[later]))
+        self.write("experiments/run-a/architecture-catalog.json", dict(models=[self.model()]))
+        self.write("experiments/run-a/report.json", dict(models=[self.model()]))
+        self.write("catalogs-ignored/catalog.json", dict(models=[self.model()]))
+        names = [c["name"] for c in discover_catalogs(self.root)]
+        self.assertEqual(names, ["catalog-later", "catalog", "run-a/architecture-catalog"])
+        result = ModelIndex(data_root=self.root, catalog_paths="discover").listing()
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["models"][0]["aliases"], ["C-resnet_seed-42", "later-alias"])
+        self.assertEqual(len(result["models"][0]["evidence"]), 3)
+        with patch.dict("os.environ", {"PLATFORM_MODEL_CATALOGS": "discover"}):
+            self.assertEqual([c["name"] for c in ModelIndex(data_root=self.root).catalogs], names)
 
     def test_invalid_sha_is_not_a_model_and_detail_rejects_alias(self):
         self.write("catalog.json", dict(models=[dict(id="invalid", sha256="short")]))
