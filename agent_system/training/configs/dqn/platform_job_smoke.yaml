@@ -1,0 +1,33 @@
+# Tiny end-to-end check for platform Jobs (about a minute on the GPU).
+# checkpoint_dir and device are set by the Job; everything else is as recorded here.
+episodes: 40
+max_steps_per_episode: 400
+buffer_capacity: 20000
+warmup_size: 300
+batch_size: 64
+lr: 1.0e-4
+gamma: 0.95
+grad_clip_norm: 10.0
+epsilon_start: 1.0
+epsilon_end: 0.1
+epsilon_decay_steps: 3000
+target_sync_interval: 200
+checkpoint_interval: 20
+agent_id: platform_job_smoke
+train_opponent:
+  type: random_legal
+evaluation:
+  interval: 20
+  games_per_opponent: 4
+  opponents:
+    - name: random_legal
+      type: random_legal
+    - name: greedy
+      type: greedy
+obs_version: v1
+model_arch: mlp
+hidden_layers: [128, 128]
+algorithm: dqn
+reward_mode: terminal
+seed: 42
+log_interval: 5

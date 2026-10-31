@@ -1,6 +1,7 @@
 #!/bin/sh
 # Isolated loopback stack for browser verification of this worktree on Training.
-# Never touches the live 8790 preview: Platform 18793, Lab 18794, gateway 18795 on 127.0.0.1.
+# Never touches the live 8790 preview: Platform 18793, Lab 18794, gateway 18795, Jobs 18796 on 127.0.0.1.
+# Jobs use the real data root: submitted Jobs run on the GPU and register checkpoints into catalog-jobs.json.
 # Usage: scripts/verify_stack.sh start|stop  (EVIDENCE_DIR overrides the log directory)
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -11,10 +12,12 @@ GATEWAY_IMAGE=${VERIFY_GATEWAY_IMAGE:-sha256:7dbe0cad93934fb6fac1638c471bf8d86a7
 LAB_CATALOG=${LAB_MODEL_CATALOG:-$DATA/platform-p1-p2/catalogs/research-catalog-17a0fc10c1260ac107745604a5836f580087ab3936465e520b804ce1ed338e46.json}
 ARTIFACTS=/home/jihua/workspace/boardgame-ai-arena/agent_system/training/artifacts
 NAME=quoridor-verify-gateway
+JOBS_IMAGE=${JOBS_IMAGE:-quoridor-train-gpu:latest}
+TOKEN_FILE=${JOBS_TOKEN_FILE:-/home/jihua/quoridor-releases/jobs/private/token}
 
 stop() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true
-  for pid in platform lab; do
+  for pid in platform lab jobs; do
     [ -f "$EVIDENCE/$pid.pid" ] && kill "$(cat "$EVIDENCE/$pid.pid")" 2>/dev/null || true
     rm -f "$EVIDENCE/$pid.pid"
   done
@@ -29,17 +32,20 @@ start)
     --app-dir "$ROOT" --host 127.0.0.1 --port 18794 >"$EVIDENCE/lab.log" 2>&1 &
   echo $! >"$EVIDENCE/lab.pid"
   PLATFORM_MODEL_CATALOGS=discover QUORIDOR_DATA_ROOT=$DATA MLFLOW_TRACKING_URI=http://127.0.0.1:8742 \
-  TRAINING_DASHBOARD_ARTIFACT_ROOTS="$ARTIFACTS/dqn:$ARTIFACTS" PLATFORM_FRONTEND_DIST="$ROOT/apps/web/dist" \
+  TRAINING_DASHBOARD_ARTIFACT_ROOTS="$ARTIFACTS/dqn:$ARTIFACTS:$DATA/jobs/runs" PLATFORM_FRONTEND_DIST="$ROOT/apps/web/dist" \
   TRAINING_DASHBOARD_SOURCE_ROOT="$ROOT" PLATFORM_LAB_UPSTREAM=http://127.0.0.1:18794 \
     nohup "$PY" -m uvicorn platform_entry:create_app --factory --app-dir "$ROOT/training-dashboard" \
     --host 127.0.0.1 --port 18793 >"$EVIDENCE/platform.log" 2>&1 &
   echo $! >"$EVIDENCE/platform.pid"
+  JOBS_DATA_ROOT=$DATA JOBS_IMAGE="$JOBS_IMAGE" JOBS_TOKEN_FILE="$TOKEN_FILE" JOBS_PORT=18796 \
+  JOBS_SOURCE_REF=${JOBS_SOURCE_REF:-feature/unified-rl-platform} nohup "$PY" -m apps.jobs >"$EVIDENCE/jobs.log" 2>&1 &
+  echo $! >"$EVIDENCE/jobs.pid"
   sed -e 's/listen 8080;/listen 127.0.0.1:18795;/' -e 's/${CLASSIC_UPSTREAM}/127.0.0.1:18793/g' \
-      -e 's/${PLATFORM_UPSTREAM}/127.0.0.1:18793/g' "$ROOT/deploy/gateway.conf.template" >"$EVIDENCE/gateway.conf"
+      -e 's/${PLATFORM_UPSTREAM}/127.0.0.1:18793/g' -e 's/${JOBS_UPSTREAM}/127.0.0.1:18796/g' "$ROOT/deploy/gateway.conf.template" >"$EVIDENCE/gateway.conf"
   docker run -d --name "$NAME" --network host -v "$EVIDENCE/gateway.conf:/etc/nginx/conf.d/default.conf:ro" \
     -v "$ROOT/apps/web/dist:/usr/share/nginx/html:ro" --entrypoint nginx "$GATEWAY_IMAGE" -g 'daemon off;' >/dev/null
   for _ in $(seq 1 60); do
-    curl -sf http://127.0.0.1:18795/health >/dev/null && curl -sf http://127.0.0.1:18794/health >/dev/null && {
+    curl -sf http://127.0.0.1:18795/health >/dev/null && curl -sf http://127.0.0.1:18794/health >/dev/null && curl -sf http://127.0.0.1:18796/health >/dev/null && {
       echo "verify stack ready: http://127.0.0.1:18795 (logs: $EVIDENCE)"; exit 0; }
     sleep 1
   done

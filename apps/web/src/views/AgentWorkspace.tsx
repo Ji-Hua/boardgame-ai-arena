@@ -1,6 +1,6 @@
 import {useEffect, useState, type ReactNode} from 'react'
 import {Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams} from 'react-router-dom'
-import {Grid3X3, LayoutDashboard, FlaskConical, Activity, Trophy, Boxes, Microscope, Swords, Sun, Moon} from 'lucide-react'
+import {Grid3X3, LayoutDashboard, FlaskConical, Activity, ListChecks, Trophy, Boxes, Microscope, Swords, Sun, Moon} from 'lucide-react'
 import '../App.css'
 import './AgentWorkspace.css'
 import './Refinement.css'
@@ -15,6 +15,7 @@ import {type Obj, useData, enc, route, ErrorBox} from './agent/shared'
 import {Overview} from './agent/Overview'
 import {ExperimentList, ExperimentDetail} from './agent/Experiments'
 import {ModelList, ModelDetail} from './agent/Models'
+import {JobList, JobNew, JobDetail} from './agent/Jobs'
 import {Ladder} from './agent/Ladder'
 import {AgentDetail} from './agent/AgentDetail'
 import {CheckpointPage} from './agent/CheckpointPage'
@@ -27,6 +28,7 @@ const NAV:[string,string,typeof Trophy,(path:string)=>boolean][]=[
  ['/','总览',LayoutDashboard,p=>p==='/'],
  ['/experiments','实验',FlaskConical,p=>p.startsWith('/experiments')],
  ['/training','训练',Activity,p=>p.startsWith('/training')||p.startsWith('/replays')],
+ ['/jobs','任务',ListChecks,p=>p.startsWith('/jobs')],
  ['/ladder','天梯',Trophy,p=>['/ladder','/agents','/games','/arena'].some(x=>p.startsWith(x))],
  ['/models','模型',Boxes,p=>p.startsWith('/models')||p.startsWith('/checkpoints')],
  ['/lab','实验室',Microscope,p=>p.startsWith('/lab')],
@@ -59,6 +61,9 @@ export default function AgentWorkspace(){
   <Route path="/training/compare" element={<Navigate replace to="/training"/>}/>
   <Route path="/replays" element={<ReplaysView/>}/>
   <Route path="/replays/:runId" element={<ReplaysView/>}/>
+  <Route path="/jobs" element={<JobList/>}/>
+  <Route path="/jobs/new" element={<JobNew/>}/>
+  <Route path="/jobs/:id" element={<JobDetail/>}/>
   <Route path="/arena" element={<ArenaView/>}/>
   <Route path="/models" element={<ModelList season={season}/>}/>
   <Route path="/models/:sha" element={<ModelDetail season={season}/>}/>

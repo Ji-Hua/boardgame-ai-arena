@@ -3,9 +3,10 @@ services:
     image: ${PREVIEW_IMAGE:?required}
     environment:
       QUORIDOR_DATA_ROOT: /home/jihua/quoridor-data
-      TRAINING_DASHBOARD_ARTIFACT_ROOTS: /data/training_artifacts/dqn:/data/training_artifacts
+      TRAINING_DASHBOARD_ARTIFACT_ROOTS: /data/training_artifacts/dqn:/data/training_artifacts:/home/jihua/quoridor-data/jobs/runs
       MLFLOW_TRACKING_URI: http://192.168.68.88:8742
       PLATFORM_LAB_UPSTREAM: http://lab:8744
+      PLATFORM_MODEL_CATALOGS: discover
     volumes:
       - /home/jihua/quoridor-data:/home/jihua/quoridor-data:ro
       - /home/jihua/workspace/boardgame-ai-arena/agent_system/training/artifacts:/data/training_artifacts:ro
@@ -31,6 +32,8 @@ services:
     environment:
       PLATFORM_UPSTREAM: platform:8741
       CLASSIC_UPSTREAM: platform:8741
+      JOBS_UPSTREAM: host.docker.internal:18796
+    extra_hosts: ["host.docker.internal:host-gateway"]
     ports: ['192.168.68.88:8790:8080']
     mem_limit: 128m
     cpus: 1

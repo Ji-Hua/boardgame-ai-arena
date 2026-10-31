@@ -69,10 +69,10 @@ describe('research shell and URL contracts', () => {
     expect(await screen.findByRole('checkbox', { name: '选择 C-resnet training' })).toBeTruthy()
     expect(screen.queryByText('加载 Agent…')).toBeNull()
   })
-  it('offers the seven unified navigation sections and persists the theme', async () => {
+  it('offers the eight unified navigation sections and persists the theme', async () => {
     mount('/lab')
     const nav = screen.getByRole('navigation', { name: '主要入口' })
-    expect(within(nav).getAllByRole('link').map(link => link.textContent)).toEqual(['总览', '实验', '训练', '天梯', '模型', '实验室', '对战'])
+    expect(within(nav).getAllByRole('link').map(link => link.textContent)).toEqual(['总览', '实验', '训练', '任务', '天梯', '模型', '实验室', '对战'])
     expect(within(nav).getByRole('link', { name: '实验室' }).getAttribute('aria-current')).toBe('page')
     fireEvent.click(screen.getByRole('button', { name: '浅色' }))
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'))

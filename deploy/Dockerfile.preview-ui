@@ -5,3 +5,4 @@ FROM ${BASE_GATEWAY}
 ARG SOURCE_COMMIT
 LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
 COPY apps/web/dist/ /usr/share/nginx/html/
+COPY deploy/gateway.conf.template /etc/nginx/templates/default.conf.template
