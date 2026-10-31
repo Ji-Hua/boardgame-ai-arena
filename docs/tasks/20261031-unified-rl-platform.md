@@ -1,5 +1,5 @@
 # Unified RL platform: single entry for training, diagnosis and play
-Status: implementing (P0-P2 verified; P3 research loop partly delivered; nothing deployed)
+Status: implementing (P0-P3 verified on branch; deployment package ready; nothing deployed)
 Owner: Ji Hua (decisions), Claude (design and implementation)
 Branch: feature/unified-rl-platform (from feature/agent-ladder-preview bbc6e28)
 Design/contract: documents/system/design/unified-rl-platform.md
@@ -29,7 +29,9 @@ P3 (2026-10-31), `020eba4`, `1c807f2`, `84282eb`, `e52c034`:
 - `train_cnn_experiment` runs `scripts/train_cnn_repair.py` (distillation, PPO, DAgger, DDQN transfer, AlphaZero-lite, teacher, CNN DQN) with any committed experiment JSON (34 templates under `agent_system/training/configs/cnn_*`), keeping its per-checkpoint diagnosis; the runner records the Job commit through `QUORIDOR_SOURCE_COMMIT`. Job detail shows research metrics and diagnoses.
 - `run_arena_matrix` evaluates registered checkpoints against `agent_system/evaluation/arena/gates/gate-v1.json` (the opponents, 25 openings and settings of `cnn-architecture-20261021-213018`) and publishes a complete report as ladder season `arena/<job id>`. Training Jobs may request a gate follow-up on their final checkpoint. Gate seasons are labelled and are not the ladder default.
 - Experiments list their Jobs (also Job-only experiments) and Job-registered models by Job; model detail links to the producing Job; Training `run_ref` is only recorded for runs the Training workspace can list.
-- Not yet delivered from P3: versioned probe suites and failure mining (design section 7).
+- `c7c7797` failure mining: Agent detail lists recorded games it lost, drew by repetition or ply limit, or where it missed a win (from recorded outcomes and per-game decision diagnostics only); for a recorded missed win the Rust engine locates the plies with a legal winning pawn move and links to them.
+- `728dd73` `diagnose_checkpoint` Jobs run the existing CNN diagnosis on registered checkpoints; `/api/v1/models/{sha}/diagnoses` collects every diagnosis of the exact SHA from experiment and Job outputs, shown on model detail.
+- Versioned probe suites as separate data (design section 7) were not created: the tactical probes stay inside `cnn_diagnostics` and books are referenced by manifest path and recorded `book_sha256`.
 ## Verification commands and observed results
 - `npm run typecheck`, `npm run test:ui` (55 passed), `npm run build`: passed before and after the split.
 - Backend (documented command, see docs/WORKSPACES.md): 134 run, all passed, 1 optional skip; with `ARENA_REPLAY_TEST_ROOT` set, 0 skipped. An earlier run reported a `backend.test_mlflow` import error only because `training-dashboard` was missing from `PYTHONPATH`; the test imports the local adapter, not the MLflow package. Five new tests pass.
@@ -46,7 +48,9 @@ P3 (2026-10-31), `020eba4`, `1c807f2`, `84282eb`, `e52c034`:
 - Acceptance data left in `/home/jihua/quoridor-data`: `jobs/` (9 records, 74 MB), 21 `catalog-jobs.json` entries from 4 smoke Jobs and their `models/<sha>.pt` copies. The first smoke Job's 2 entries predate `run_ref`.
 - P3 reproduction acceptance (`/home/jihua/quoridor-backups/unified-rl-platform-p3/reproduction-shaping-A.json`): the reward-shaping arm A config submitted unchanged as `job-20261031-161625-b2fc26`. Initialization weights equal; training games identical through batch 11; loss values differ by up to 7e-8 in batch 0 (GPU floating-point nondeterminism) and the drift changes a sampled action in batch 12, so the run is not bitwise reproducible. Learner win rate 0.367 vs 0.371; development diagnosis wins 38/39/38 vs 37/38/38 of 50, tactical 18/18 and no missed immediate wins in both.
 - P3 gate acceptance (`gate-shaping-A-season.json`): historical and reproduced final checkpoints in one gate Job (`job-20261031-162303-62e284`, 260 blocks in 10 s, published as a season). Versus random/greedy/D1/D2/frozen D2 CNN: historical 48-2-0, 38-0-12, 38-0-12, 0-12-38, 6-43-1; reproduction 49-1-0, 36-0-14, 36-0-14, 0-14-36, 3-43-4 (Elo 2179 vs 2154); differences are within 50-game sampling error.
-- P3 tests: Jobs controller 11, entrypoints 8, platform backend 140 run with 1 optional skip, React 61; all passed.
+- P3 failure mining on real seasons: all 5 recorded missed-win games of `cnn-architecture-20261021-213018` recompute to exactly the recorded counts (17 Agents scanned in 4 s; `matrix-20261020-v2` has none).
+- P3 diagnosis acceptance: `job-20261031-163034-278f72` diagnosed the frozen D2 CNN on the `matrix-20261020-v2` book (`c6268c82…`); every count shared with the historical `cnn-distillation-20261020/02-policy-d2` diagnosis is identical (38 wins / 12 losses, 734 decisions, 18/18 tactical, score 0.76); only the newer `search_changed_policy_argmax` key is added.
+- P3 tests at `728dd73`: Jobs controller 11, entrypoints 9, platform backend 143 run with 1 optional skip, React 62; all passed.
 - The reproduction Job's three catalog entries were registered before `1c807f2` and still carry a Training run_ref that the Training workspace cannot list.
 ## External artifacts and deployment impact
 Evidence: `/home/jihua/quoridor-backups/unified-rl-platform-p0/`, `.../p1/` and `.../p2/` (logs, browser results, `jobctl.py`). Deployment package: `/home/jihua/quoridor-releases/agent-ladder-preview/unified-p2-20261031/` (`deploy.sh`, `rollback.sh`, compose, user unit, README). Deploying needs the user: the automated session was not permitted to replace the running preview. Platform image `sha256:148ed964…`, gateway `sha256:dac0bcc2…`, both from `ae293ca`. (`e2e/`, `e2e-baseline/`, logs, temporary gateway config). Nothing deployed; 8790 and all other services unchanged. Not pushed to GitHub.
