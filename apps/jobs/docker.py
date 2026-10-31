@@ -73,7 +73,7 @@ class Git:
 
     def files(self, commit, directory):
         result = _run(['git', '-C', self.repo, 'ls-tree', '--name-only', f'{commit}:{directory}'])
-        return sorted(result.stdout.split()) if result.returncode == 0 else []
+        return sorted(result.stdout.splitlines()) if result.returncode == 0 else []
 
     def show(self, commit, path):
         result = _run(['git', '-C', self.repo, 'show', f'{commit}:{path}'])

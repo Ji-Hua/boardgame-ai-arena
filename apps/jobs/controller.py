@@ -146,6 +146,8 @@ class Controller:
                 '--cpus', str(r['cpus']), '--memory', f"{r['memory_gb']}g", '--shm-size', '2g',
                 '--network', 'none', '--read-only', '--tmpfs', '/tmp:rw,size=2g',
                 '-e', f"OMP_NUM_THREADS={int(r['cpus'])}", '-e', 'HOME=/tmp',
+                # The host uid has no passwd entry in the image; getpass and torch caches read these instead.
+                '-e', 'USER=quoridor-job', '-e', 'LOGNAME=quoridor-job', '-e', 'TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor',
                 '-v', f'{self.data_root}:{self.data_root}:ro',
                 '-v', f'{control / "job.json"}:/job/job.json:ro', '-v', f'{control / "source"}:/job/source:ro',
                 '-v', f'{run}:/job/run:rw']

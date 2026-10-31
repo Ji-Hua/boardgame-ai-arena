@@ -100,6 +100,7 @@ class ControllerTests(unittest.TestCase):
         args = self.docker.runs[0]
         self.assertIn('nvidia.com/gpu=all', args)
         self.assertIn('none', args)  # --network none
+        self.assertIn('USER=quoridor-job', args)
         self.assertIn(f'{self.root / "jobs" / "runs" / first["id"]}:/job/run:rw', args)
         self.assertNotIn('nvidia.com/gpu=all', self.docker.runs[1])
         spec = json.loads((self.root / 'jobs' / first['id'] / 'job.json').read_text())
