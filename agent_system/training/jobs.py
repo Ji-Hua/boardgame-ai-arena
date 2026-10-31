@@ -82,14 +82,21 @@ def train_dqn(job: dict, run: Path, events: Events):
     return write_manifest(run, 'q_values' if 'dqn' in algorithm else None)
 
 
+def load_train_script(path='scripts/train_dqn.py'):
+    """Import scripts/train_dqn.py as a module (it is a script, not a package member)."""
+    spec = importlib.util.spec_from_file_location('train_dqn_script', path)
+    script = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = script  # dataclasses resolve annotations through sys.modules
+    spec.loader.exec_module(script)
+    return script
+
+
 def evaluate_checkpoints(job: dict, run: Path, events: Events):
     config = json.loads(job['config']) if isinstance(job['config'], str) else job['config']
     shas = config.get('checkpoints') or []
     if not shas or any(not isinstance(s, str) or len(s) != 64 for s in shas):
         raise ValueError('checkpoints must be a non-empty list of full SHA-256 identities')
-    spec = importlib.util.spec_from_file_location('train_dqn_script', 'scripts/train_dqn.py')
-    script = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(script)
+    script = load_train_script()
     from agent_system.training.dqn.observation import encode_observation
     from agent_system.training.dqn.observation_cnn import encode_observation_cnn
     import torch
