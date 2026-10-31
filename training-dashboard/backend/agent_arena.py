@@ -134,6 +134,64 @@ class Evidence:
             self.cache[key] = result
         return result
 
+    FAILURE_KINDS = ('missed_win', 'loss', 'cycle', 'ply_limit')
+
+    def failures(self, season, agent):
+        """Recorded games of one Agent that it lost, drew by repetition or ply limit, or where it missed a win.
+
+        Classification uses only recorded outcomes and the per-game decision diagnostics; nothing is inferred.
+        """
+        base, _, manifest = self.season(season)
+        self.spec(season, agent)
+        key = ('failures', manifest['manifest_sha256'], agent)
+        with self.lock:
+            if key in self.cache:
+                return self.cache[key]
+        rows, totals, games = [], dict.fromkeys(self.FAILURE_KINDS, 0), 0
+        for file in sorted((base / 'blocks').glob('*.json.gz')):
+            with gzip.open(self.path(file), 'rt') as stream:
+                block = json.load(stream)
+            if agent not in (block.get('a'), block.get('b')) or block.get('manifest_sha256') != manifest['manifest_sha256']:
+                continue
+            opponent = block['b'] if block['a'] == agent else block['a']
+            for i, game in enumerate(block.get('games', [])):
+                if agent not in (game.get('p1'), game.get('p2')):
+                    continue
+                games += 1
+                missed = int(((game.get('decision_diagnostics') or {}).get(agent) or {}).get('missed_immediate_win') or 0)
+                kinds = [k for k, hit in (('missed_win', missed > 0), ('loss', bool(game.get('winner')) and game['winner'] != agent),
+                                          ('cycle', game.get('termination') == 'deterministic_cycle'),
+                                          ('ply_limit', game.get('termination') == 'ply_limit')) if hit]
+                for kind in kinds:
+                    totals[kind] += 1
+                if kinds:
+                    rows.append(dict(id=file.name.removesuffix('.json.gz') + ':' + str(i), opponent=opponent,
+                        seat=1 if game.get('p1') == agent else 2, kinds=kinds, missed_immediate_win=missed,
+                        steps=game.get('steps'), termination=game.get('termination'), winner=game.get('winner'),
+                        control=bool(block.get('control')), opening=block.get('opening_id'),
+                        available=isinstance(game.get('actions'), list) and bool(game.get('trajectory_hash'))))
+        result = dict(agent=agent, games=games, totals=totals, failures=rows)
+        with self.lock:
+            self.cache[key] = result
+        return result
+
+    def missed_wins(self, season, game_id, agent):
+        """Plies of one recorded game where the Agent had a legal winning pawn move and played something else."""
+        from agent_system.analysis.state import ENGINE, Position, build_state, wire_action
+        replay = self.replay(season, game_id)
+        if agent not in (replay['p1'], replay['p2']):
+            raise ValueError('Agent did not play this game')
+        plies = []
+        for ply, (position, action) in enumerate(zip(replay['positions'], replay['actions'])):
+            if (replay['p1'] if position['turn'] == 1 else replay['p2']) != agent:
+                continue
+            goal = 8 if position['turn'] == 1 else 0
+            state = build_state(Position.model_validate(position))
+            wins = [wire_action(a) for a in ENGINE.legal_actions(state) if a.kind == 'MovePawn' and a.target_y == goal]
+            if wins and not (action['type'] == 'pawn' and action['target'][1] == goal):
+                plies.append(dict(ply=ply, actual=action, winning=wins))
+        return dict(game=game_id, agent=agent, plies=plies)
+
     def replay(self, season, game_id):
         if not re.fullmatch(r'[a-f0-9]{16,64}:[0-9]{1,3}', game_id):
             raise ValueError('Invalid game identity')
@@ -281,6 +339,12 @@ def install(app):
 
     @router.get('/seasons/{season}/games')
     def games(season: str, agent: str, opponent: str): return call(evidence.games, season, agent, opponent)
+
+    @router.get('/seasons/{season}/failures/{agent}')
+    def failures(season: str, agent: str): return call(evidence.failures, season, agent)
+
+    @router.get('/seasons/{season}/replay/{game_id}/missed-wins')
+    def missed_wins(season: str, game_id: str, agent: str): return call(evidence.missed_wins, season, game_id, agent)
 
     @router.get('/seasons/{season}/replay/{game_id}')
     def replay(season: str, game_id: str): return call(evidence.replay, season, game_id)

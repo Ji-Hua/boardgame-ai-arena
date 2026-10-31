@@ -38,6 +38,36 @@ class ArenaTests(unittest.TestCase):
         (self.base/'report.json').write_text(json.dumps(v))
         with self.assertRaises(ValueError):self.ev.season('test')
 
+    def test_failures_classify_recorded_outcomes_only(self):
+        result = self.ev.failures('test', 'policy')
+        self.assertEqual(result['games'], 1)
+        self.assertEqual(result['totals'], {'missed_win': 0, 'loss': 0, 'cycle': 1, 'ply_limit': 0})
+        self.assertEqual(result['failures'][0]['kinds'], ['cycle'])
+        game = self.fixture.block['games'][0]
+        game.update(winner='minimax', termination='goal',
+                    decision_diagnostics={'policy': {'missed_immediate_win': 2}, 'minimax': {'missed_immediate_win': 0}})
+        self.publish()
+        self.ev.cache.clear()
+        row = self.ev.failures('test', 'policy')['failures'][0]
+        self.assertEqual((row['kinds'], row['missed_immediate_win'], row['opponent'], row['seat']), (['missed_win', 'loss'], 2, 'minimax', 1))
+        self.assertEqual(self.ev.failures('test', 'minimax')['failures'], [])
+        with self.assertRaises(StopIteration):
+            self.ev.failures('test', 'nobody')
+
+    def test_missed_wins_recomputes_legal_winning_moves_with_the_engine(self):
+        # P2 stays off its goal row (y=0) so the game is still in progress.
+        near = dict(pawns=[[4, 7], [0, 5]], walls_remaining=[10, 10], walls=[], turn=1)
+        after = dict(near, pawns=[[3, 7], [0, 5]], turn=2)
+        replay = dict(p1='policy', p2='minimax', positions=[near, after, dict(after, pawns=[[3, 7], [0, 4]], turn=1)],
+                      actions=[dict(player=1, type='pawn', target=[3, 7]), dict(player=2, type='pawn', target=[0, 4])])
+        self.ev.replay = lambda season, game_id: replay
+        result = self.ev.missed_wins('test', 'x:0', 'policy')
+        self.assertEqual([p['ply'] for p in result['plies']], [0])
+        self.assertIn(dict(player=1, type='pawn', target=[4, 8]), result['plies'][0]['winning'])
+        self.assertEqual(self.ev.missed_wins('test', 'x:0', 'minimax')['plies'], [])
+        with self.assertRaises(ValueError):
+            self.ev.missed_wins('test', 'x:0', 'other')
+
     def test_seasons_mark_gate_protocols(self):
         self.assertIsNone(self.ev.seasons()['seasons'][0]['gate'])
         self.fixture.manifest['roster']['gate'] = 'gate-v1'
