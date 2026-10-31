@@ -171,6 +171,33 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual((entry['experiment'], entry['training_job']), ('exp-1', job['id']))
         self.assertEqual([j['id'] for j in self.controller.store.listing(experiment='exp-1')], [job['id']])
 
+    def test_complete_arena_result_is_published_and_gate_follows_training(self):
+        job = self.submit(name='cand', experiment='exp-2', follow_up={'gate': 'gate-v1'})
+        with self.assertRaises(ValueError):
+            self.submit('evaluate_checkpoints', follow_up={'gate': 'gate-v1'})
+        self.controller.tick()
+        run = self.root / 'jobs' / 'runs' / job['id']
+        (run / 'checkpoints').mkdir()
+        (run / 'checkpoints' / 'ep1.pt').write_bytes(b'g')
+        sha = hashlib.sha256(b'g').hexdigest()
+        (run / 'manifest.json').write_text(json.dumps(dict(checkpoints=[dict(file='checkpoints/ep1.pt', sha256=sha)])))
+        self.finish(self.controller.store.get(job['id']))
+        self.controller.tick()
+        gate = next(j for j in self.controller.store.listing() if j['entrypoint'] == 'run_arena_matrix')
+        self.assertEqual((gate['name'], gate['experiment'], gate['spec']['source']['commit']), ('cand-gate', 'exp-2', COMMIT))
+        self.assertEqual(json.loads(gate['spec']['config'])['candidates'], [sha])
+        arena = self.root / 'jobs' / 'runs' / gate['id'] / 'arena'
+        (arena / 'blocks').mkdir(parents=True)
+        (arena / 'report.json').write_text(json.dumps(dict(status='complete')))
+        (arena / '.lock').write_text('')
+        self.finish(self.controller.store.get(gate['id']))
+        self.controller.tick()
+        published = self.root / 'arena' / gate['id']
+        self.assertTrue((published / 'report.json').exists())
+        self.assertFalse((published / '.lock').exists())
+        self.assertEqual(self.controller.detail(gate['id'])['season'], gate['id'])
+        self.assertIsNone(self.controller.detail(job['id'])['season'])
+
     def test_tampered_checkpoint_fails_registration(self):
         job = self.submit()
         self.controller.tick()

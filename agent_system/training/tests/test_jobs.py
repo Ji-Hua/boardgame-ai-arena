@@ -49,6 +49,20 @@ class JobEntrypointTests(unittest.TestCase):
         self.assertEqual([r['file'] for r in rows], ['experiment/checkpoints/a.pt', 'experiment/checkpoints/b.pt', 'experiment/checkpoints/c.pt'])
         self.assertEqual([r['output_semantics'] for r in rows], ['policy_logits', 'q_values', 'policy_logits'])
 
+    def test_gate_roster_pairs_each_candidate_with_every_gate_opponent(self):
+        import os
+        cwd = os.getcwd()
+        os.chdir(ROOT)
+        self.addCleanup(os.chdir, cwd)
+        roster, gate = jobs.gate_roster({'candidates': ['a' * 64, 'a' * 64, 'b' * 64], 'names': {'a' * 64: 'repro-A'}}, '/data')
+        ids = [a['id'] for a in roster['agents']]
+        self.assertEqual(ids[:2], ['repro-A', 'cand-bbbbbbbbbbbb'])
+        self.assertEqual(len(roster['matchups']), 2 * len(gate['agents']))
+        self.assertEqual(roster['agents'][0]['algo']['params'], dict(checkpoint='/data/models/' + 'a' * 64 + '.pt', sha256='a' * 64, device='cpu'))
+        for bad in ({'candidates': []}, {'candidates': ['a' * 64], 'names': {'a' * 64: 'greedy'}}, {'candidates': ['a' * 64], 'gate': '../x'}):
+            with self.assertRaises(ValueError):
+                jobs.gate_roster(bad, '/data')
+
     def test_cnn_experiment_requires_a_training_object(self):
         with self.assertRaises(ValueError):
             jobs.train_cnn_experiment(dict(id='j', config='{}'), self.run_dir, jobs.Events(self.run_dir))

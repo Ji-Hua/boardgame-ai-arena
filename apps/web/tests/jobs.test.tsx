@@ -40,6 +40,28 @@ it('submits a templated training Job with the saved token and opens it',async()=
  expect(localStorage.getItem('quoridor-platform-token')).toBe('secret')
 })
 
+it('prefills a gate Job and links a published season',async()=>{
+ const sha='a'.repeat(64)
+ mock({'/api/v1/jobs/entrypoints':()=>({source_ref:'feature/x',source_commit:commit,image:'img',entrypoints:{run_arena_matrix:{title:'Gate',kind:'evaluate',gpu:false,format:'json',template:{candidates:[],gate:'gate-v1'},description:'g'}}}),
+  '/api/v1/jobs/job-2':()=>({...job,id:'job-2',status:'succeeded',events:[],run_id:'job-2',run_files:['arena'],season:'job-2',diagnoses:[]}),'/api/v1/jobs/job-2/metrics':()=>({metrics:[],evaluations:[]})})
+ at('/jobs/new?entrypoint=run_arena_matrix&sha='+sha)
+ await waitFor(()=>expect(JSON.parse((screen.getByLabelText('任务配置') as HTMLTextAreaElement).value).candidates).toEqual([sha]))
+ expect(screen.queryByRole('checkbox')).toBeNull()
+ cleanup()
+ at('/jobs/job-2')
+ expect((await screen.findByRole('link',{name:'天梯评测批次 job-2'})).getAttribute('href')).toBe('/ladder?season=job-2')
+})
+
+it('sends the gate follow-up for training Jobs',async()=>{
+ const calls=mock({'/api/v1/jobs/entrypoints':()=>({source_ref:'feature/x',source_commit:commit,image:'img',entrypoints:{train_dqn:{title:'DQN',kind:'train',gpu:true,format:'yaml',templates:[],description:'d'}}}),'/api/v1/jobs':()=>({...job,status:'queued'})})
+ at('/jobs/new')
+ fireEvent.change(await screen.findByLabelText('任务配置'),{target:{value:'episodes: 1\n'}})
+ fireEvent.click(screen.getByRole('checkbox'))
+ fireEvent.click(screen.getByRole('button',{name:'提交任务'}))
+ await waitFor(()=>expect(calls.some(c=>c.init?.method==='POST')).toBe(true))
+ expect(JSON.parse(calls.find(c=>c.init?.method==='POST')!.init!.body as string).follow_up).toEqual({gate:'gate-v1'})
+})
+
 it('prefills an evaluation Job with the model SHA',async()=>{
  const sha='a'.repeat(64)
  mock({'/api/v1/jobs/entrypoints':()=>({source_ref:'feature/x',source_commit:commit,image:'img',entrypoints:{evaluate_checkpoints:{title:'Eval',gpu:false,format:'json',template:{checkpoints:[],opponents:[]},description:'e'}}})})

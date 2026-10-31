@@ -100,11 +100,15 @@ class Controller:
                 if not low <= value <= high:
                     raise ValueError(f'{key} must be within [{low}, {high}]')
                 resources[key] = value
+        follow_up = payload.get('follow_up') or {}
+        if set(follow_up) - {'gate'} or (follow_up.get('gate') and meta['kind'] != 'train'):
+            raise ValueError('follow_up only supports {"gate": "<gate id>"} for training Jobs')
         commit = self.git.resolve(payload.get('source') or self.source_ref)
         stamp = time.strftime('%Y%m%d-%H%M%S', time.gmtime(self.clock()))
         identifier = f'job-{stamp}-{secrets.token_hex(3)}'
         spec = dict(entrypoint=entrypoint, config=config, resources=resources, image=self.image,
-                    source=dict(ref=payload.get('source') or self.source_ref, commit=commit))
+                    source=dict(ref=payload.get('source') or self.source_ref, commit=commit),
+                    follow_up={k: v for k, v in follow_up.items() if v})
         (self.root / identifier).mkdir()
         (self.runs / identifier).mkdir()
         self.store.insert(dict(id=identifier, name=name, entrypoint=entrypoint, experiment=experiment, spec=spec,
@@ -208,6 +212,7 @@ class Controller:
         elif exit_code == 0:
             try:
                 fields.update(status='succeeded', registered=self.register(job))
+                self.publish_season(job)
             except Exception as exc:
                 log.exception('registration failed for %s', identifier)
                 fields.update(status='failed', error=f'registration failed: {exc}')
@@ -215,6 +220,28 @@ class Controller:
             fields.update(status='failed', error=f'exit code {exit_code}')
         self.store.update(identifier, **fields)
         self.docker.remove(job['container'])
+        gate = job['spec'].get('follow_up', {}).get('gate')
+        if gate and fields.get('status') == 'succeeded' and fields.get('registered'):
+            # Gate the final registered checkpoint; the follow-up Job keeps the source commit and experiment.
+            follow = self.submit(dict(entrypoint='run_arena_matrix', name=f"{job['name']}-gate"[:80], experiment=job['experiment'],
+                                      source=job['spec']['source']['commit'],
+                                      config=dict(candidates=[fields['registered'][-1]], names={fields['registered'][-1]: job['name']},
+                                                  gate=gate, workers=4)))
+            log.info('queued gate %s after %s', follow['id'], identifier)
+
+    def publish_season(self, job):
+        """Copy a complete Arena result to <data root>/arena/<job id>, where the ladder lists it."""
+        source = self.runs / job['id'] / 'arena'
+        report = source / 'report.json'
+        if not report.exists() or json.loads(report.read_text()).get('status') != 'complete':
+            return None
+        target = self.data_root / 'arena' / job['id']
+        if not target.exists():
+            partial = target.with_name(target.name + '.partial')
+            shutil.rmtree(partial, ignore_errors=True)
+            shutil.copytree(source, partial, ignore=shutil.ignore_patterns('.lock'))
+            partial.rename(target)
+        return job['id']
 
     # ---- registration -----------------------------------------------------------------------
     def register(self, job):
@@ -274,6 +301,7 @@ class Controller:
         job['events'] = [json.loads(x) for x in events.read_text().splitlines() if x.strip()] if events.exists() else []
         job['run_id'] = identifier
         job['run_files'] = sorted(p.name for p in run.iterdir()) if run.exists() else []
+        job['season'] = identifier if (self.data_root / 'arena' / identifier / 'report.json').exists() else None
         diagnoses = run / 'experiment' / 'diagnoses.json'
         try:
             job['diagnoses'] = json.loads(diagnoses.read_text()) if diagnoses.exists() else []

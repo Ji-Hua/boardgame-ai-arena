@@ -8,6 +8,7 @@ import hashlib
 import importlib.metadata
 import itertools
 import json
+import os
 import multiprocessing
 import os
 import platform
@@ -76,7 +77,9 @@ def main():
         opening_book = make_openings(args.pairs, args.seed)
     manifest = {
         "protocol": "quoridor-paired-opening-v1", "roster": roster, "book": opening_book,
-        "source_sha256": digest, "git_head": subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip(),
+        "source_sha256": digest,
+        # Platform Jobs run from a snapshot without .git and pass the pinned commit.
+        "git_head": os.environ.get("QUORIDOR_SOURCE_COMMIT") or subprocess.check_output(["git","rev-parse","HEAD"],cwd=ROOT,text=True).strip(),
         "max_plies": args.max_plies, "seed": args.seed, "pairs": args.pairs,
         "versions": {p: importlib.metadata.version(p) for p in ["torch","numpy","PyYAML"]},
         "python": platform.python_version(), "platform": platform.platform(),

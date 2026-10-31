@@ -34,6 +34,11 @@ ENTRYPOINTS = {
         templates='agent_system/training/configs', template_pattern=r'cnn_[^/]+/[^/]+\.json',
         description='scripts/train_cnn_repair.py with the submitted experiment JSON, including per-checkpoint '
                     'diagnosis. output, checkpoint_dir and device are set by the Job; input paths must be under the data root.'),
+    'run_arena_matrix': dict(
+        kind='evaluate', gpu=False, format='json', title='门槛评测（Arena 评测批次）',
+        template={'candidates': [], 'names': {}, 'gate': 'gate-v1', 'workers': 4},
+        description='Registered checkpoints (full SHA) against a versioned gate protocol with scripts/run_benchmark_matrix.py. '
+                    'A complete result is published as a new ladder season named by the Job id.'),
     'evaluate_checkpoints': dict(
         kind='evaluate', gpu=False, format='json', title='Checkpoint 评测',
         template={'checkpoints': [], 'opponents': [{'name': 'greedy', 'type': 'greedy'},
@@ -115,6 +120,45 @@ def train_cnn_experiment(job: dict, run: Path, events: Events):
     return write_manifest(run, None, output / 'checkpoints', known)
 
 
+def gate_roster(config: dict, data_root: str) -> tuple[dict, dict]:
+    """Candidate AgentSpecs plus the gate opponents, restricted to candidate-versus-gate matchups."""
+    gate_id = config.get('gate', 'gate-v1')
+    if not isinstance(gate_id, str) or not gate_id.replace('-', '').isalnum():
+        raise ValueError('Invalid gate protocol id')
+    gate = json.loads(Path(f'agent_system/evaluation/arena/gates/{gate_id}.json').read_text())
+    shas = config.get('candidates') or []
+    if not shas or any(not isinstance(s, str) or len(s) != 64 for s in shas):
+        raise ValueError('candidates must be a non-empty list of full SHA-256 identities')
+    names = config.get('names') or {}
+    taken = {a['id'] for a in gate['agents']}
+    candidates = []
+    for sha in dict.fromkeys(shas):
+        identifier = names.get(sha) or f'cand-{sha[:12]}'
+        if identifier in taken:
+            raise ValueError(f'Candidate name collides with another agent: {identifier}')
+        taken.add(identifier)
+        candidates.append(dict(id=identifier, display_name=identifier, deterministic=True, policy=dict(type='top_k', k=1),
+                               algo=dict(type='dqn', params=dict(checkpoint=f'{data_root}/models/{sha}.pt', sha256=sha, device='cpu'))))
+    matchups = [[c['id'], g['id']] for c in candidates for g in gate['agents']]
+    return dict(agents=candidates + gate['agents'], matchups=matchups, gate=gate_id), gate
+
+
+def run_arena_matrix(job: dict, run: Path, events: Events):
+    config = json.loads(job['config']) if isinstance(job['config'], str) else job['config']
+    roster, gate = gate_roster(config, job['data_root'])
+    path = run / 'arena-roster.json'
+    path.write_text(json.dumps(roster, indent=2))
+    workers = max(1, min(int(config.get('workers', 4)), int(job['resources'].get('cpus', 4))))
+    events.emit('process', command='scripts/run_benchmark_matrix.py', gate=gate['id'],
+                candidates=[a['id'] for a in roster['agents'][:len(roster['agents']) - len(gate['agents'])]])
+    subprocess.run([sys.executable, '-u', 'scripts/run_benchmark_matrix.py', '--roster', str(path), '--output', str(run / 'arena'),
+                    '--pairs', str(gate['pairs']), '--seed', str(gate['seed']), '--max-plies', str(gate['max_plies']),
+                    '--workers', str(workers), '--book', gate['book']], check=True)
+    report = json.loads((run / 'arena' / 'report.json').read_text())
+    events.emit('arena', status=report.get('status'), ranking=[(r.get('id'), r.get('rank'), r.get('elo')) for r in report.get('ranking', [])])
+    return []
+
+
 def load_train_script(path='scripts/train_dqn.py'):
     """Import scripts/train_dqn.py as a module (it is a script, not a package member)."""
     spec = importlib.util.spec_from_file_location('train_dqn_script', path)
@@ -163,7 +207,8 @@ def evaluate_checkpoints(job: dict, run: Path, events: Events):
     return []
 
 
-RUNNERS = {'train_dqn': train_dqn, 'train_cnn_experiment': train_cnn_experiment, 'evaluate_checkpoints': evaluate_checkpoints}
+RUNNERS = {'train_dqn': train_dqn, 'train_cnn_experiment': train_cnn_experiment, 'run_arena_matrix': run_arena_matrix,
+           'evaluate_checkpoints': evaluate_checkpoints}
 
 
 def main(path: str) -> int:

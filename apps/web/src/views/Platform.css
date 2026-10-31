@@ -34,3 +34,4 @@
 .pf-form textarea{width:100%;font-family:ui-monospace,Consolas,monospace;font-size:12px;padding:10px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:6px}
 .pf-form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
 .pf-log{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5;max-height:65vh;overflow:auto;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px}
+.pf-form .pf-check{flex-direction:row;align-items:center;gap:8px;color:var(--text)}

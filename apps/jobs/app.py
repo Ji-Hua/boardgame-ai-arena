@@ -23,6 +23,7 @@ class Submission(BaseModel):
     experiment: str | None = Field(default=None, max_length=80)
     source: str | None = Field(default=None, max_length=200)
     resources: dict[str, float] | None = None
+    follow_up: dict[str, str] | None = None
 
 
 def create_app(controller, token_file=None):
