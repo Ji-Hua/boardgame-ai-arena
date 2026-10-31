@@ -2,7 +2,7 @@
 import unittest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from backend.platform_v1 import install, model_detail, model_listing
+from backend.platform_v1 import TimedCache, install, model_detail, model_listing
 
 A, B = 'a'*64, 'b'*64
 
@@ -47,6 +47,17 @@ class PlatformV1Tests(unittest.TestCase):
         self.assertTrue(model_detail(models, Evidence(), A)['ranked'])
         self.assertEqual(models.verify, [True])
 
+    def test_timed_cache_reuses_value_until_ttl(self):
+        now = [0.0]
+        cache = TimedCache(ttl=60, clock=lambda: now[0])
+        calls = []
+        compute = lambda: calls.append(1) or len(calls)
+        self.assertEqual(cache.get(compute), 1)
+        now[0] = 59
+        self.assertEqual(cache.get(compute), 1)
+        now[0] = 60
+        self.assertEqual(cache.get(compute), 2)
+
     def test_http_routes_and_unknown_model(self):
         app = FastAPI()
         app.state.models, app.state.evidence = Models(), Evidence()
@@ -55,6 +66,9 @@ class PlatformV1Tests(unittest.TestCase):
         self.assertEqual(client.get('/api/v1/models').json()['summary']['ranked'], 1)
         self.assertEqual(client.get('/api/v1/models/' + A).json()['seasons'][0]['agent'], 'policy')
         self.assertEqual(client.get('/api/v1/models/' + B).status_code, 404)
+        self.assertEqual(client.get('/api/v1/experiments/..%2Fx').status_code, 404)
+        self.assertEqual(client.get('/api/v1/experiments/.hidden').status_code, 422)
+        self.assertEqual(client.get('/api/v1/experiments/missing').status_code, 404)
 
 
 if __name__ == '__main__':
