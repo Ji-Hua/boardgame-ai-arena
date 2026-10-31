@@ -1,5 +1,5 @@
 # Unified RL platform: single entry for training, diagnosis and play
-Status: implementing (P0-P4 code verified on branch; deployment and retirement packages ready; nothing deployed)
+Status: implementing (P0-P5 code verified on branch; P4 deploy, retirement and P5 cutover packages ready; nothing deployed)
 Owner: Ji Hua (decisions), Claude (design and implementation)
 Branch: feature/unified-rl-platform (from feature/agent-ladder-preview bbc6e28)
 Design/contract: documents/system/design/unified-rl-platform.md
@@ -79,7 +79,42 @@ P4 (2026-10-31), `ddef780`. Classic play is not kept (user decision 2026-10-31),
   - Browser 18/18 passed.
   - The nested read-write `games` mount needs the directory to exist on the host; `deploy.sh` creates it, and `~/quoridor-data/games` now exists (empty).
 - Retirement: see below. Before retirement, the old entries logged only curl probes in the last 72 h, and the gameplay and Classic backends logged no requests.
+UI refinement (2026-10-31), `6753bdf`:
+- The overview became a dashboard: KPI tiles for models, ranked models, experiments, active Jobs and GPU; quick actions; Elo bars for the top six; recent Jobs with status.
+- `Theme.css` refines every page using theme tokens only: quiet links, primary buttons, sticky header, row hover, focus rings, loading spinners, capability chips without strikethrough.
+- Screenshots before and after (with a user-level Noto Sans SC font installed on Training for headless rendering): `~/quoridor-backups/unified-rl-platform-p5/shots-*`.
+- React 65 passed; browser 18/18 passed (`e2e-ui`).
+
+P5 (2026-10-31), `54593aa`, `379a943`: entry and gameplay on Dev; Training keeps compute and evidence.
+- The gateway image renders a second listener (`gateway-api.conf.template`, port 8081) that serves the research API, Lab and Jobs without the SPA; `/api/v1/play` returns 404 there. Training publishes it on 8792.
+- `compose.dev-entry.yaml` runs the Dev gateway (8790) and the gameplay service.
+- `compose.training-api.yaml` keeps the platform and Lab, publishes the API listener, and turns 8790 into a 301 to Dev.
+- `sync_gameplay_mirror.sh` with a 10-minute user timer mirrors `quoridor-data` to Dev at the same path:
+  - excluded: `mlflow/`, `games/`, Job snapshots, `jobs.sqlite`
+  - size 5.8 GB; incremental run about 1 s
+  - every catalog checkpoint is under the data root, so no artifact mirror is needed
+- Upstream connect timeout is 5 s, so a stopped service fails fast.
+- Verification, all on isolated ports. Evidence in `~/quoridor-backups/unified-rl-platform-p5/`.
+  - Browser 18/18 through a Dev test entry backed by a Training test API listener (`e2e-dev`), plus the real GPU Job submitted via Dev (`e2e-dev-jobs`).
+  - Latency (`drills.json`, median ms, Training direct → via Dev):
+
+    | Operation | Training direct | Via Dev |
+    |---|---|---|
+    | roster | 11.8 | 18.0 |
+    | Lab Minimax d2 | 38.6 | 42.9 |
+    | heuristic move | 6.0 | 15.6 |
+    | CNN move | 4.4 | 14.9 |
+
+  - Training API down: Dev games keep working, research and Jobs routes return 502, and everything recovers.
+  - Dev gameplay down: 504 within 5 s and other pages are unaffected; the game resumes after restart.
+  - Full cutover and rollback simulation on test ports (`sim.log`): games moved both ways, including moves made on Dev.
+- The Dev mirror `~/quoridor-data` (5.8 GB) stays in place for the real cutover; every test stack and test unit was removed.
+- The images are already loaded on Dev.
+
 ## External artifacts and deployment impact
+P5 cutover package (prepared, not run): `/home/jihua/quoridor-releases/p5-cutover-379a943/`, containing `cutover.sh`, `rollback.sh`, `lib.sh`, the Training compose, the redirect, the Dev files and a README.
+- Run on Training after the P4 deploy.
+- The retirement scripts now follow the 8790 redirect, so they work before or after the cutover.
 P4 packages (prepared, not run):
 - `/home/jihua/quoridor-releases/agent-ladder-preview/unified-platform-ddef780/` deploys platform `sha256:47de7af6…`, gateway `sha256:671598fd…` and the gameplay container, and installs the Job controller unit if it is missing. `ba7adbb` is marked SUPERSEDED.
 - `/home/jihua/quoridor-releases/retire-legacy-20261031/` exists on Training and on Dev:
@@ -90,4 +125,4 @@ P4 packages (prepared, not run):
   - `selftest.sh` ran retire → check → rollback with a throwaway container on both hosts (`selftest.log`).
 Evidence: `/home/jihua/quoridor-backups/unified-rl-platform-p0/`, `.../p1/` and `.../p2/` (logs, browser results, `jobctl.py`). Deployment package (current): `/home/jihua/quoridor-releases/agent-ladder-preview/unified-platform-ba7adbb/`; the earlier p1, p2 and p3 packages are marked SUPERSEDED. Original P2 package: `/home/jihua/quoridor-releases/agent-ladder-preview/unified-p2-20261031/` (`deploy.sh`, `rollback.sh`, compose, user unit, README). Deploying needs the user: the automated session was not permitted to replace the running preview. Current images: platform `sha256:54635638…`, gateway `sha256:4e0d7e8b…`, both from `ba7adbb`; Job controller snapshot `~/quoridor-releases/jobs/src-ba7adbb`. (`e2e/`, `e2e-baseline/`, logs, temporary gateway config). Nothing deployed; 8790 and all other services unchanged. Not pushed to GitHub.
 ## Deferred decisions
-All section-12 items are decided (design section 0); Classic play is not kept. Still open: MLflow `/mlflow/` proxy, versioned probe suites, P5 move to Dev.
+All section-12 items are decided (design section 0); Classic play is not kept. Still open: MLflow `/mlflow/` proxy and versioned probe suites. Deployment of P4, retirement and P5 is pending the user.

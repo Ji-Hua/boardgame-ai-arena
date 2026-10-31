@@ -35,7 +35,7 @@ Patches: `~/quoridor-backups/workspace-tidy-20261031/`.
 
 `/home/jihua/quoridor-data/jobs/jobs.sqlite` (records), `jobs/<id>/` (job.json, source snapshot, stdout.log), `jobs/runs/<id>/` (run directory, Training artifact root), `catalog-jobs.json` and `models/<sha>.pt` (registered checkpoints). The write token is `~/quoridor-releases/jobs/private/token`. Only one controller may use this data at a time.
 
-Games: `/home/jihua/quoridor-data/games/games.sqlite`, written only by the gameplay service (container uid 1000). Old service retirement and rollback: `~/quoridor-releases/retire-legacy-20261031/` on Training and Dev.
+Games: `/home/jihua/quoridor-data/games/games.sqlite`, written only by the gameplay service (container uid 1000). After P5, Dev holds a read-only mirror of `/home/jihua/quoridor-data` (same path, `quoridor-mirror.timer`, excluding `games/`, `mlflow/` and Job snapshots); Dev `games/` is owned by the Dev gameplay service. P5 cutover: `~/quoridor-releases/p5-cutover-379a943/` on Training. Old service retirement and rollback: `~/quoridor-releases/retire-legacy-20261031/` on Training and Dev.
 
 ## Tests in a worktree
 
