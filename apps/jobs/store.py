@@ -51,11 +51,15 @@ class Store:
         with self.lock:
             return self._row(self.db.execute('select * from jobs where id=?', (identifier,)).fetchone())
 
-    def listing(self, statuses=None, limit=200):
-        query, args = 'select * from jobs', []
+    def listing(self, statuses=None, limit=200, experiment=None):
+        clauses, args = [], []
         if statuses:
-            query += f' where status in ({",".join("?" * len(statuses))})'
-            args = list(statuses)
+            clauses.append(f'status in ({",".join("?" * len(statuses))})')
+            args += list(statuses)
+        if experiment:
+            clauses.append('experiment=?')
+            args.append(experiment)
+        query = 'select * from jobs' + (' where ' + ' and '.join(clauses) if clauses else '')
         with self.lock:
             rows = self.db.execute(query + ' order by created desc, rowid desc limit ?', (*args, limit)).fetchall()
         return [self._row(r) for r in rows]

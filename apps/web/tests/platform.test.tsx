@@ -48,6 +48,7 @@ afterEach(() => { cleanup(); vi.useRealTimers() })
 const seasonEntry = { season: 's1', agent: 'C-resnet_seed-42', name: 'C-resnet_seed-42', protocol: 'paired', policy: { type: 'top_k', k: 1 }, rank: 2, elo: 1600, wins: 3, draws: 1, losses: 0 }
 const v1Model = { ...model, ranked: true, seasons: [seasonEntry], evidence: [{ record: { training_experiment: '/home/jihua/quoridor-data/experiments/cnn-test/01-arm' } }], warnings: [] }
 const unsupported = { ...model, id: 'b'.repeat(64), sha256: 'b'.repeat(64), aliases: ['Unsupported'], analyzable: false, ranked: false, seasons: [], evidence: [] }
+const jobRow = { id: 'job-1', name: 'repro-A', entrypoint: 'train_cnn_experiment', experiment: 'cnn-test', status: 'succeeded', created: 1761900000, registered: [sha], spec: { source: { commit: 'c'.repeat(40) }, resources: { gpu: true } } }
 function mockV1() {
   const calls: string[] = []
   const reply = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
@@ -58,6 +59,10 @@ function mockV1() {
     if (url === '/api/v1/experiments') return reply({ experiments: [{ id: 'cnn-test', modified: 1761900000, arms: ['01-arm'], reports: ['report.md'], has_assessment: true, catalogs: [] }], warnings: [] })
     if (url === '/api/v1/experiments/cnn-test') return reply({ id: 'cnn-test', modified: 1761900000, arms: ['01-arm'], reports: [{ path: 'report.md', size: 8, truncated: false, text: '# Result' }], has_assessment: false, catalogs: [], assessment: null, files: [], models: [{ sha256: sha, aliases: ['C-resnet'], arms: ['01-arm'], architecture: 'cnn', output_semantics: 'policy_logits', ranked: true, seasons: [seasonEntry] }], warnings: [] })
     if (url === '/api/runs') return reply({ runs: [run], count: 1, warnings: [] })
+    if (url === '/api/v1/jobs') return reply({ jobs: [{ ...jobRow, experiment: 'job-only' }], counts: {} })
+    if (url === '/api/v1/jobs?experiment=cnn-test') return reply({ jobs: [jobRow], counts: {} })
+    if (url === '/api/v1/jobs?experiment=job-only') return reply({ jobs: [{ ...jobRow, experiment: 'job-only' }], counts: {} })
+    if (url === '/api/v1/experiments/job-only') return reply({ detail: 'Model or experiment not found' }, 404)
     return reply({ detail: 'not mocked' }, 404)
   })
   return calls
@@ -134,6 +139,20 @@ describe('research shell and URL contracts', () => {
     fireEvent.click(screen.getByRole('tab', { name: /模型 · 1/ }))
     expect(screen.getByRole('heading', { name: '01-arm' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'C-resnet' }).getAttribute('href')).toContain(`/models/${sha}`)
+  })
+  it('lists an experiment\'s platform Jobs and Job-only experiments', async () => {
+    mockV1()
+    mount('/experiments/cnn-test?tab=jobs')
+    expect(await screen.findByRole('link', { name: 'repro-A' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: '为此实验新建任务' }).getAttribute('href')).toBe('/jobs/new?experiment=cnn-test')
+    cleanup()
+    mount('/experiments')
+    expect(await screen.findByRole('link', { name: 'job-only' })).toBeTruthy()
+    expect(screen.getByText('仅平台任务')).toBeTruthy()
+    cleanup()
+    mount('/experiments/job-only')
+    expect(await screen.findByText('此实验只有平台任务，没有外部实验目录')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'repro-A' })).toBeTruthy()
   })
   it('summarizes models, runs and experiments on the overview', async () => {
     mockV1()

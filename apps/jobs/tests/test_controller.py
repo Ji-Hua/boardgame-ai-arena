@@ -124,6 +124,7 @@ class ControllerTests(unittest.TestCase):
         self.controller.tick()
         run = self.root / 'jobs' / 'runs' / job['id']
         (run / 'checkpoints').mkdir()
+        (run / 'metrics.jsonl').write_text('')
         data = b'weights'
         (run / 'checkpoints' / 'ep00010.pt').write_bytes(data)
         sha = hashlib.sha256(data).hexdigest()
@@ -138,6 +139,8 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(catalog['models'][0]['id'], 'smoke_ep00010')
         self.assertEqual(catalog['models'][0]['training_job'], job['id'])
         self.assertEqual(catalog['models'][0]['run_ref'], dict(source='legacy', run_id=job['id']))
+        self.assertIsNone(catalog['models'][0]['experiment'])
+        self.assertEqual([j['id'] for j in self.controller.store.listing(experiment='none-such')], [])
         self.assertEqual((self.root / 'jobs' / job['id'] / 'stdout.log').read_text(), 'log line\n')
         self.assertIn(f'qjob-{job["id"]}', self.docker.removed)
 
@@ -152,6 +155,21 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(metrics['metric_source'], 'experiment/research-metrics.jsonl')
         self.assertEqual(metrics['metrics'], [{'episode': 32, 'totals.learner_wins': 6, 'imitation_ce': 1.38}])
         self.assertEqual(self.controller.detail(job['id'])['diagnoses'][0]['games'], 50)
+
+    def test_research_runs_register_without_a_training_run_ref(self):
+        job = self.submit('evaluate_checkpoints', experiment='exp-1')
+        self.controller.tick()
+        run = self.root / 'jobs' / 'runs' / job['id']
+        (run / 'experiment' / 'checkpoints').mkdir(parents=True)
+        (run / 'experiment' / 'checkpoints' / 'ep1.pt').write_bytes(b'r')
+        sha = hashlib.sha256(b'r').hexdigest()
+        (run / 'manifest.json').write_text(json.dumps(dict(checkpoints=[dict(file='experiment/checkpoints/ep1.pt', sha256=sha)])))
+        self.finish(self.controller.store.get(job['id']))
+        self.controller.tick()
+        entry = json.loads((self.root / 'catalog-jobs.json').read_text())['models'][0]
+        self.assertNotIn('run_ref', entry)
+        self.assertEqual((entry['experiment'], entry['training_job']), ('exp-1', job['id']))
+        self.assertEqual([j['id'] for j in self.controller.store.listing(experiment='exp-1')], [job['id']])
 
     def test_tampered_checkpoint_fails_registration(self):
         job = self.submit()

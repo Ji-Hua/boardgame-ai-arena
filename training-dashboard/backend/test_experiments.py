@@ -45,6 +45,10 @@ class ExperimentTests(unittest.TestCase):
         self.assertEqual(linked['b'*64], ['01-arm'])
         self.assertNotIn('c'*64, linked)
         self.assertNotIn('d'*64, linked)
+        job = self.model('e'*64, experiment='cnn-test-20261031', training_job='job-1', source_path='/elsewhere/x.pt')
+        other = self.model('f'*64, experiment='other', training_job='job-2')
+        linked = {m['sha256']: m['arms'] for m in self.index.detail('cnn-test-20261031', [job, other])['models']}
+        self.assertEqual(linked, {'e'*64: ['job:job-1']})
         self.assertEqual(detail['assessment'], {'winner': 'A'})
         self.assertEqual(detail['reports'][0]['text'], '# Result\nA wins.')
         self.assertIn('holdout', [f['name'] for f in detail['files'] if f['directory']])

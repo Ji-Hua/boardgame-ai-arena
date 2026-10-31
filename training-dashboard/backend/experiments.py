@@ -102,9 +102,10 @@ class Experiments:
                  for p in sorted(path.iterdir())]
         linked = []
         for model in models:
-            arms = sorted({arm for e in model.get('evidence', [])
-                           if isinstance(e.get('record'), dict)
-                           for arm in [self._arm(path, e['record'])] if arm is not None})
+            records = [e['record'] for e in model.get('evidence', []) if isinstance(e.get('record'), dict)]
+            arms = sorted({arm for r in records for arm in [self._arm(path, r)] if arm is not None} |
+                          {'job:' + r['training_job'] for r in records
+                           if r.get('experiment') == path.name and isinstance(r.get('training_job'), str)})
             if arms:
                 linked.append(dict(sha256=model['sha256'], aliases=model.get('aliases', []),
                     arms=arms, architecture=model.get('architecture'),

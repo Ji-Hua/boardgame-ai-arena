@@ -47,8 +47,8 @@ def create_app(controller, token_file=None):
             raise HTTPException(503, str(exc)) from exc
 
     @router.get('')
-    def listing():
-        jobs = controller.store.listing()
+    def listing(experiment: str | None = None):
+        jobs = controller.store.listing(experiment=experiment)
         return dict(jobs=jobs, counts={s: sum(1 for j in jobs if j['status'] == s) for s in
                                        ('queued', 'preparing', 'running', 'succeeded', 'failed', 'cancelled')})
 

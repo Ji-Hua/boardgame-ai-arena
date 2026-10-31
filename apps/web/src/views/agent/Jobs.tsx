@@ -35,7 +35,7 @@ export function JobList(){
 export function JobNew(){
  const [params]=useSearchParams();const navigate=useNavigate();const meta=useV1('/jobs/entrypoints')
  const [entrypoint,setEntrypoint]=useState(params.get('entrypoint')??'train_dqn'),[template,setTemplate]=useState(''),[config,setConfig]=useState('')
- const [name,setName]=useState(''),[experiment,setExperiment]=useState(''),[resources,setResources]=useState<Record<string,string>>({}),[source,setSource]=useState('')
+ const [name,setName]=useState(''),[experiment,setExperiment]=useState(params.get('experiment')??''),[resources,setResources]=useState<Record<string,string>>({}),[source,setSource]=useState('')
  const [token,setToken]=useState(readToken),[error,setError]=useState(''),[busy,setBusy]=useState(false)
  const entry=meta.data?.entrypoints?.[entrypoint]
  useEffect(()=>{if(!entry)return;setTemplate('');if(entry.format==='json'){const value={...entry.template};if(params.get('sha'))value.checkpoints=[params.get('sha')];setConfig(JSON.stringify(value,null,2))}else setConfig('')},[entrypoint,meta.data])
