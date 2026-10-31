@@ -261,7 +261,7 @@ jobs/<id>/
 | **P2 Jobs MVP**（2026-10-31 完成，部署包待执行；UI 以轮询代替 SSE） | `apps/jobs` controller + worker；GPU 训练镜像；`train_dqn` 与 `evaluate_checkpoints` 两个 entrypoint；提交表单、队列、SSE 日志与实时曲线、取消 | 从 UI 提交一个冒烟训练 Job，在 GPU 上跑完，checkpoint 出现在模型页；取消与 controller 重启对账各验证一次 |
 | **P3 研究闭环**（2026-10-31 完成：CNN 实验任务、门槛评测批次、诊断任务与模型诊断历史、失败样本挖掘、历史 arm 复现；探针集仍随诊断代码版本化） | 其余 entrypoint；后处理链（注册 → 诊断 → 门槛赛季）；实验页；探针集版本化；失败样本挖掘 | 复现一个历史实验的一个 arm（如 PPO reward-shaping A），结果与历史记录在协议允许的误差内一致 |
 | **P4 服务收敛**（2026-10-31 代码完成：gameplay 服务、`/api/v1` 统一、网关去掉 Classic；部署包与下线/回滚脚本已在两台机器自测，待用户执行） | API 统一到 `/api/v1`；拆出 gameplay 服务；Runtime/Lab 各一份；对局持久化；旧入口改为重定向；按顺序下线旧服务 | 每下线一个服务都有前后健康检查与回滚演练记录 |
-| **P5 迁移到 Dev**（2026-10-31 代码与切换包完成：Dev 入口 + gameplay，Training API 监听 8792，证据镜像每 10 分钟同步；跨机延迟、故障与切换/回滚演练已在测试端口通过，待用户执行） | 网关与 gameplay 迁到 Dev；Training 只保留计算与证据 | 跨机延迟与故障演练；回滚到 Training 单机形态可用 |
+| **P5 迁移到 Dev**（2026-10-31 已上线；旧服务已下线。代码与切换包：Dev 入口 + gameplay，Training API 监听 8792，证据镜像每 10 分钟同步；跨机延迟、故障与切换/回滚演练已在测试端口通过，待用户执行） | 网关与 gameplay 迁到 Dev；Training 只保留计算与证据 | 跨机延迟与故障演练；回滚到 Training 单机形态可用 |
 
 ## 12. 待决问题
 
