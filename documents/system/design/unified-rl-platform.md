@@ -256,8 +256,8 @@ jobs/<id>/
 
 | 阶段 | 内容 | 验收条件 |
 |---|---|---|
-| **P0 基线与整理** | 新分支 `feature/unified-rl-platform`；本设计文档；统一模型索引的只读实现（合并现有 catalog，不改原文件）；拆分 `AgentWorkspace.tsx`（目前 215 行高密度 JSX）为模块，不改变行为 | 现有 8790 的 React 测试与 3 个浏览器测试全部通过；模型索引条目数与各 catalog 去重后数量一致 |
-| **P1 单入口外壳** | 8 个一级导航；把 RunList/Compare/Metrics、ModelsView、LabView 迁入新外壳；删除 LegacyApp；新增总览页 | 8741 上的每一项功能在 8790 都有对应入口（用功能清单逐项对照）；移动端 390px 可用 |
+| **P0 基线与整理**（2026-10-31 完成） | 新分支 `feature/unified-rl-platform`；本设计文档；统一模型索引的只读实现（合并现有 catalog，不改原文件）；拆分 `AgentWorkspace.tsx`（目前 215 行高密度 JSX）为模块，不改变行为 | 现有 8790 的 React 测试与 3 个浏览器测试全部通过；模型索引条目数与各 catalog 去重后数量一致 |
+| **P1 单入口外壳**（2026-10-31 完成；"任务"导航随 P2 加入） | 8 个一级导航；把 RunList/Compare/Metrics、ModelsView、LabView 迁入新外壳；删除 LegacyApp；新增总览页 | 8741 上的每一项功能在 8790 都有对应入口（用功能清单逐项对照）；移动端 390px 可用 |
 | **P2 Jobs MVP** | `apps/jobs` controller + worker；GPU 训练镜像；`train_dqn` 与 `evaluate_checkpoints` 两个 entrypoint；提交表单、队列、SSE 日志与实时曲线、取消 | 从 UI 提交一个冒烟训练 Job，在 GPU 上跑完，checkpoint 出现在模型页；取消与 controller 重启对账各验证一次 |
 | **P3 研究闭环** | 其余 entrypoint；后处理链（注册 → 诊断 → 门槛赛季）；实验页；探针集版本化；失败样本挖掘 | 复现一个历史实验的一个 arm（如 PPO reward-shaping A），结果与历史记录在协议允许的误差内一致 |
 | **P4 服务收敛** | API 统一到 `/api/v1`；拆出 gameplay 服务；Runtime/Lab 各一份；对局持久化；旧入口改为重定向；按顺序下线旧服务 | 每下线一个服务都有前后健康检查与回滚演练记录 |
