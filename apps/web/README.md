@@ -9,13 +9,13 @@ dependency authority.
 
 | Section | Routes | Data |
 |---|---|---|
-| 总览 | `/` | `/api/v1/models` summary, latest season, `/api/runs`, `/api/v1/experiments` |
+| 总览 | `/` | `/api/v1/models` summary, latest season, `/api/v1/research/runs`, `/api/v1/experiments` |
 | 实验 | `/experiments`, `/experiments/:id` | `/api/v1/experiments` (reports, assessment, files, models by exact arm) |
-| 训练 | `/training`, `/training/runs/:runId`, `/replays/:runId` | `/api/runs*`; the run page keeps benchmarks, diagnosis and evaluation replays |
-| 天梯 | `/ladder`, `/agents/:id`, `/games/:id`, `/arena` | `/api/agents/seasons*`, `/api/arena/*` |
+| 训练 | `/training`, `/training/runs/:runId`, `/replays/:runId` | `/api/v1/research/runs*`; the run page keeps benchmarks, diagnosis and evaluation replays |
+| 天梯 | `/ladder`, `/agents/:id`, `/games/:id`, `/arena` | `/api/v1/seasons*`, `/api/v1/research/arena/*` |
 | 模型 | `/models`, `/models/:sha`, `/checkpoints/:sha` | `/api/v1/models*`; checkpoint page lists exact-SHA season matches and replays |
-| 实验室 | `/lab` | `/api/platform/context`, `/research-lab/api/*` |
-| 对战 | `/play` | `/api/agents/play*` (capability-token sessions, in memory) |
+| 实验室 | `/lab` | `/api/v1/research/context`, `/api/v1/lab/*` |
+| 对战 | `/play` | `/api/v1/play*` (gameplay service: durable games, player and watch tokens, published finished games) |
 
 Only Ladder, Agent, Game and Play wait for the selected season roster. The shell lives in
 `src/views/AgentWorkspace.tsx`; pages are in `src/views/agent/`. Shared board rendering is in
