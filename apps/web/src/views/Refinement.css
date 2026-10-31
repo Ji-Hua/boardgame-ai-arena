@@ -2,7 +2,7 @@
 .agent-workspace .aw-main{margin:0 auto}
 .aw-workbench{grid-template-columns:minmax(300px,460px) minmax(0,1fr);align-items:start;gap:18px}
 .aw-board-column{position:sticky;top:12px}
-.aw-board-column>svg{margin:8px auto;width:min(100%,clamp(260px,calc(100dvh - 410px),430px))}
+.aw-board-column>svg{margin:8px auto;width:min(100%,clamp(260px,calc(100dvh - 446px),430px))}
 .aw-participant{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);position:relative;min-width:0}
 .aw-participant-name{flex:1;min-width:0}.aw-participant-name strong{display:block;overflow-wrap:anywhere}.aw-participant-name small{display:block;color:var(--text-muted);font-size:11px;margin-top:3px}
 .aw-seat-dot{color:white;padding:5px;border-radius:5px;font-size:12px;font-weight:600}.aw-p1 .aw-seat-dot{background:#4CAF50}.aw-p2 .aw-seat-dot{background:#2196F3}
