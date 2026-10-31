@@ -23,7 +23,7 @@
 .pf-reasons{display:grid;grid-template-columns:1fr!important;gap:10px}
 .pf-reasons dt{font-weight:600;color:var(--text)!important}
 .pf-reasons dd{color:var(--text-muted);font-size:12px}
-@media(max-width:760px){.pf-overview{grid-template-columns:minmax(0,1fr)}.agent-workspace .aw-header nav{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto}.agent-workspace .aw-header nav a{flex:none}}
+@media(max-width:760px){.pf-overview{grid-template-columns:minmax(0,1fr)}.agent-workspace .aw-header nav{order:3;width:100%;min-width:0;max-width:100%;flex-wrap:nowrap;overflow-x:auto}.agent-workspace .aw-header nav a{flex:none}}
 .pf-job-status{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--border);white-space:nowrap}
 .pf-job-status.running,.pf-job-status.preparing{color:var(--accent);background:var(--accent-bg)}
 .pf-job-status.succeeded{color:var(--good);background:var(--good-bg)}
@@ -35,3 +35,6 @@
 .pf-form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
 .pf-log{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5;max-height:65vh;overflow:auto;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px}
 .pf-form .pf-check{flex-direction:row;align-items:center;gap:8px;color:var(--text)}
+/* Long option text (e.g. gate season labels) must not widen toolbars beyond the viewport. */
+.agent-workspace .aw-toolbar label{min-width:0;max-width:100%}
+.agent-workspace .aw-toolbar select{min-width:0;max-width:100%;text-overflow:ellipsis}
