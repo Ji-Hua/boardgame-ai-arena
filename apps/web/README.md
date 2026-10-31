@@ -1,18 +1,30 @@
-# Agent workspace
+# Quoridor platform web
 
-Current preview navigation is Ladder and Play. Agent detail contains pair records and exact-SHA training runs; replay embeds per-ply analysis. Global training records remain at /training. See [preview release](../../docs/AGENT_LADDER_PREVIEW_20261025.md).
+The single React application for the unified RL training, diagnosis and play platform
+([design](../../documents/system/design/unified-rl-platform.md)). Run `npm ci`, `npm run typecheck`,
+`npm run test:ui` and `npm run build` from the repository root; the root `package-lock.json` is the
+dependency authority.
 
-# Earlier unified web baseline
-This is the single active React application. Run npm ci, npm run typecheck,
-npm run test:ui and npm run build from the repository root. Root package-lock.json
-is the workspace dependency authority; the migrated nested lock is historical.
-Routes: Play (exact checkpoint and classic modes), Training, Arena, Replay,
-Decision Lab and Models. Lab is native React; no iframe or external site is
-required. Standalone old Lab remains available for recovery.
-Shared board rendering and projection code lives in packages/board-ui. Classic
-controllers/pages remain in frontend/src and are imported into this same bundle;
-compatibility exports prevent a second implementation. Future relocation can
-move those source files without changing behavior.
-The gateway routes classic HTTP/WebSocket to the preserved Gameplay service;
-research Play uses its separate capability-protected service. Lab snapshot
-navigation never pauses, rewinds or mutates a running game.
+## Navigation
+
+| Section | Routes | Data |
+|---|---|---|
+| 总览 | `/` | `/api/v1/models` summary, latest season, `/api/runs`, `/api/v1/experiments` |
+| 实验 | `/experiments`, `/experiments/:id` | `/api/v1/experiments` (reports, assessment, files, models by exact arm) |
+| 训练 | `/training`, `/training/runs/:runId`, `/replays/:runId` | `/api/runs*`; the run page keeps benchmarks, diagnosis and evaluation replays |
+| 天梯 | `/ladder`, `/agents/:id`, `/games/:id`, `/arena` | `/api/agents/seasons*`, `/api/arena/*` |
+| 模型 | `/models`, `/models/:sha`, `/checkpoints/:sha` | `/api/v1/models*`; checkpoint page lists exact-SHA season matches and replays |
+| 实验室 | `/lab` | `/api/platform/context`, `/research-lab/api/*` |
+| 对战 | `/play` | `/api/agents/play*` (capability-token sessions, in memory) |
+
+Only Ladder, Agent, Game and Play wait for the selected season roster. The shell lives in
+`src/views/AgentWorkspace.tsx`; pages are in `src/views/agent/`. Shared board rendering is in
+`packages/board-ui`. Classic WebSocket play and the external research Play were removed from this
+build on 2026-10-31; the released 8741/8765 entries still serve them from their own branches.
+
+## Verification
+
+Unit tests use mocked APIs. Browser tests run against an isolated loopback stack, never the live
+preview: `scripts/verify_stack.sh start`, then in `apps/web`
+`E2E_BASE_URL=http://127.0.0.1:18795 E2E_RESULTS_DIR=<external dir> npx playwright test --config tests/e2e/playwright.config.mjs`,
+then `scripts/verify_stack.sh stop`.

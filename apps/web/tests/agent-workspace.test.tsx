@@ -1,6 +1,6 @@
 import React from 'react'
 import {afterEach,expect,it,vi} from 'vitest'
-import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react'
+import {cleanup,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import {MemoryRouter} from 'react-router-dom'
 import AgentWorkspace,{StepAnalysis} from '../src/views/AgentWorkspace'
 import * as lab from '../src/lab'
@@ -11,7 +11,7 @@ it('keeps Ladder and Play independent and uses reported ratings only',async()=>{
  render(<MemoryRouter initialEntries={['/ladder?season=s']}><AgentWorkspace/></MemoryRouter>)
  expect(await screen.findByRole('heading',{name:'天梯榜'})).toBeTruthy()
  expect(screen.getByText('1500')).toBeTruthy()
- fireEvent.click(screen.getByRole('navigation').querySelectorAll('a')[1])
+ fireEvent.click(within(screen.getByRole('navigation',{name:'主要入口'})).getByRole('link',{name:'对战'}))
  expect(await screen.findByRole('heading',{name:'对战'})).toBeTruthy()
  expect(screen.getByLabelText('P1 对战方')).toBeTruthy()
  expect(screen.getByLabelText('P2 对战方')).toBeTruthy()

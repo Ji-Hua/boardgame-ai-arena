@@ -1,12 +1,20 @@
-import {useEffect, useState} from 'react'
-import {Link, Navigate, Route, Routes, useLocation, useSearchParams} from 'react-router-dom'
-import {Grid3X3, Trophy, Swords, Sun, Moon} from 'lucide-react'
+import {useEffect, useState, type ReactNode} from 'react'
+import {Link, Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams} from 'react-router-dom'
+import {Grid3X3, LayoutDashboard, FlaskConical, Activity, Trophy, Boxes, Microscope, Swords, Sun, Moon} from 'lucide-react'
 import '../App.css'
 import './AgentWorkspace.css'
 import './Refinement.css'
 import './Polish.css'
+import './Platform.css'
 import {TrainingWorkspace} from './TrainingWorkspace'
-import {useData, enc, route, ErrorBox} from './agent/shared'
+import {RunDetailView} from './RunDetailView'
+import {ReplaysView} from './ReplaysView'
+import {ArenaView} from './ArenaView'
+import {LabView} from './LabView'
+import {type Obj, useData, enc, route, ErrorBox} from './agent/shared'
+import {Overview} from './agent/Overview'
+import {ExperimentList, ExperimentDetail} from './agent/Experiments'
+import {ModelList, ModelDetail} from './agent/Models'
 import {Ladder} from './agent/Ladder'
 import {AgentDetail} from './agent/AgentDetail'
 import {CheckpointPage} from './agent/CheckpointPage'
@@ -15,17 +23,52 @@ import {Play} from './agent/Play'
 export {evidence, route, Participant} from './agent/shared'
 export {StepAnalysis} from './agent/StepAnalysis'
 
+const NAV:[string,string,typeof Trophy,(path:string)=>boolean][]=[
+ ['/','总览',LayoutDashboard,p=>p==='/'],
+ ['/experiments','实验',FlaskConical,p=>p.startsWith('/experiments')],
+ ['/training','训练',Activity,p=>p.startsWith('/training')||p.startsWith('/replays')],
+ ['/ladder','天梯',Trophy,p=>['/ladder','/agents','/games','/arena'].some(x=>p.startsWith(x))],
+ ['/models','模型',Boxes,p=>p.startsWith('/models')||p.startsWith('/checkpoints')],
+ ['/lab','实验室',Microscope,p=>p.startsWith('/lab')],
+ ['/play','对战',Swords,p=>p.startsWith('/play')],
+]
+
+function RunPage(){const {runId=''}=useParams();const navigate=useNavigate();return <RunDetailView key={runId} runId={runId} onBack={()=>navigate('/training')}/>}
+
 export default function AgentWorkspace(){
  const [params]=useSearchParams();const seasons=useData('/seasons');const season=params.get('season')??seasons.data?.seasons?.[0]?.id??''
  const roster=useData(season?'/seasons/'+enc(season):null)
  const location=useLocation()
  const [theme,setTheme]=useState(()=>localStorage.getItem('quoridor-workbench-theme')==='light'?'light':'dark')
  useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('quoridor-workbench-theme',theme)},[theme])
- return <div className="app agent-workspace"><header className="aw-header"><Link to={route('/ladder',season)} className="aw-brand"><Grid3X3 aria-hidden="true"/>Quoridor</Link><nav aria-label="主要入口"><Link to={route('/ladder',season)} aria-current={location.pathname!=='/play'?'page':undefined}><Trophy aria-hidden="true"/>天梯</Link><Link to={route('/play',season)} aria-current={location.pathname==='/play'?'page':undefined}><Swords aria-hidden="true"/>对战</Link></nav><span className="aw-preview">独立预览</span><button className="aw-theme-toggle" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}>{theme==='light'?<Moon aria-hidden="true"/>:<Sun aria-hidden="true"/>}{theme==='light'?'深色':'浅色'}</button></header><main className="aw-main">
- <ErrorBox text={seasons.error||roster.error} retry={seasons.error?seasons.retry:roster.retry}/>
- {!seasons.data&&!seasons.error&&<p role="status">加载评测批次…</p>}
- {seasons.data?.seasons?.length===0&&<p>暂无已完成的天梯报告</p>}
- {season&&!roster.data&&!roster.error&&<p role="status">加载 Agent…</p>}
- {roster.data&&<Routes><Route path="/" element={<Navigate replace to={route('/ladder',season)}/>}/><Route path="/ladder" element={<Ladder season={season} roster={roster.data} seasons={seasons.data?.seasons??[]}/>}/><Route path="/agents/:agentId" element={<AgentDetail season={season} roster={roster.data}/>}/><Route path="/games/:gameId" element={<Replay season={season} roster={roster.data}/>}/><Route path="/play" element={<Play season={season} roster={roster.data}/>}/><Route path="/checkpoints/:sha" element={<CheckpointPage season={season}/>}/><Route path="/training" element={<TrainingWorkspace season={season}/>}/><Route path="*" element={<Navigate replace to={route('/ladder',season)}/>}/></Routes>}
+ const target=(path:string)=>season&&(path==='/ladder'||path==='/play')?route(path,season):path
+ // Ladder, Agent, Game and Play pages need the selected season's roster; other workspaces do not wait for it.
+ const rostered=(render:(roster:Obj)=>ReactNode)=><>
+  <ErrorBox text={seasons.error||roster.error} retry={seasons.error?seasons.retry:roster.retry}/>
+  {!seasons.data&&!seasons.error&&<p role="status">加载评测批次…</p>}
+  {seasons.data?.seasons?.length===0&&<p>暂无已完成的天梯报告</p>}
+  {season&&!roster.data&&!roster.error&&<p role="status">加载 Agent…</p>}
+  {roster.data&&render(roster.data)}</>
+ return <div className="app agent-workspace"><header className="aw-header"><Link to="/" className="aw-brand"><Grid3X3 aria-hidden="true"/>Quoridor</Link><nav aria-label="主要入口">{NAV.map(([path,label,Icon,active])=><Link key={path} to={target(path)} aria-current={active(location.pathname)?'page':undefined}><Icon aria-hidden="true"/>{label}</Link>)}</nav><span className="aw-preview">独立预览</span><button className="aw-theme-toggle" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}>{theme==='light'?<Moon aria-hidden="true"/>:<Sun aria-hidden="true"/>}{theme==='light'?'深色':'浅色'}</button></header><main className="aw-main">
+ <Routes>
+  <Route path="/" element={<Overview season={season} roster={roster.data}/>}/>
+  <Route path="/experiments" element={<ExperimentList/>}/>
+  <Route path="/experiments/:slug" element={<ExperimentDetail season={season}/>}/>
+  <Route path="/training" element={<TrainingWorkspace season={season}/>}/>
+  <Route path="/training/runs/:runId" element={<RunPage/>}/>
+  <Route path="/training/compare" element={<Navigate replace to="/training"/>}/>
+  <Route path="/replays" element={<ReplaysView/>}/>
+  <Route path="/replays/:runId" element={<ReplaysView/>}/>
+  <Route path="/arena" element={<ArenaView/>}/>
+  <Route path="/models" element={<ModelList season={season}/>}/>
+  <Route path="/models/:sha" element={<ModelDetail season={season}/>}/>
+  <Route path="/checkpoints/:sha" element={<CheckpointPage season={season}/>}/>
+  <Route path="/lab" element={<LabView/>}/>
+  <Route path="/ladder" element={rostered(r=><Ladder season={season} roster={r} seasons={seasons.data?.seasons??[]}/>)}/>
+  <Route path="/agents/:agentId" element={rostered(r=><AgentDetail season={season} roster={r}/>)}/>
+  <Route path="/games/:gameId" element={rostered(r=><Replay season={season} roster={r}/>)}/>
+  <Route path="/play" element={rostered(r=><Play season={season} roster={r}/>)}/>
+  <Route path="*" element={<Navigate replace to="/"/>}/>
+ </Routes>
  </main></div>
 }

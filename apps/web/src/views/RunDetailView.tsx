@@ -139,7 +139,7 @@ export function RunDetailView({ runId, onBack }: Props) {
         </div>
       </div>
       <div className="muted mono">{runId}</div>
-      <div className="action-bar"><Link to={arenaRoute(runId)}>Run Arena evaluations →</Link><Link to={replayRoute(runId)}>Recorded evaluations & replays →</Link><Link to={`/training/compare?${new URLSearchParams({ run: runId })}`}>Compare this run</Link></div>
+      <div className="action-bar"><Link to={arenaRoute(runId)}>Run Arena evaluations →</Link><Link to={replayRoute(runId)}>Recorded evaluations & replays →</Link><Link to={`/training?${new URLSearchParams({ run: runId })}`}>Compare this run</Link></div>
       {(detail.warnings ?? []).map((w, i) => <div className="warning" key={i}>{w}</div>)}
 
       {/* Tab bar */}
@@ -242,7 +242,7 @@ export function RunDetailView({ runId, onBack }: Props) {
                       <td>{ck.episode ?? '—'}</td>
                       <td>{ck.step ?? '—'}</td>
                       <td>{ck.progress_type ?? 'Unspecified'}</td>
-                      <td><div className="mono sha">{ck.sha256 ? <Link to={`/models/${ck.sha256}`}>{ck.sha256}</Link> : 'SHA unavailable'}</div><div>{ck.model_type ?? 'Model type unavailable'}</div><div className="mono">{ck.artifact_ref ?? ck.path ?? 'Artifact reference unavailable'}</div><div className="action-bar"><Link to={arenaRoute(runId, ck.sha256, ck.filename)}>Arena evaluations</Link><Link to={replayRoute(runId, { checkpoint_sha: ck.sha256, checkpoint: ck.sha256 ? undefined : ck.filename })}>Checkpoint evaluations & replays</Link>{ck.sha256 && <Link to={`/play?${new URLSearchParams({ model_sha: ck.sha256, run_id: runId })}`}>Play against</Link>}</div></td>
+                      <td><div className="mono sha">{ck.sha256 ? <Link to={`/models/${ck.sha256}`}>{ck.sha256}</Link> : 'SHA unavailable'}</div><div>{ck.model_type ?? 'Model type unavailable'}</div><div className="mono">{ck.artifact_ref ?? ck.path ?? 'Artifact reference unavailable'}</div><div className="action-bar"><Link to={arenaRoute(runId, ck.sha256, ck.filename)}>Arena evaluations</Link><Link to={replayRoute(runId, { checkpoint_sha: ck.sha256, checkpoint: ck.sha256 ? undefined : ck.filename })}>Checkpoint evaluations & replays</Link>{ck.sha256 && <Link to={`/checkpoints/${ck.sha256}`}>Ladder matches & play</Link>}</div></td>
                       <td>
                         {ck.has_benchmark
                           ? <span style={{ color: 'var(--good)' }}>✓</span>

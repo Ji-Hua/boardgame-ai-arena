@@ -1,17 +1,24 @@
 import {useEffect, useState} from 'react'
 
 export type Obj = Record<string, any>
-export async function evidence(path:string, options:RequestInit={}) {
-  const response=await fetch('/api/agents'+path,options)
+export async function request(url:string, options:RequestInit={}) {
+  const response=await fetch(url,options)
   const data=await response.json()
   if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:JSON.stringify(data.detail??data))
   return data
 }
-export function useData(path:string|null){
+export function evidence(path:string, options:RequestInit={}) {return request('/api/agents'+path,options)}
+function useRequest(url:string|null){
  const [data,setData]=useState<Obj|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0)
- useEffect(()=>{setData(null);setError('');if(!path)return;const c=new AbortController();evidence(path,{signal:c.signal}).then(d=>{if(!c.signal.aborted)setData(d)}).catch(e=>{if(!c.signal.aborted)setError(String(e))});return()=>c.abort()},[path,retry])
+ useEffect(()=>{setData(null);setError('');if(!url)return;const c=new AbortController();request(url,{signal:c.signal}).then(d=>{if(!c.signal.aborted)setData(d)}).catch(e=>{if(!c.signal.aborted)setError(String(e))});return()=>c.abort()},[url,retry])
  return {data,error,retry:()=>setRetry(v=>v+1)}
 }
+export const useData=(path:string|null)=>useRequest(path?'/api/agents'+path:null)
+export const useV1=(path:string|null)=>useRequest(path?'/api/v1'+path:null)
+export const useRuns=()=>useRequest('/api/runs')
+export const when=(seconds?:number|null)=>typeof seconds==='number'?new Date(seconds*1000).toLocaleString('zh-CN',{hour12:false}):'—'
+export const STATES:[string,string][]=[['analyzable','可分析'],['playable','可对战'],['research_playable','研究对战'],['ranked','已上天梯'],['deployed','已上线']]
+export function States({model}:{model:Obj}){return <span className="pf-states">{STATES.map(([k,label])=><span key={k} className={'pf-state '+(model[k]?'on':'off')} title={(model.reasons?.[k]??[]).join(' · ')}>{label}</span>)}</span>}
 export const enc=encodeURIComponent
 export const kind=(a:Obj)=>({neural:'神经网络',heuristic:'启发式',random:'随机',human:'玩家'}[a.kind as string]??a.kind)
 export const fmt=(x:any,n=2)=>typeof x==='number'?x.toFixed(n):'—'

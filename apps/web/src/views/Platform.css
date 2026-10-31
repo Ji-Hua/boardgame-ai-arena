@@ -1,0 +1,26 @@
+.agent-workspace .aw-header nav{flex-wrap:wrap}
+.pf-overview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.pf-overview .aw-toolbar{justify-content:space-between}
+.pf-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.pf-stats a{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;color:var(--text-muted);text-decoration:none;font-size:12px}
+.pf-stats b{font-size:22px;color:var(--text);font-variant-numeric:tabular-nums}
+.pf-list{list-style:none;margin:0;padding:0}
+.pf-list li{padding:8px 0;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.pf-list li:last-child{border:0}
+.pf-list small{display:block;color:var(--text-muted);font-size:11px;margin-top:3px}
+.pf-quick{margin-top:18px}
+.pf-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.pf-chips button{background:transparent;border:1px solid var(--border);border-radius:999px;padding:5px 12px}
+.pf-chips button[aria-pressed=true]{color:var(--accent);background:var(--accent-bg)}
+.pf-chips b{margin-left:4px;font-variant-numeric:tabular-nums}
+.pf-states{display:inline-flex;flex-wrap:wrap;gap:4px}
+.pf-state{font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid var(--border)}
+.pf-state.on{color:var(--good);background:var(--good-bg)}
+.pf-state.off{color:var(--text-muted);opacity:.55;text-decoration:line-through}
+.pf-tab-body{min-width:0}
+.pf-report{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.6;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:75vh;overflow:auto}
+.pf-arm{margin-bottom:18px}
+.pf-reasons{display:grid;grid-template-columns:1fr!important;gap:10px}
+.pf-reasons dt{font-weight:600;color:var(--text)!important}
+.pf-reasons dd{color:var(--text-muted);font-size:12px}
+@media(max-width:760px){.pf-overview{grid-template-columns:minmax(0,1fr)}.agent-workspace .aw-header nav{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto}.agent-workspace .aw-header nav a{flex:none}}

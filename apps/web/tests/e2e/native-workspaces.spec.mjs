@@ -1,6 +1,5 @@
 import {test,expect} from '@playwright/test'
-const SHA='0faaae51ded5b88ed5e0b3d8774a6e5de954bf30a5ec72e4d8007afe344a15fc'
-test('Lab editor, native diagnostics, mobile layout and classic configuration',async({page},info)=>{
+test('Lab editor, native diagnostics and mobile layout',async({page},info)=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message))
  await page.goto('/lab')
  await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toBeEnabled()
@@ -14,37 +13,5 @@ test('Lab editor, native diagnostics, mobile layout and classic configuration',a
  await page.setViewportSize({width:390,height:844})
  await page.screenshot({path:info.outputPath('native-lab-mobile.png'),fullPage:true})
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)
- await page.goto('/play/classic')
- await expect(page.getByRole('heading',{name:'Classic Play',exact:true})).toBeVisible()
- await page.screenshot({path:info.outputPath('classic-setup.png'),fullPage:true})
  expect(errors).toEqual([])
-})
-test('Play snapshot enters native Lab without changing the live game identity',async({page},info)=>{
- await page.addInitScript(()=>Object.defineProperty(window.crypto,'randomUUID',{value:undefined,configurable:true}))
- await page.goto('/play?model_sha='+SHA)
- await expect(page.getByRole('button',{name:'Start game',exact:true})).toBeEnabled()
- await page.getByRole('button',{name:'Start game',exact:true}).click()
- await expect(page.getByTestId('actual-sha')).toHaveText(SHA)
- const before=JSON.parse(await page.getByTestId('game-evidence').textContent())
- await page.getByRole('button',{name:'Analyze snapshot (game continues)'}).click()
- await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toBeEnabled()
- await expect(page.getByText('Frozen snapshot only. The live game is not paused.')).toBeVisible()
- await page.getByRole('link',{name:/Return to source/}).click()
- await expect(page.getByTestId('actual-sha')).toHaveText(SHA)
- const after=JSON.parse(await page.getByTestId('game-evidence').textContent())
- expect(after.game_id).toBe(before.game_id);expect(after.identity.sha256).toBe(SHA)
- page.on('dialog',d=>d.accept())
- await page.getByRole('button',{name:'Close game',exact:true}).click()
-})
-
-test('Classic mode preserves same-origin HTTP, WebSocket and default replay resource',async({page,request},info)=>{
- const resource=await request.get('/replays/full_game_replay.json');expect(resource.ok()).toBe(true);expect((await resource.json()).steps.length).toBeGreaterThan(0)
- const sockets=[];page.on('websocket',ws=>sockets.push(ws.url()))
- await page.goto('/play/classic')
- await page.getByRole('button',{name:'Start Game',exact:true}).click()
- await expect(page.locator('svg.board-container')).toBeVisible()
- await expect.poll(()=>sockets.length).toBeGreaterThan(0)
- expect(new URL(sockets[0]).host).toBe(new URL(page.url()).host)
- await page.screenshot({path:info.outputPath('classic-live.png'),fullPage:true})
- await page.getByRole('navigation').getByRole('link',{name:'Training',exact:true}).click()
 })

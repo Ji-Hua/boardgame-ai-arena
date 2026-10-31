@@ -2,7 +2,7 @@ import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
-import App from '../src/LegacyApp'
+import App from '../src/views/AgentWorkspace'
 import { api } from '../src/api'
 import * as lab from '../src/lab'
 import type { PlatformModel } from '../src/platform'
@@ -45,37 +45,46 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
+const seasonEntry = { season: 's1', agent: 'C-resnet_seed-42', name: 'C-resnet_seed-42', protocol: 'paired', policy: { type: 'top_k', k: 1 }, rank: 2, elo: 1600, wins: 3, draws: 1, losses: 0 }
+const v1Model = { ...model, ranked: true, seasons: [seasonEntry], evidence: [{ record: { training_experiment: '/home/jihua/quoridor-data/experiments/cnn-test/01-arm' } }], warnings: [] }
+const unsupported = { ...model, id: 'b'.repeat(64), sha256: 'b'.repeat(64), aliases: ['Unsupported'], analyzable: false, ranked: false, seasons: [], evidence: [] }
+function mockV1() {
+  const calls: string[] = []
+  const reply = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input); calls.push(url)
+    if (url === '/api/v1/models') return reply({ models: [v1Model, unsupported], count: 2, sources: [], warnings: [], summary: { total: 2, available: 2, sha_verified: 0, analyzable: 1, playable: 0, research_playable: 0, ranked: 1, deployed: 0 } })
+    if (url === `/api/v1/models/${sha}`) return reply(v1Model)
+    if (url === '/api/v1/experiments') return reply({ experiments: [{ id: 'cnn-test', modified: 1761900000, arms: ['01-arm'], reports: ['report.md'], has_assessment: true, catalogs: [] }], warnings: [] })
+    if (url === '/api/v1/experiments/cnn-test') return reply({ id: 'cnn-test', modified: 1761900000, arms: ['01-arm'], reports: [{ path: 'report.md', size: 8, truncated: false, text: '# Result' }], has_assessment: false, catalogs: [], assessment: null, files: [], models: [{ sha256: sha, aliases: ['C-resnet'], arms: ['01-arm'], architecture: 'cnn', output_semantics: 'policy_logits', ranked: true, seasons: [seasonEntry] }], warnings: [] })
+    if (url === '/api/runs') return reply({ runs: [run], count: 1, warnings: [] })
+    return reply({ detail: 'not mocked' }, 404)
+  })
+  return calls
+}
+
 describe('research shell and URL contracts', () => {
-  it('shows Training runs while the optional summary is still pending', async () => {
-    vi.mocked(api.summary).mockImplementation(() => new Promise(() => {}))
+  it('lists Training runs as a top-level workspace without waiting for the ladder', async () => {
     mount('/training')
-    expect(await screen.findByRole('table')).toBeTruthy()
-    expect(screen.queryByText('Loading runs…')).toBeNull()
+    expect(await screen.findByRole('checkbox', { name: '选择 C-resnet training' })).toBeTruthy()
+    expect(screen.queryByText('加载 Agent…')).toBeNull()
   })
-  it('keeps Training runs visible when the optional summary fails', async () => {
-    vi.mocked(api.summary).mockRejectedValue(new Error('Summary offline'))
-    mount('/training')
-    expect(await screen.findByRole('table')).toBeTruthy()
-    expect(await screen.findByText(/Run summary unavailable:.*Summary offline/)).toBeTruthy()
-  })
-  it('offers all six navigation sections and persists accessible theme toggles', async () => {
-    mount('/play')
-    const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    for (const name of ['Play', 'Training', 'Arena', 'Replay', 'Lab', 'Models']) expect(within(nav).getByRole('link', { name: new RegExp(name) })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Switch to dark theme' }))
-    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'))
-    expect(localStorage.getItem('quoridor-theme')).toBe('dark')
+  it('offers the seven unified navigation sections and persists the theme', async () => {
+    mount('/lab')
+    const nav = screen.getByRole('navigation', { name: '主要入口' })
+    expect(within(nav).getAllByRole('link').map(link => link.textContent)).toEqual(['总览', '实验', '训练', '天梯', '模型', '实验室', '对战'])
+    expect(within(nav).getByRole('link', { name: '实验室' }).getAttribute('aria-current')).toBe('page')
+    fireEvent.click(screen.getByRole('button', { name: '浅色' }))
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'))
+    expect(localStorage.getItem('quoridor-workbench-theme')).toBe('light')
     expect(screen.queryByRole('iframe')).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Human vs Checkpoint' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Start game' }).hasAttribute('disabled')).toBe(true)
   })
   it('restores Run tabs after reload and browser back; preserves checkpoint full SHA links', async () => {
     const route = `/training/runs/${encodeURIComponent(runId)}?tab=checkpoints`
     const view = mount(route)
     const link = await screen.findByRole('link', { name: sha })
     expect(link.getAttribute('href')).toBe(`/models/${sha}`)
-    const playLink = screen.getByRole('link', { name: 'Play against' })
-    expect(new URL(playLink.getAttribute('href')!, 'http://localhost').searchParams.get('model_sha')).toBe(sha)
+    expect(screen.getByRole('link', { name: 'Ladder matches & play' }).getAttribute('href')).toBe(`/checkpoints/${sha}`)
     const arenaLink = within(screen.getByRole('table')).getByRole('link', { name: 'Arena evaluations' })
     const arenaUrl = new URL(arenaLink.getAttribute('href')!, 'http://localhost')
     expect(arenaUrl.pathname).toBe('/arena')
@@ -89,31 +98,50 @@ describe('research shell and URL contracts', () => {
     view.unmount(); mount(route)
     expect(await screen.findByRole('link', { name: sha })).toBeTruthy()
   })
-  it('keeps Compare selection in repeated run params, including an explicit empty selection', async () => {
-    mount(`/training/compare?${new URLSearchParams({ run: runId })}`)
-    const checkbox = await screen.findByRole('checkbox') as HTMLInputElement
-    expect(checkbox.checked).toBe(true)
-    fireEvent.click(checkbox)
-    expect(new URLSearchParams(window.location.search).getAll('run')).toEqual([])
-    fireEvent.click(checkbox)
-    expect(new URLSearchParams(window.location.search).getAll('run')).toEqual([runId])
-  })
-  it('loads Models from its real contract and links full C-resnet SHA lineage to replays', async () => {
-    mount(`/models/${sha}`)
+  it('shows one model with separate states, exact season Play target and SHA lineage', async () => {
+    const calls = mockV1()
+    mount(`/models/${sha}?season=s1`)
     expect(await screen.findByRole('heading', { name: 'C-resnet' })).toBeTruthy()
-    expect(api.model).toHaveBeenCalledWith(sha)
-    const replay = screen.getByRole('link', { name: /Recorded evaluations & replays/ })
-    expect(new URL(replay.getAttribute('href')!, 'http://localhost').searchParams.get('checkpoint_sha')).toBe(sha)
-    expect(screen.getByText('playable: No')).toBeTruthy()
-    expect(screen.getByText('no_pinned_top1_agent_spec')).toBeTruthy()
-    const arena = new URL(screen.getByRole('link', { name: 'Arena evaluations →' }).getAttribute('href')!, 'http://localhost')
-    expect(arena.searchParams.get('run_id')).toBe(runId)
-    expect(arena.searchParams.get('checkpoint_sha')).toBe(sha)
+    expect(calls).toContain(`/api/v1/models/${sha}`)
+    const play = new URL(screen.getByRole('link', { name: '发起对战' }).getAttribute('href')!, 'http://localhost')
+    expect([play.pathname, play.searchParams.get('season'), play.searchParams.get('p1'), play.searchParams.get('p2')]).toEqual(['/play', 's1', 'C-resnet_seed-42', 'human'])
+    expect(new URL(screen.getByRole('link', { name: '在实验室分析' }).getAttribute('href')!, 'http://localhost').searchParams.get('model_sha')).toBe(sha)
+    expect(screen.getByText('已上天梯').className).toContain('on')
+    expect(screen.getByText('可对战').className).toContain('off')
+    fireEvent.click(screen.getByRole('tab', { name: /训练来源/ }))
+    expect(screen.getByRole('link', { name: 'cnn-test' }).getAttribute('href')).toBe('/experiments/cnn-test')
+    expect(screen.getByRole('link', { name: runId }).getAttribute('href')).toContain('run=' + encodeURIComponent(runId))
+  })
+  it('filters the model library by one capability state without inferring others', async () => {
+    mockV1()
+    mount('/models?state=ranked')
+    expect(await screen.findByRole('link', { name: 'C-resnet' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Unsupported' })).toBeNull()
+    expect(screen.getByRole('button', { name: /已上天梯 1/ }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: /全部 2/ }))
+    expect(await screen.findByRole('link', { name: 'Unsupported' })).toBeTruthy()
   })
   it('rejects abbreviated model identities instead of resolving by display alias', async () => {
+    const calls = mockV1()
     mount('/models/0faa')
-    expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(api.model).not.toHaveBeenCalled()
+    expect((await screen.findByRole('alert')).textContent).toContain('64 位')
+    expect(calls.some(url => url.startsWith('/api/v1/models/'))).toBe(false)
+  })
+  it('groups an experiment\'s models by exact arm and shows its recorded report', async () => {
+    mockV1()
+    mount('/experiments/cnn-test')
+    expect(await screen.findByText('# Result')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: /模型 · 1/ }))
+    expect(screen.getByRole('heading', { name: '01-arm' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'C-resnet' }).getAttribute('href')).toContain(`/models/${sha}`)
+  })
+  it('summarizes models, runs and experiments on the overview', async () => {
+    mockV1()
+    mount('/')
+    expect(await screen.findByRole('link', { name: /2\s*已登记/ })).toBeTruthy()
+    expect(screen.getByRole('link', { name: /1\s*已上天梯/ }).getAttribute('href')).toBe('/models?state=ranked')
+    expect(await screen.findByRole('link', { name: 'cnn-test' })).toBeTruthy()
+    expect(await screen.findByRole('link', { name: 'C-resnet training' })).toBeTruthy()
   })
   it('loads global run groups lazily and opens the reused checkpoint/evaluation index', async () => {
     mount('/replays')
@@ -171,7 +199,8 @@ describe('research shell and URL contracts', () => {
     expect(screen.queryByRole('link',{name:/Open isolated Lab/})).toBeNull()
     expect(vi.mocked(lab.labRequest).mock.calls.every(call=>['meta','models','position'].includes(call[0]))).toBe(true)
     expect(vi.mocked(api.context).mock.calls[0][0].get('replay_path')).toBe(replayPath)
-    expect(fetchSpy).not.toHaveBeenCalled()
+    // Only the shell's season list may use fetch; Lab analysis stays behind the mocked clients.
+    expect(fetchSpy.mock.calls.every(([url]) => String(url).startsWith('/api/agents/seasons'))).toBe(true)
     const strip = screen.getByRole('complementary', { name: 'Research context' })
     expect(within(strip).getByText('actual-game-hash')).toBeTruthy()
     expect(within(strip).getByText('arena-v2')).toBeTruthy()

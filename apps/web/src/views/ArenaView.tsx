@@ -78,7 +78,7 @@ function LatestArenaView() {
   return <div className="arena-view">
     <div className="arena-heading">
       <div><h2>对战矩阵与模型库</h2><p>{report.run_id} · {report.status === 'complete' ? '已完成' : '评测中，每 10 秒更新'}</p></div>
-      <div className="arena-links"><Link to="/play">External Play ↗</Link><Link to="/replays">Recorded replays</Link><Link to="/models">Model identities</Link><a href={mlflow + '/#/models'} target="_blank" rel="noreferrer">MLflow ↗</a></div>
+      <div className="arena-links"><Link to="/play">Play</Link><Link to="/replays">Recorded replays</Link><Link to="/models">Model identities</Link><a href={mlflow + '/#/models'} target="_blank" rel="noreferrer">MLflow ↗</a></div>
     </div>
     {error && <div className="warning">{error}；以下为上次成功读取的数据。</div>}
     {report.forfeits.length > 0 && <div className="error">{report.forfeits.length} 局发生弃权，需检查出招或推理错误后再解释排名。</div>}
