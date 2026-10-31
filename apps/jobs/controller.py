@@ -234,6 +234,8 @@ class Controller:
                 partial.rename(target)
             entries.append(dict(id=f"{job['name']}_{source.stem}", sha256=item['sha256'], checkpoint=str(target),
                                 source_path=str(source), training_job=job['id'], training_run=str(run),
+                                # The Job run directory is a Training artifact root entry named by the Job id.
+                                run_ref=dict(source='legacy', run_id=job['id']),
                                 output_semantics=item.get('output_semantics'),
                                 source_commit=job['spec']['source']['commit'],
                                 selection_reason='registered by platform Job', metadata=item.get('metadata') or {}))

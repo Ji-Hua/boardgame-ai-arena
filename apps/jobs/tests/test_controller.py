@@ -128,6 +128,7 @@ class ControllerTests(unittest.TestCase):
         catalog = json.loads((self.root / 'catalog-jobs.json').read_text())
         self.assertEqual(catalog['models'][0]['id'], 'smoke_ep00010')
         self.assertEqual(catalog['models'][0]['training_job'], job['id'])
+        self.assertEqual(catalog['models'][0]['run_ref'], dict(source='legacy', run_id=job['id']))
         self.assertEqual((self.root / 'jobs' / job['id'] / 'stdout.log').read_text(), 'log line\n')
         self.assertIn(f'qjob-{job["id"]}', self.docker.removed)
 
