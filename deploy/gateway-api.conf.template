@@ -1,0 +1,24 @@
+# Training compute and evidence API (P5): the research API, Lab and Jobs for the Dev entry gateway.
+# No SPA and no games here: /api/v1/play lives on Dev. Rendered by the same image as the entry gateway;
+# published only where the deployment maps port 8081 (Training 8792).
+server {
+    listen 8081;
+    client_max_body_size 1m;
+    location ^~ /api/v1/play {
+        return 404 '{"detail":"Games are served by the entry gateway"}';
+        default_type application/json;
+    }
+    location ^~ /api/v1/jobs {
+        proxy_pass http://${JOBS_UPSTREAM};
+        proxy_set_header Host $http_host;
+        proxy_read_timeout 120s;
+        proxy_buffering off;
+    }
+    location ~ ^/(api/|health$) {
+        proxy_pass http://${PLATFORM_UPSTREAM};
+        proxy_set_header Host $http_host;
+        proxy_read_timeout 180s;
+        proxy_buffering off;
+    }
+    location / { return 404; }
+}

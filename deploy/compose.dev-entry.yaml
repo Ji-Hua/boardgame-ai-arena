@@ -1,0 +1,35 @@
+# P5 single entry on Dev: SPA gateway and the gameplay service. The research API, Lab and Jobs stay on
+# Training and are reached through its API listener (192.168.68.88:8792). Gameplay reads the read-only
+# mirror of /home/jihua/quoridor-data kept by quoridor-mirror.timer and writes only games/.
+services:
+  gameplay:
+    image: ${PLATFORM_IMAGE:?required}
+    command: [python, -m, apps.gameplay]
+    user: '1000:1000'
+    environment:
+      QUORIDOR_DATA_ROOT: /home/jihua/quoridor-data
+      PLATFORM_MODEL_CATALOGS: discover
+      TRAINING_DASHBOARD_ARTIFACT_ROOTS: /home/jihua/quoridor-data/jobs/runs
+      GAMEPLAY_HOST: 0.0.0.0
+      HOME: /tmp
+      USER: quoridor-gameplay
+      LOGNAME: quoridor-gameplay
+      TORCHINDUCTOR_CACHE_DIR: /tmp/torchinductor
+    volumes:
+      - /home/jihua/quoridor-data:/home/jihua/quoridor-data:ro
+      - /home/jihua/quoridor-data/games:/home/jihua/quoridor-data/games
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 3g
+    cpus: 2
+    restart: unless-stopped
+  gateway:
+    image: ${GATEWAY_IMAGE:?required}
+    environment:
+      PLATFORM_UPSTREAM: ${TRAINING_API:-192.168.68.88:8792}
+      JOBS_UPSTREAM: ${TRAINING_API:-192.168.68.88:8792}
+      GAMEPLAY_UPSTREAM: gameplay:18797
+    ports: ['${ENTRY_BIND:-192.168.68.102:8790}:8080']
+    mem_limit: 128m
+    cpus: 1
+    restart: unless-stopped

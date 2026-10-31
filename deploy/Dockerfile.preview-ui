@@ -6,3 +6,5 @@ ARG SOURCE_COMMIT
 LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
 COPY apps/web/dist/ /usr/share/nginx/html/
 COPY deploy/gateway.conf.template /etc/nginx/templates/default.conf.template
+# Second listener (8081): Training API for the Dev entry (P5); unpublished elsewhere.
+COPY deploy/gateway-api.conf.template /etc/nginx/templates/api.conf.template

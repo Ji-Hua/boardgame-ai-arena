@@ -4,3 +4,4 @@
 !apps/web/dist/
 !apps/web/dist/**
 !deploy/gateway.conf.template
+!deploy/gateway-api.conf.template
