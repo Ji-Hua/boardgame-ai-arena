@@ -1,0 +1,2 @@
+# Historical pawn trails
+2026-10-31. Preview 8790 only. Display both players' actual snapshot paths in pawn colors at low opacity, under walls/pawns, pointer-events none. Include only prefix through displayed ply, collapse consecutive stationary points. Compact toggle, default on. No rule reconstruction; no hypothetical branch trail or future path. Preserve games/backends. Validate prefix projection, rendering/toggle and deployed replay/wall interactions.

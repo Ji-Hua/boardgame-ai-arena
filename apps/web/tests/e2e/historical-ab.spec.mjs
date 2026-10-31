@@ -11,6 +11,9 @@ test('historical A/B uses real model evidence without mutating a game',async({pa
  await page.getByText('走子记录',{exact:true}).click()
  await page.getByRole('button',{name:'40. P2 a2',exact:true}).click()
  await expect(page.getByLabel('诊断历史步')).toHaveValue('39')
+ await expect(page.getByTestId('historical-trails')).toBeVisible();await page.getByRole('button',{name:'历史轨迹',exact:true}).click();await expect(page.getByTestId('historical-trails')).toHaveCount(0);await page.getByRole('button',{name:'历史轨迹',exact:true}).click()
+ const expected=f.positions.slice(0,40).map(p=>p.pawns[0]).filter((p,i,all)=>!i||p[0]!==all[i-1][0]||p[1]!==all[i-1][1]).map(([x,y])=>`${x*51+34},${(8-y)*51+34}`).join(' ');await expect(page.locator('[data-trail-player="1"] polyline')).toHaveAttribute('points',expected)
+
  for(const a of f.actions.slice(0,39).filter(a=>a.type!=='pawn')){const wall=page.locator(`[data-wall="${a.type}:${a.target[0]}:${a.target[1]}"]`);await expect(wall).toHaveAttribute('data-owner',String(a.player));await expect(wall).toHaveAttribute('fill',a.player===1?'#4CAF50':'#2196F3')}
 
  await expect(page.locator('.aw-actor-context')).toContainText(f.identities[1].name)

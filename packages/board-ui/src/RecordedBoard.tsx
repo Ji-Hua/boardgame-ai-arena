@@ -15,9 +15,9 @@
  *     Screen: sits in the gap between screen cols wx and wx+1.
  */
 
-import React from 'react'
+import React, {useState} from 'react'
 import { PLAYER_COLORS } from './theme/playerColors'
-interface EvalReplayState { p1: [number, number]; p2: [number, number]; h_walls: [number, number][]; v_walls: [number, number][]; wall_owners?: Record<string, 1 | 2>; wall_history?: Record<string,{player:1|2;ply:number}> }
+interface EvalReplayState { trails?: [number,number][][]; p1: [number, number]; p2: [number, number]; h_walls: [number, number][]; v_walls: [number, number][]; wall_owners?: Record<string, 1 | 2>; wall_history?: Record<string,{player:1|2;ply:number}> }
 
 // -------------------------------------------------------------------------
 // Board geometry constants
@@ -84,6 +84,8 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
   lastActionPlayer,
   size, onCellClick, onWallClick, onWallInspect,
 }) => {
+  const [showTrails,setShowTrails]=useState(true)
+  const hasTrails=state.trails?.some(path=>path.length>1)
   const viewSize = BOARD_SVG_SIZE
 
   const cells = []
@@ -240,6 +242,8 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
     : { width: viewSize, height: viewSize }
 
   return (
+    <>
+    {hasTrails&&<button type="button" className="aw-trail-toggle" aria-label="历史轨迹" aria-pressed={showTrails} onClick={()=>setShowTrails(v=>!v)}>历史轨迹 {showTrails?'开':'关'}</button>}
     <svg
       {...svgProps}
       role="img"
@@ -249,11 +253,18 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
       {/* Background */}
       <rect x={0} y={0} width={viewSize} height={viewSize} fill={BOARD_BG} />
       {cells}
+      {showTrails&&hasTrails&&<g data-testid="historical-trails" opacity={0.28} pointerEvents="none" aria-label="双方历史移动轨迹">
+        {state.trails?.map((path,player)=>path.length>1&&<g key={player} data-trail-player={player+1}>
+          <polyline points={path.map(([x,y])=>`${cellLeft(x)+CELL/2},${cellTop(y)+CELL/2}`).join(' ')} fill="none" stroke={player===0?P1_COLOR:P2_COLOR} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round"/>
+          {path.map(([x,y],i)=><circle key={i} cx={cellLeft(x)+CELL/2} cy={cellTop(y)+CELL/2} r={5} fill={player===0?P1_COLOR:P2_COLOR}/>)}
+        </g>)}
+      </g>}
       {hWallRects}
       {vWallRects}
       {pawns}
       {colLabels}
       {rowLabels}
     </svg>
+    </>
   )
 }

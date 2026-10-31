@@ -12,12 +12,12 @@ export async function labRequest(path: string, body?: unknown, signal?: AbortSig
   if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail ?? data))
   return data
 }
-export function positionBoard(position: Position, actions: {type?:string;target?:number[];player?:number}[] = []) {
+export function positionBoard(position: Position, actions: {type?:string;target?:number[];player?:number}[] = [], history: Position[] = []) {
   const wall_history:Record<string,{player:1|2;ply:number}>={}
   actions.forEach((a,ply)=>{if((a.type==='horizontal'||a.type==='vertical')&&a.target?.length===2&&(a.player===1||a.player===2))wall_history[`${a.type}:${a.target[0]}:${a.target[1]}`]={player:a.player,ply}})
   // Branch-only walls have no historical move, even if supplied by a caller.
   for(const key of Object.keys((position as any).wall_owners??{}))delete wall_history[key]
-  return {wall_history,wall_owners:{...wallOwners(actions),...(position as Position & {wall_owners?:Record<string,1|2>}).wall_owners},p1: position.pawns[0], p2: position.pawns[1],
+  return {trails: [0,1].map(player=>history.map(p=>p.pawns[player]).filter((p,i,points)=>i===0||p[0]!==points[i-1][0]||p[1]!==points[i-1][1])),wall_history,wall_owners:{...wallOwners(actions),...(position as Position & {wall_owners?:Record<string,1|2>}).wall_owners},p1: position.pawns[0], p2: position.pawns[1],
     h_walls: position.walls.filter(w => w.orientation === 'horizontal').map(w => [w.x,w.y] as [number,number]),
     v_walls: position.walls.filter(w => w.orientation === 'vertical').map(w => [w.x,w.y] as [number,number])}
 }
