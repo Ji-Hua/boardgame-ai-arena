@@ -253,10 +253,16 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
       {/* Background */}
       <rect x={0} y={0} width={viewSize} height={viewSize} fill={BOARD_BG} />
       {cells}
-      {showTrails&&hasTrails&&<g data-testid="historical-trails" opacity={0.28} pointerEvents="none" aria-label="双方历史移动轨迹">
+      {showTrails&&hasTrails&&<g data-testid="historical-trails" opacity={0.16} pointerEvents="none" aria-label="双方历史移动轨迹">
         {state.trails?.map((path,player)=>path.length>1&&<g key={player} data-trail-player={player+1}>
-          <polyline points={path.map(([x,y])=>`${cellLeft(x)+CELL/2},${cellTop(y)+CELL/2}`).join(' ')} fill="none" stroke={player===0?P1_COLOR:P2_COLOR} strokeWidth={7} strokeLinejoin="round" strokeLinecap="round"/>
-          {path.map(([x,y],i)=><circle key={i} cx={cellLeft(x)+CELL/2} cy={cellTop(y)+CELL/2} r={5} fill={player===0?P1_COLOR:P2_COLOR}/>)}
+          <polyline points={path.map(([x,y])=>`${cellLeft(x)+CELL/2},${cellTop(y)+CELL/2}`).join(' ')} fill="none" stroke={player===0?P1_COLOR:P2_COLOR} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round"/>
+          {path.slice(1).map(([x,y],i)=>{
+            const [px,py]=path[i],dx=x-px,dy=py-y
+            if(!dx&&!dy)return null
+            const cx=(cellLeft(px)+cellLeft(x))/2+CELL/2,cy=(cellTop(py)+cellTop(y))/2+CELL/2
+            return <path key={'arrow-'+i} data-trail-arrow="true" d="M -3 -3 L 1 0 L -3 3" transform={`translate(${cx} ${cy}) rotate(${Math.atan2(dy,dx)*180/Math.PI})`} fill="none" stroke={player===0?P1_COLOR:P2_COLOR} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+          })}
+          {path.map(([x,y],i)=><circle key={i} cx={cellLeft(x)+CELL/2} cy={cellTop(y)+CELL/2} r={2} fill={player===0?P1_COLOR:P2_COLOR}/>)}
         </g>)}
       </g>}
       {hWallRects}
