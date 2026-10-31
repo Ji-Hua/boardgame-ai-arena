@@ -55,7 +55,7 @@ class Evidence:
                     continue
                 rows.append(dict(id=path.parent.name, run_id=report.get('run_id'),
                     updated_at=report.get('updated_at'), protocol=report.get('protocol'),
-                    agents=len(manifest['roster']['agents'])))
+                    agents=len(manifest['roster']['agents']), gate=manifest['roster'].get('gate')))
             except (ValueError, OSError, KeyError) as exc:
                 warnings.append(f'{path.parent.name}: {exc}')
         return dict(seasons=sorted(rows, key=lambda x: x['updated_at'] or '', reverse=True), warnings=warnings)

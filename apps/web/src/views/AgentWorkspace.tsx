@@ -38,7 +38,9 @@ const NAV:[string,string,typeof Trophy,(path:string)=>boolean][]=[
 function RunPage(){const {runId=''}=useParams();const navigate=useNavigate();return <RunDetailView key={runId} runId={runId} onBack={()=>navigate('/training')}/>}
 
 export default function AgentWorkspace(){
- const [params]=useSearchParams();const seasons=useData('/seasons');const season=params.get('season')??seasons.data?.seasons?.[0]?.id??''
+ const [params]=useSearchParams();const seasons=useData('/seasons');const list:Obj[]=seasons.data?.seasons??[]
+ // Gate seasons only pair candidates with fixed opponents; default to the newest complete ladder season.
+ const season=params.get('season')??(list.find(s=>!s.gate)??list[0])?.id??''
  const roster=useData(season?'/seasons/'+enc(season):null)
  const location=useLocation()
  const [theme,setTheme]=useState(()=>localStorage.getItem('quoridor-workbench-theme')==='light'?'light':'dark')

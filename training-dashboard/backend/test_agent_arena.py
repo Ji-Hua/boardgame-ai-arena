@@ -38,6 +38,12 @@ class ArenaTests(unittest.TestCase):
         (self.base/'report.json').write_text(json.dumps(v))
         with self.assertRaises(ValueError):self.ev.season('test')
 
+    def test_seasons_mark_gate_protocols(self):
+        self.assertIsNone(self.ev.seasons()['seasons'][0]['gate'])
+        self.fixture.manifest['roster']['gate'] = 'gate-v1'
+        self.publish()
+        self.assertEqual(self.ev.seasons()['seasons'][0]['gate'], 'gate-v1')
+
     def test_rankings_join_exact_sha_per_season(self):
         rows, warnings = self.ev.rankings()
         self.assertEqual(warnings, [])
