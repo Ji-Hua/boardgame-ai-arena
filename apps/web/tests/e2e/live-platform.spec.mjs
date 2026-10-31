@@ -16,7 +16,7 @@ const test = base.extend({
     await use(audit)
     await info.attach('live-network-and-browser-audit', { body: JSON.stringify(audit, null, 2), contentType: 'application/json' })
     const mutations = audit.requests.filter(r => !['GET', 'HEAD', 'OPTIONS'].includes(r.method))
-    expect(mutations.filter(r => !/^\/research-lab\/api\/(position|analyze|branch|neural\/[^?]+)$/.test(new URL(r.url).pathname)), 'Only isolated position validation and explicitly requested analysis/branch diagnostics may POST').toEqual([])
+    expect(mutations.filter(r => !/^\/api\/v1\/lab\/(position|analyze|branch|neural\/[^?]+)$/.test(new URL(r.url).pathname)), 'Only isolated position validation and explicitly requested analysis/branch diagnostics may POST').toEqual([])
   }, { auto: true }],
 })
 
@@ -65,7 +65,7 @@ async function exportCase(page) {
 test('legacy health GET and Training list retain both providers and exact C-resnet metrics', async ({ page, request }, info) => {
   const health = await json(request, '/health')
   expect(health).toMatchObject({ status: 'ok', service: 'training-dashboard', read_only: true })
-  const runs = await json(request, '/api/runs')
+  const runs = await json(request, '/api/v1/research/runs')
   expect(runs.runs).toEqual(expect.arrayContaining([
     expect.objectContaining({ run_id: RUN, run_name: 'C-resnet_seed-42', source: 'mlflow' }),
     expect.objectContaining({ run_id: LEGACY, source: 'legacy' }),
@@ -83,7 +83,7 @@ test('legacy health GET and Training list retain both providers and exact C-resn
   await page.getByRole('link', { name: /完整详情/ }).click()
   await expect(page).toHaveURL(new RegExp(`/training/runs/${RUN}$`))
   await page.getByRole('button', { name: 'Metrics', exact: true }).click()
-  const metrics = await json(request, `/api/runs/${RUN}/metrics`)
+  const metrics = await json(request, `/api/v1/research/runs/${RUN}/metrics`)
   expect(metrics.run_id).toBe(RUN)
   expect(metrics.points).toHaveLength(60)
   await expect(page.locator('.chart-card').first()).toBeVisible()
@@ -92,7 +92,7 @@ test('legacy health GET and Training list retain both providers and exact C-resn
 })
 
 test('checkpoint → Arena Greedy → playback ply7 → isolated Lab exact import and explicit neural analysis', async ({ page, request, audit }, info) => {
-  const detail = await json(request, `/api/runs/${RUN}`)
+  const detail = await json(request, `/api/v1/research/runs/${RUN}`)
   expect(detail.checkpoints).toEqual(expect.arrayContaining([expect.objectContaining({ sha256: SHA, filename: 'update012000.pt' })]))
   await page.goto(`/training/runs/${RUN}?tab=checkpoints`)
   const checkpoint = page.getByRole('row').filter({ hasText: SHA })
@@ -120,7 +120,7 @@ test('checkpoint → Arena Greedy → playback ply7 → isolated Lab exact impor
   const permalink = page.url()
   const replayPath = new URL(permalink).searchParams.get('replay')
   expect(replayPath).toBeTruthy()
-  const replay = await json(request, `/api/runs/${RUN}/eval-replays/${replayPath}`)
+  const replay = await json(request, `/api/v1/research/runs/${RUN}/eval-replays/${replayPath}`)
   expect(replay.states.length).toBe(replay.actions.length + 1)
   const state = replay.states[7]
   await page.reload()
@@ -129,13 +129,13 @@ test('checkpoint → Arena Greedy → playback ply7 → isolated Lab exact impor
   await expect(page.getByRole('heading', { name: 'Decision Lab', exact:true })).toBeVisible()
   await expect(page.getByRole('button', {name:'Run analysis',exact:true})).toBeEnabled()
   await expect(page.locator('iframe')).toHaveCount(0)
-  const context = await json(request, '/api/platform/context?' + new URLSearchParams({run_id:RUN,replay_path:replayPath,ply:'7',model_sha:SHA}))
+  const context = await json(request, '/api/v1/research/context?' + new URLSearchParams({run_id:RUN,replay_path:replayPath,ply:'7',model_sha:SHA}))
   expect(context.position.pawns).toEqual([state.p1,state.p2])
   expect(context.source.ply).toBe(7)
   const imported = JSON.parse(await page.getByLabel('Position JSON').inputValue())
   expect(imported).toEqual(context.position)
-  expect(audit.requests.filter(r=>new URL(r.url).pathname==='/research-lab/api/analyze')).toHaveLength(0)
-  const responsePromise=page.waitForResponse(r=>new URL(r.url()).pathname==='/research-lab/api/analyze' && r.request().method()==='POST')
+  expect(audit.requests.filter(r=>new URL(r.url).pathname==='/api/v1/lab/analyze')).toHaveLength(0)
+  const responsePromise=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/v1/lab/analyze' && r.request().method()==='POST')
   await page.getByRole('button',{name:'Run analysis',exact:true}).click()
   const response=await responsePromise;const analysis=await response.json()
   expect(response.ok(),JSON.stringify(analysis)).toBe(true)

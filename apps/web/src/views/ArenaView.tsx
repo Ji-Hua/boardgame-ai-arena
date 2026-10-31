@@ -56,7 +56,7 @@ function LatestArenaView() {
     let active = true
     const refresh = async () => {
       try {
-        const response = await fetch('/api/arena/latest')
+        const response = await fetch('/api/v1/research/arena/latest')
         if (!response.ok) throw new Error(`对战数据暂不可用 (${response.status})`)
         const data = await response.json()
         if (active) { setReport(data); setError('') }
@@ -64,7 +64,7 @@ function LatestArenaView() {
     }
     void refresh()
     const timer = window.setInterval(refresh, 10000)
-    fetch('/api/models').then(async response => {
+    fetch('/api/v1/research/catalog').then(async response => {
       if (!response.ok) throw new Error(`模型库暂不可用 (${response.status})`)
       const data = await response.json()
       if (active) setCatalog(data)
@@ -151,7 +151,7 @@ function LatestArenaView() {
       <p>置信区间：固定样本量 Hoeffding 界，采样单元为交换先后手的两局；单项 95%，未做多重比较校正。观察到的名次不等于显著差异。</p>
       <p>确定性、无记忆策略出现完整状态循环时计和；其余对局达到步数上限计和。</p>
       <p className="mono">Manifest: {report.manifest_sha256}<br />Source: {report.source_sha256}</p>
-      <p><a href={`/api/arena/runs/${report.run_id}/manifest`} target="_blank" rel="noreferrer">查看模型、源码摘要与开局清单 JSON</a> · <a href="/api/arena/latest" target="_blank" rel="noreferrer">查看完整结果 JSON</a></p>
+      <p><a href={`/api/v1/research/arena/runs/${report.run_id}/manifest`} target="_blank" rel="noreferrer">查看模型、源码摘要与开局清单 JSON</a> · <a href="/api/arena/latest" target="_blank" rel="noreferrer">查看完整结果 JSON</a></p>
       <p>最近更新：{new Date(report.updated_at).toLocaleString()}</p>
     </details>
   </div>

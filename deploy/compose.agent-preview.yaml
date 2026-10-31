@@ -27,11 +27,34 @@ services:
     mem_limit: 2g
     cpus: 1
     restart: unless-stopped
+  gameplay:
+    # Same image as the platform; the only service that writes (quoridor-data/games).
+    image: ${PREVIEW_IMAGE:?required}
+    command: [python, -m, apps.gameplay]
+    user: '1000:1000'
+    environment:
+      QUORIDOR_DATA_ROOT: /home/jihua/quoridor-data
+      TRAINING_DASHBOARD_ARTIFACT_ROOTS: /data/training_artifacts/dqn:/data/training_artifacts:/home/jihua/quoridor-data/jobs/runs
+      PLATFORM_MODEL_CATALOGS: discover
+      GAMEPLAY_HOST: 0.0.0.0
+      HOME: /tmp
+      USER: quoridor-gameplay
+      LOGNAME: quoridor-gameplay
+      TORCHINDUCTOR_CACHE_DIR: /tmp/torchinductor
+    volumes:
+      - /home/jihua/quoridor-data:/home/jihua/quoridor-data:ro
+      - /home/jihua/quoridor-data/games:/home/jihua/quoridor-data/games
+      - /home/jihua/workspace/boardgame-ai-arena/agent_system/training/artifacts:/data/training_artifacts:ro
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 3g
+    cpus: 2
+    restart: unless-stopped
   gateway:
     image: ${GATEWAY_IMAGE:?required}
     environment:
       PLATFORM_UPSTREAM: platform:8741
-      CLASSIC_UPSTREAM: platform:8741
+      GAMEPLAY_UPSTREAM: gameplay:18797
       JOBS_UPSTREAM: host.docker.internal:18796
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports: ['192.168.68.88:8790:8080']

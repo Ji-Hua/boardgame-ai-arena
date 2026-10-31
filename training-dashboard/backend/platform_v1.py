@@ -13,9 +13,16 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from fastapi.routing import APIRoute
 
 from .experiments import Experiments
 
+# Legacy prefix -> /api/v1 prefix. The old paths keep working until every caller has moved;
+# /api/platform/models* is replaced by /api/v1/models (a superset) and has no alias.
+LEGACY = (('/api/agents/seasons', '/api/v1/seasons'), ('/api/platform/runs', '/api/v1/research/runs'),
+          ('/api/platform/context', '/api/v1/research/context'), ('/api/runs', '/api/v1/research/runs'),
+          ('/api/summary', '/api/v1/research/summary'), ('/api/arena', '/api/v1/research/arena'),
+          ('/api/mlflow', '/api/v1/research/mlflow'), ('/api/models', '/api/v1/research/catalog'))
 CAPABILITIES = ('available', 'sha_verified', 'analyzable', 'playable', 'research_playable', 'ranked', 'deployed')
 
 
@@ -78,6 +85,18 @@ def model_detail(models, evidence, sha):
     detail = models.detail(sha, verify_sha=True)
     rankings, warnings = evidence.rankings()
     return dict(_ranked(detail, rankings), warnings=detail['warnings'] + warnings)
+
+
+def alias_legacy(app):
+    """Serve each legacy research route under /api/v1 as well, with the same handler."""
+    for route in list(app.router.routes):
+        if not isinstance(route, APIRoute):
+            continue
+        for old, new in LEGACY:
+            if route.path == old or route.path.startswith(old + '/'):
+                app.add_api_route(new + route.path[len(old):], route.endpoint, methods=sorted(route.methods),
+                                  include_in_schema=False)
+                break
 
 
 def install(app):

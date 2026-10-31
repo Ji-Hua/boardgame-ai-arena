@@ -6,7 +6,7 @@ export interface Position {
 }
 export const opening: Position = { pawns: [[4,0],[4,8]], walls_remaining: [10,10], walls: [], turn: 1 }
 export async function labRequest(path: string, body?: unknown, signal?: AbortSignal): Promise<any> {
-  const response = await fetch('/research-lab/api/' + path, {method: body === undefined ? 'GET' : 'POST',
+  const response = await fetch('/api/v1/lab/' + path, {method: body === undefined ? 'GET' : 'POST',
     headers: {'Content-Type': 'application/json'}, ...(body === undefined ? {} : {body: JSON.stringify(body)}), signal})
   const data = await response.json()
   if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail ?? data))

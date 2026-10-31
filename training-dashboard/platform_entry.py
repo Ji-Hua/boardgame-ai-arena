@@ -1,4 +1,4 @@
-"""Isolated unified platform: existing read-only API, built SPA and loopback Lab.
+"""Isolated unified platform: existing read-only API, built SPA and loopback Lab (/api/v1/lab).
 
 Uvicorn entry: platform_entry:create_app --factory --app-dir training-dashboard.
 Importing this module neither imports a generic ``backend`` nor starts analysis.
@@ -158,9 +158,6 @@ def create_app(*, backend_app=None, dist=None, lab_upstream=None, transport=None
 
     app = FastAPI(title="Quoridor isolated research platform", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
-    from platform_play import install_play_gateway
-    install_play_gateway(app)
-
     @app.api_route("/research-lab", methods=METHODS)
     async def lab_slash(request: Request):
         if request.method not in ("GET", "HEAD"):
@@ -233,6 +230,11 @@ def create_app(*, backend_app=None, dist=None, lab_upstream=None, transport=None
                 raise HTTPException(504, "Lab request timed out") from exc
             except httpx.HTTPError as exc:
                 raise HTTPException(502, "Isolated Lab unavailable") from exc
+
+    @app.api_route("/api/v1/lab/{path:path}", methods=METHODS)
+    async def lab_v1(request: Request, path: str):
+        # Same allowlist and bounds as /research-lab/api/*; only the public prefix differs.
+        return await lab_proxy(request, "api/" + path)
 
     # Route (not Mount) preserves /api in the ASGI scope for the existing app.
     # The API's own 404/405 responses must never become frontend index.html.

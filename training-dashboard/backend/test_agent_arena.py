@@ -3,8 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from fastapi import HTTPException
-from backend.agent_arena import Evidence, Sessions, CreateGame, GameStep
+from backend.agent_arena import Evidence
 from backend import test_replay as fixtures
 from backend.replay import _stable_hash
 
@@ -111,35 +110,6 @@ class ArenaTests(unittest.TestCase):
         self.fixture.block['games'][0]['actions'][0]['target']=[99,99]
         with gzip.open(self.base/'blocks'/('a'*20+'.json.gz'),'wt') as f:json.dump(self.fixture.block,f)
         with self.assertRaises(ValueError):self.ev.replay('test','a'*20+':0')
-
-
-class SessionTests(unittest.TestCase):
-    def setUp(self):
-        class Ev:
-            def spec(_,season,identifier):
-                spec={'id':identifier,'algo':{'type':'greedy'},'policy':{'type':'top_k','k':1}}
-                return dict(id=identifier,name=identifier,kind='heuristic',spec=spec,sha256=None,playable=True,identity=_stable_hash(spec))
-        self.sessions=Sessions(Ev(),capacity=2)
-        self.game=self.sessions.create(CreateGame(season='s',p1='human',p2='greedy'))
-
-    def test_human_agent_revision_and_capability(self):
-        g=self.game
-        with self.assertRaises(HTTPException):self.sessions.get(g['id'],'wrong')
-        first=self.sessions.step(g['id'],g['token'],GameStep(revision=0,action={'player':1,'type':'pawn','target':[4,1]}))
-        self.assertEqual(first['revision'],1)
-        with self.assertRaises(HTTPException) as e:self.sessions.step(g['id'],g['token'],GameStep(revision=0))
-        self.assertEqual(e.exception.status_code,409)
-        second=self.sessions.step(g['id'],g['token'],GameStep(revision=1))
-        self.assertEqual(second['revision'],2)
-        self.assertEqual(len(second['positions']),2)
-
-    def test_illegal_no_mutation_and_capacity(self):
-        g=self.game
-        with self.assertRaises(ValueError):self.sessions.step(g['id'],g['token'],GameStep(revision=0,action={'player':1,'type':'pawn','target':[0,8]}))
-        self.assertEqual(self.sessions.get(g['id'],g['token'])['revision'],0)
-        self.sessions.create(CreateGame(season='s',p1='human',p2='human'))
-        with self.assertRaises(HTTPException) as e:self.sessions.create(CreateGame(season='s',p1='human',p2='human'))
-        self.assertEqual(e.exception.status_code,429)
 
 
 if __name__=='__main__':unittest.main()

@@ -16,7 +16,8 @@ ARG SOURCE_COMMIT
 LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
 COPY scripts/start_unified_platform.sh /app/scripts/start_unified_platform.sh
 COPY training-dashboard/backend /app/training-dashboard/backend
-COPY training-dashboard/platform_entry.py training-dashboard/platform_play.py /app/training-dashboard/
+COPY training-dashboard/platform_entry.py /app/training-dashboard/
+COPY apps/gameplay /app/apps/gameplay
 COPY --from=frontend /build/apps/web/dist /app/apps/web/dist
 ENV PLATFORM_FRONTEND_DIST=/app/apps/web/dist     TRAINING_DASHBOARD_SOURCE_ROOT=/app     PLATFORM_LAB_UPSTREAM=http://lab:8744
 EXPOSE 8741

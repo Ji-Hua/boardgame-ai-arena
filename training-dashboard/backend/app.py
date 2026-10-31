@@ -283,6 +283,8 @@ def create_app(*, unified_run_service=None, model_index=None) -> FastAPI:
         """Return the raw replay JSON for a specific replay file."""
         return delegate(run_id, "replay", replay_path)
 
+    from .platform_v1 import alias_legacy
+    alias_legacy(app)
     return app
 
 

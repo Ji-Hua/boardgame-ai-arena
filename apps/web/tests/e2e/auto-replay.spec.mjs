@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test'
 test('paused replay automatically analyzes; playback stays quiet; seeks reuse cache',async({page},info)=>{
  const requests=[];const errors=[]
  page.on('pageerror',e=>errors.push(e.message))
- page.on('request',r=>{if(r.url().endsWith('/api/analyze'))requests.push(r.postDataJSON())})
+ page.on('request',r=>{if(r.url().endsWith('/api/v1/lab/analyze'))requests.push(r.postDataJSON())})
  await page.goto('/games/049f457b806f4604720d%3A0?season=cnn-architecture-20261021-213018&agent=A-baseline_seed-44&opponent=greedy&ply=14')
  await expect(page.getByLabel('决策依据')).toContainText('当前代码复算')
  expect(requests).toHaveLength(1);expect(requests[0].algorithm).toBe('dqn')

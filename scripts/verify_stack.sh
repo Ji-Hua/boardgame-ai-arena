@@ -1,6 +1,7 @@
 #!/bin/sh
 # Isolated loopback stack for browser verification of this worktree on Training.
-# Never touches the live 8790 preview: Platform 18793, Lab 18794, gateway 18795, Jobs 18796 on 127.0.0.1.
+# Never touches the live 8790 preview: Platform 18793, Lab 18794, gateway 18795, Jobs 18796, gameplay 18797
+# on 127.0.0.1. Games go to a throwaway database under the evidence directory.
 # Jobs use the real data root: submitted Jobs run on the GPU and register checkpoints into catalog-jobs.json.
 # Usage: scripts/verify_stack.sh start|stop  (EVIDENCE_DIR overrides the log directory)
 set -eu
@@ -17,7 +18,7 @@ TOKEN_FILE=${JOBS_TOKEN_FILE:-/home/jihua/quoridor-releases/jobs/private/token}
 
 stop() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true
-  for pid in platform lab jobs; do
+  for pid in platform lab jobs gameplay; do
     [ -f "$EVIDENCE/$pid.pid" ] && kill "$(cat "$EVIDENCE/$pid.pid")" 2>/dev/null || true
     rm -f "$EVIDENCE/$pid.pid"
   done
@@ -40,12 +41,18 @@ start)
   JOBS_DATA_ROOT=$DATA JOBS_IMAGE="$JOBS_IMAGE" JOBS_TOKEN_FILE="$TOKEN_FILE" JOBS_PORT=18796 \
   JOBS_SOURCE_REF=${JOBS_SOURCE_REF:-feature/unified-rl-platform} nohup "$PY" -m apps.jobs >"$EVIDENCE/jobs.log" 2>&1 &
   echo $! >"$EVIDENCE/jobs.pid"
-  sed -e 's/listen 8080;/listen 127.0.0.1:18795;/' -e 's/${CLASSIC_UPSTREAM}/127.0.0.1:18793/g' \
+  rm -f "$EVIDENCE"/games.sqlite*
+  PLATFORM_MODEL_CATALOGS=discover QUORIDOR_DATA_ROOT=$DATA GAMEPLAY_DB="$EVIDENCE/games.sqlite" GAMEPLAY_PORT=18797 \
+  TRAINING_DASHBOARD_ARTIFACT_ROOTS="$ARTIFACTS/dqn:$ARTIFACTS:$DATA/jobs/runs" TRAINING_DASHBOARD_SOURCE_ROOT="$ROOT" \
+    nohup "$PY" -m apps.gameplay >"$EVIDENCE/gameplay.log" 2>&1 &
+  echo $! >"$EVIDENCE/gameplay.pid"
+  sed -e 's/listen 8080;/listen 127.0.0.1:18795;/' -e 's/${GAMEPLAY_UPSTREAM}/127.0.0.1:18797/g' \
       -e 's/${PLATFORM_UPSTREAM}/127.0.0.1:18793/g' -e 's/${JOBS_UPSTREAM}/127.0.0.1:18796/g' "$ROOT/deploy/gateway.conf.template" >"$EVIDENCE/gateway.conf"
   docker run -d --name "$NAME" --network host -v "$EVIDENCE/gateway.conf:/etc/nginx/conf.d/default.conf:ro" \
     -v "$ROOT/apps/web/dist:/usr/share/nginx/html:ro" --entrypoint nginx "$GATEWAY_IMAGE" -g 'daemon off;' >/dev/null
   for _ in $(seq 1 60); do
-    curl -sf http://127.0.0.1:18795/health >/dev/null && curl -sf http://127.0.0.1:18794/health >/dev/null && curl -sf http://127.0.0.1:18796/health >/dev/null && {
+    curl -sf http://127.0.0.1:18795/health >/dev/null && curl -sf http://127.0.0.1:18794/health >/dev/null && curl -sf http://127.0.0.1:18796/health >/dev/null \
+      && curl -sf http://127.0.0.1:18797/health >/dev/null && {
       echo "verify stack ready: http://127.0.0.1:18795 (logs: $EVIDENCE)"; exit 0; }
     sleep 1
   done

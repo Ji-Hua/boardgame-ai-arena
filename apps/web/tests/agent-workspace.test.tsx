@@ -21,8 +21,8 @@ it('defaults to the newest non-gate season and labels gate seasons',async()=>{
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>{urls.push(url);return {ok:true,json:async()=>url.endsWith('/seasons')?{seasons:[{id:'gate-job',gate:'gate-v1'},{id:'full'}]}:{agents,matrix:{},protocol:'paired'}}}))
  render(<MemoryRouter initialEntries={['/ladder']}><AgentWorkspace/></MemoryRouter>)
  expect(await screen.findByRole('heading',{name:'天梯榜'})).toBeTruthy()
- expect(urls).toContain('/api/agents/seasons/full')
- expect(urls).not.toContain('/api/agents/seasons/gate-job')
+ expect(urls).toContain('/api/v1/seasons/full')
+ expect(urls).not.toContain('/api/v1/seasons/gate-job')
  expect(screen.getByRole('option',{name:'gate-job · 门槛 gate-v1'})).toBeTruthy()
 })
 it('invalidates old analysis when Agent changes and never auto-runs',async()=>{

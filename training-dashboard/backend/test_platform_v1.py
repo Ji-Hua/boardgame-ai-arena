@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 import json
 from pathlib import Path
 import tempfile
-from backend.platform_v1 import TimedCache, diagnoses_index, install, model_detail, model_listing
+from backend.platform_v1 import TimedCache, alias_legacy, diagnoses_index, install, model_detail, model_listing
 
 A, B = 'a'*64, 'b'*64
 
@@ -88,6 +88,27 @@ class PlatformV1Tests(unittest.TestCase):
         self.assertEqual(client.get('/api/v1/experiments/..%2Fx').status_code, 404)
         self.assertEqual(client.get('/api/v1/experiments/.hidden').status_code, 422)
         self.assertEqual(client.get('/api/v1/experiments/missing').status_code, 404)
+
+
+class LegacyAliasTests(unittest.TestCase):
+    def test_v1_paths_share_legacy_handlers(self):
+        app = FastAPI()
+        app.get('/api/runs')(lambda: {'runs': []})
+        app.get('/api/runs/{run_id}/metrics')(lambda run_id: {'run': run_id})
+        app.get('/api/agents/seasons/{season}')(lambda season: {'season': season})
+        app.get('/api/models')(lambda: {'catalog': True})
+        app.get('/api/models-extra')(lambda: {})
+        app.get('/api/platform/models')(lambda: {})
+        alias_legacy(app)
+        client = TestClient(app)
+        self.assertEqual(client.get('/api/v1/research/runs').json(), {'runs': []})
+        self.assertEqual(client.get('/api/v1/research/runs/r1/metrics').json(), {'run': 'r1'})
+        self.assertEqual(client.get('/api/v1/seasons/s1').json(), {'season': 's1'})
+        self.assertEqual(client.get('/api/v1/research/catalog').json(), {'catalog': True})
+        self.assertEqual(client.get('/api/runs/r1/metrics').json(), {'run': 'r1'})
+        paths = {r.path for r in app.routes}
+        self.assertNotIn('/api/v1/research/catalog-extra', paths)
+        self.assertFalse(any(p.startswith('/api/v1/platform') for p in paths))
 
 
 if __name__ == '__main__':

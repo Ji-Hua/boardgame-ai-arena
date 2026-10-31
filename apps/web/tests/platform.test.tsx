@@ -59,7 +59,7 @@ function mockV1() {
     if (url === `/api/v1/models/${sha}/diagnoses`) return reply({ sha256: sha, warnings: [], diagnoses: [{ source: 'experiments/e/arm/diagnoses.json', model_id: 'arm_ep1', games: 50, wins: 38, losses: 12, tactical_wins: 18, tactical_count: 18, missed_immediate_win: 0, immediate_win_available: 38 }] })
     if (url === '/api/v1/experiments') return reply({ experiments: [{ id: 'cnn-test', modified: 1761900000, arms: ['01-arm'], reports: ['report.md'], has_assessment: true, catalogs: [] }], warnings: [] })
     if (url === '/api/v1/experiments/cnn-test') return reply({ id: 'cnn-test', modified: 1761900000, arms: ['01-arm'], reports: [{ path: 'report.md', size: 8, truncated: false, text: '# Result' }], has_assessment: false, catalogs: [], assessment: null, files: [], models: [{ sha256: sha, aliases: ['C-resnet'], arms: ['01-arm'], architecture: 'cnn', output_semantics: 'policy_logits', ranked: true, seasons: [seasonEntry] }], warnings: [] })
-    if (url === '/api/runs') return reply({ runs: [run], count: 1, warnings: [] })
+    if (url === '/api/v1/research/runs') return reply({ runs: [run], count: 1, warnings: [] })
     if (url === '/api/v1/jobs') return reply({ jobs: [{ ...jobRow, experiment: 'job-only' }], counts: {} })
     if (url === '/api/v1/jobs?experiment=cnn-test') return reply({ jobs: [jobRow], counts: {} })
     if (url === '/api/v1/jobs?experiment=job-only') return reply({ jobs: [{ ...jobRow, experiment: 'job-only' }], counts: {} })
@@ -224,7 +224,7 @@ describe('research shell and URL contracts', () => {
     expect(vi.mocked(lab.labRequest).mock.calls.every(call=>['meta','models','position'].includes(call[0]))).toBe(true)
     expect(vi.mocked(api.context).mock.calls[0][0].get('replay_path')).toBe(replayPath)
     // Only the shell's season list may use fetch; Lab analysis stays behind the mocked clients.
-    expect(fetchSpy.mock.calls.every(([url]) => String(url).startsWith('/api/agents/seasons'))).toBe(true)
+    expect(fetchSpy.mock.calls.every(([url]) => String(url).startsWith('/api/v1/seasons'))).toBe(true)
     const strip = screen.getByRole('complementary', { name: 'Research context' })
     expect(within(strip).getByText('actual-game-hash')).toBeTruthy()
     expect(within(strip).getByText('arena-v2')).toBeTruthy()
@@ -297,7 +297,7 @@ describe('research shell and URL contracts', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ run_id: 'latest-arena', status: 'complete', agents: [], ranking: [], matrix: {}, forfeits: [], standard_controls: [], terminations: {}, ranked_games: 0, control_games: 0, pairs_per_match: 1, completed_blocks: 1, expected_blocks: 1, models: [], registry: [] }) } as any)
     mount('/arena')
     expect(await screen.findByText(/latest-arena/)).toBeTruthy()
-    expect(fetch).toHaveBeenCalledWith('/api/arena/latest')
+    expect(fetch).toHaveBeenCalledWith('/api/v1/research/arena/latest')
     expect(api.evaluations).not.toHaveBeenCalled()
   })
   it('opens only the exact protocol, side, seed and checkpoint progress replay group', async () => {

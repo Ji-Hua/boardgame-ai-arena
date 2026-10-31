@@ -5,8 +5,8 @@ const fixture='/home/jihua/quoridor-backups/cycle-diagnosis-20261030/reconstruct
 test('historical A/B uses real model evidence without mutating a game',async({page},info)=>{
  test.setTimeout(90000);expect.configure({timeout:20000});test.skip(!fs.existsSync(fixture),'External historical fixture unavailable')
  const f=JSON.parse(fs.readFileSync(fixture,'utf8')),mutations=[],errors=[],branches=[]
- page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().includes('/api/agents/play')&&r.method()!=='GET')mutations.push(r.url());if(r.url().endsWith('/api/branch'))branches.push(r.postDataJSON())})
- await page.route('**/api/agents/play/history-fixture',route=>route.fulfill({json:{id:'history-fixture',identities:f.identities,position:f.positions[73],positions:f.positions.slice(0,73),actions:f.actions,revision:73,winner:null,limit:false,legal_actions:[]}}))
+ page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().includes('/api/v1/play')&&r.method()!=='GET')mutations.push(r.url());if(r.url().endsWith('/api/v1/lab/branch'))branches.push(r.postDataJSON())})
+ await page.route('**/api/v1/play/history-fixture',route=>route.fulfill({json:{id:'history-fixture',identities:f.identities,position:f.positions[73],positions:f.positions.slice(0,73),actions:f.actions,revision:73,winner:null,limit:false,legal_actions:[],status:'active',role:'player',listed:false}}))
  await page.goto('/play?'+new URLSearchParams({season,game:'history-fixture'}))
  await page.getByText('走子记录',{exact:true}).click()
  await page.getByRole('button',{name:'40. P2 a2',exact:true}).click()

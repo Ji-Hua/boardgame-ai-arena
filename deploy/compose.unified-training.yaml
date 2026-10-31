@@ -35,7 +35,8 @@ services:
     image: ${GATEWAY_IMAGE:?required}
     environment:
       PLATFORM_UPSTREAM: platform:8741
-      CLASSIC_UPSTREAM: 192.168.68.102:8764
+      # Legacy 8740/8741 stack, retired in P4; its gateway image predates /api/v1/play.
+      GAMEPLAY_UPSTREAM: platform:8741
       JOBS_UPSTREAM: host.docker.internal:18796
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports: ["${GATEWAY_BIND:?required}:8080"]
