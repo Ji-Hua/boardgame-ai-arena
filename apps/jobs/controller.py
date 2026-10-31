@@ -142,7 +142,8 @@ class Controller:
     def _container_args(self, job):
         r = job['spec']['resources']
         control, run = self.root / job['id'], self.runs / job['id']
-        args = ['--name', f"qjob-{job['id']}", '--label', f"org.quoridor.job={job['id']}", '--user', self.uid_gid,
+        # --init forwards the stop signal to the Job process, so cancellation ends it gracefully.
+        args = ['--init', '--name', f"qjob-{job['id']}", '--label', f"org.quoridor.job={job['id']}", '--user', self.uid_gid,
                 '--cpus', str(r['cpus']), '--memory', f"{r['memory_gb']}g", '--shm-size', '2g',
                 '--network', 'none', '--read-only', '--tmpfs', '/tmp:rw,size=2g',
                 '-e', f"OMP_NUM_THREADS={int(r['cpus'])}", '-e', 'HOME=/tmp',
