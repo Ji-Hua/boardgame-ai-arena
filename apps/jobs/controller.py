@@ -302,7 +302,7 @@ class Controller:
         job['run_id'] = identifier
         job['run_files'] = sorted(p.name for p in run.iterdir()) if run.exists() else []
         job['season'] = identifier if (self.data_root / 'arena' / identifier / 'report.json').exists() else None
-        diagnoses = run / 'experiment' / 'diagnoses.json'
+        diagnoses = next((p for p in (run / 'diagnoses.json', run / 'experiment' / 'diagnoses.json') if p.exists()), run / 'diagnoses.json')
         try:
             job['diagnoses'] = json.loads(diagnoses.read_text()) if diagnoses.exists() else []
         except ValueError:

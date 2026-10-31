@@ -39,6 +39,12 @@ ENTRYPOINTS = {
         template={'candidates': [], 'names': {}, 'gate': 'gate-v1', 'workers': 4},
         description='Registered checkpoints (full SHA) against a versioned gate protocol with scripts/run_benchmark_matrix.py. '
                     'A complete result is published as a new ladder season named by the Job id.'),
+    'diagnose_checkpoint': dict(
+        kind='evaluate', gpu=False, format='json', title='Checkpoint 诊断（开发对局 + 战术题）',
+        template={'checkpoints': [], 'book': '/home/jihua/quoridor-data/arena/cnn-architecture-20261021-213018/manifest.json',
+                  'max_plies': 300},
+        description='agent_system.evaluation.cnn_diagnostics.diagnose_checkpoint on registered checkpoints (full SHA): '
+                    'paired development games on a locked book plus the tactical probes. Development results are not holdout.'),
     'evaluate_checkpoints': dict(
         kind='evaluate', gpu=False, format='json', title='Checkpoint 评测',
         template={'checkpoints': [], 'opponents': [{'name': 'greedy', 'type': 'greedy'},
@@ -159,6 +165,29 @@ def run_arena_matrix(job: dict, run: Path, events: Events):
     return []
 
 
+def diagnose_checkpoints(job: dict, run: Path, events: Events):
+    from agent_system.evaluation.cnn_diagnostics import diagnose_checkpoint
+    config = json.loads(job['config']) if isinstance(job['config'], str) else job['config']
+    shas = config.get('checkpoints') or []
+    if not shas or any(not isinstance(s, str) or len(s) != 64 for s in shas):
+        raise ValueError('checkpoints must be a non-empty list of full SHA-256 identities')
+    book_path = Path(config.get('book') or ENTRYPOINTS['diagnose_checkpoint']['template']['book'])
+    if not book_path.resolve().is_relative_to(Path(job['data_root'])):
+        raise ValueError('The book must be under the data root')
+    loaded = json.loads(book_path.read_text())
+    book = loaded if isinstance(loaded, list) else loaded['book']
+    rows = []
+    for sha in dict.fromkeys(shas):
+        path = Path(job['data_root']) / 'models' / f'{sha}.pt'
+        if not path.is_file() or sha256(path) != sha:
+            raise ValueError(f'Checkpoint {sha} is not a verified registered model')
+        rows.append(diagnose_checkpoint(path, f'diag-{sha[:12]}', book, run / 'diagnostics' / sha[:12],
+                                        max_plies=int(config.get('max_plies', 300))))
+        (run / 'diagnoses.json').write_text(json.dumps(rows, indent=2, ensure_ascii=False))
+        events.emit('diagnosis', sha256=sha, wins=rows[-1]['counts']['wins'], games=rows[-1]['games'])
+    return []
+
+
 def load_train_script(path='scripts/train_dqn.py'):
     """Import scripts/train_dqn.py as a module (it is a script, not a package member)."""
     spec = importlib.util.spec_from_file_location('train_dqn_script', path)
@@ -208,7 +237,7 @@ def evaluate_checkpoints(job: dict, run: Path, events: Events):
 
 
 RUNNERS = {'train_dqn': train_dqn, 'train_cnn_experiment': train_cnn_experiment, 'run_arena_matrix': run_arena_matrix,
-           'evaluate_checkpoints': evaluate_checkpoints}
+           'diagnose_checkpoint': diagnose_checkpoints, 'evaluate_checkpoints': evaluate_checkpoints}
 
 
 def main(path: str) -> int:

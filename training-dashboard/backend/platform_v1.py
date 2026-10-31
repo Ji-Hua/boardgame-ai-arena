@@ -9,6 +9,9 @@ import os
 import threading
 import time
 
+import json
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 
 from .experiments import Experiments
@@ -27,6 +30,35 @@ class TimedCache:
             if self.stamp is None or self.clock() - self.stamp >= self.ttl:
                 self.value, self.stamp = compute(), self.clock()
             return self.value
+
+
+DIAGNOSIS_FILES = ('experiments/**/diagnoses.json', 'experiments/**/search-diagnoses.json',
+                   'jobs/runs/*/diagnoses.json', 'jobs/runs/*/experiment/diagnoses.json')
+
+
+def diagnoses_index(data_root):
+    """Checkpoint SHA -> every recorded diagnosis of exactly that SHA, with its source file."""
+    root = Path(data_root).resolve()
+    index, warnings = {}, []
+    for pattern in DIAGNOSIS_FILES:
+        for path in sorted(root.glob(pattern)):
+            try:
+                rows = json.loads(path.read_text())
+            except (OSError, ValueError) as exc:
+                warnings.append(f'{path.relative_to(root)}: {exc}')
+                continue
+            for row in rows if isinstance(rows, list) else []:
+                sha = row.get('sha256') if isinstance(row, dict) else None
+                if isinstance(sha, str) and len(sha) == 64:
+                    counts = row.get('counts') or {}
+                    index.setdefault(sha, []).append(dict(source=str(path.relative_to(root)), model_id=row.get('model_id'),
+                        games=row.get('games'), wins=counts.get('wins'), losses=counts.get('losses'),
+                        missed_immediate_win=counts.get('missed_immediate_win'), immediate_win_available=counts.get('immediate_win_available'),
+                        tactical_wins=row.get('tactical_wins'), tactical_count=row.get('tactical_count'),
+                        repetition_rate=row.get('repetition_rate'), mean_decision_ms=row.get('mean_decision_ms'),
+                        output_semantics=row.get('output_semantics'), search=row.get('search'),
+                        book_sha256=row.get('book_sha256'), unique_openings=row.get('unique_openings')))
+    return index, warnings
 
 
 def _ranked(row, rankings):
@@ -53,6 +85,8 @@ def install(app):
     cache = TimedCache()
     experiments = Experiments(os.environ.get('QUORIDOR_DATA_ROOT', '/data/quoridor'))
     listing = lambda: cache.get(lambda: model_listing(app.state.models, app.state.evidence))
+    diagnosis_cache = TimedCache()
+    data_root = os.environ.get('QUORIDOR_DATA_ROOT', '/data/quoridor')
 
     def call(fn, *args):
         try:
@@ -69,6 +103,15 @@ def install(app):
 
     @router.get('/models/{sha}')
     def model(sha: str): return call(model_detail, app.state.models, app.state.evidence, sha)
+
+    @router.get('/models/{sha}/diagnoses')
+    def model_diagnoses(sha: str):
+        def find():
+            if not (len(sha) == 64 and all(c in '0123456789abcdef' for c in sha)):
+                raise ValueError('Model identity must be a full lowercase SHA-256')
+            index, warnings = diagnosis_cache.get(lambda: diagnoses_index(data_root))
+            return dict(sha256=sha, diagnoses=index.get(sha, []), warnings=warnings)
+        return call(find)
 
     @router.get('/experiments')
     def experiment_listing(): return call(experiments.listing)

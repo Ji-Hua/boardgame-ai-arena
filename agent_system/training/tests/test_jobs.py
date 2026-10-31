@@ -63,6 +63,12 @@ class JobEntrypointTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 jobs.gate_roster(bad, '/data')
 
+    def test_diagnosis_validates_identities_and_book_location(self):
+        events = jobs.Events(self.run_dir)
+        for config in ({'checkpoints': []}, {'checkpoints': ['a' * 64], 'book': '/etc/passwd'}):
+            with self.assertRaises(ValueError):
+                jobs.diagnose_checkpoints(dict(config=config, data_root=self.tmp.name), self.run_dir, events)
+
     def test_cnn_experiment_requires_a_training_object(self):
         with self.assertRaises(ValueError):
             jobs.train_cnn_experiment(dict(id='j', config='{}'), self.run_dir, jobs.Events(self.run_dir))

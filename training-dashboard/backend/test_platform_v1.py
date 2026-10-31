@@ -2,7 +2,10 @@
 import unittest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from backend.platform_v1 import TimedCache, install, model_detail, model_listing
+import json
+from pathlib import Path
+import tempfile
+from backend.platform_v1 import TimedCache, diagnoses_index, install, model_detail, model_listing
 
 A, B = 'a'*64, 'b'*64
 
@@ -46,6 +49,22 @@ class PlatformV1Tests(unittest.TestCase):
         models = Models()
         self.assertTrue(model_detail(models, Evidence(), A)['ranked'])
         self.assertEqual(models.verify, [True])
+
+    def test_diagnoses_index_joins_exact_sha_across_experiments_and_jobs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            row = lambda sha, wins: dict(sha256=sha, model_id='m', games=50, counts=dict(wins=wins, losses=50 - wins), tactical_wins=18, tactical_count=18)
+            for path, rows in (('experiments/e1/arm/diagnoses.json', [row(A, 38), row(B, 10)]),
+                               ('jobs/runs/job-1/diagnoses.json', [row(A, 37)]),
+                               ('experiments/e1/notes.json', [row(A, 1)])):
+                (root / path).parent.mkdir(parents=True, exist_ok=True)
+                (root / path).write_text(json.dumps(rows))
+            (root / 'jobs/runs/job-2').mkdir(parents=True)
+            (root / 'jobs/runs/job-2/diagnoses.json').write_text('{broken')
+            index, warnings = diagnoses_index(root)
+            self.assertEqual([(d['source'], d['wins']) for d in index[A]], [('experiments/e1/arm/diagnoses.json', 38), ('jobs/runs/job-1/diagnoses.json', 37)])
+            self.assertEqual(len(index[B]), 1)
+            self.assertEqual(len(warnings), 1)
 
     def test_timed_cache_reuses_value_until_ttl(self):
         now = [0.0]
