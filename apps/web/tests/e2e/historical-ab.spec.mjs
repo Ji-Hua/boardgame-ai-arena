@@ -11,6 +11,8 @@ test('historical A/B uses real model evidence without mutating a game',async({pa
  await page.getByText('走子记录',{exact:true}).click()
  await page.getByRole('button',{name:'40. P2 a2',exact:true}).click()
  await expect(page.getByLabel('诊断历史步')).toHaveValue('39')
+ for(const a of f.actions.slice(0,39).filter(a=>a.type!=='pawn')){const wall=page.locator(`[data-wall="${a.type}:${a.target[0]}:${a.target[1]}"]`);await expect(wall).toHaveAttribute('data-owner',String(a.player));await expect(wall).toHaveAttribute('fill',a.player===1?'#4CAF50':'#2196F3')}
+
  await expect(page.locator('.aw-actor-context')).toContainText(f.identities[1].name)
  const pair=page.getByLabel('动作 A B 比较');await expect(pair).toContainText('实际动作：a2')
  await page.getByLabel('对照动作 B').selectOption('pawn:2:1')

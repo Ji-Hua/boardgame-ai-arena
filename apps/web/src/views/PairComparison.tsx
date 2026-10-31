@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react'
-import {labRequest,type Position} from '../lab'
+import {labRequest,colorBranch,type Position} from '../lab'
 import {Tensor} from './LabView'
 import {actionKey,briefNumber,orderedCandidates} from './DecisionSummary'
 type Obj=Record<string,any>
@@ -30,9 +30,9 @@ export function PairComparison({position,actor,result,actual,bId,onB,onBranch,on
   const c=new AbortController();setBusy(true);setError('')
   const timer=setTimeout(()=>{void(async()=>{try{
    const payload={position,algorithm:actor.spec.algo.type,depth:actor.spec.algo.params?.depth??1,...(actor.spec.algo.type==='dqn'?{model_id:actor.actual_sha256??actor.sha256}:{})}
-   const left=await labRequest('branch',{...payload,action:a.action},c.signal)
+   const left=colorBranch(await labRequest('branch',{...payload,action:a.action},c.signal),a.action)
    if(c.signal.aborted)return
-   const right=await labRequest('branch',{...payload,action:b.action},c.signal)
+   const right=colorBranch(await labRequest('branch',{...payload,action:b.action},c.signal),b.action)
    if(c.signal.aborted)return
    for(const field of ['position_hash','checkpoint_sha256','algorithm','depth'])if(left[field]!==right[field])throw new Error('A/B 来源不一致')
    if(result.position_hash&&left.position_hash!==result.position_hash)throw new Error('局面证据不一致')

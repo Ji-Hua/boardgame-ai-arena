@@ -1,0 +1,2 @@
+# Wall ownership colors
+2026-10-31. Scope: 8790 frontend only. Use recorded wall actions for ownership, never snapshot order or turn parity. P1/P2 use shared pawn colors. Preserve unknown ownership as gray. Historical prefixes exclude future actions; hypothetical branches use explicit branch/PV actions. No rule, backend, session or data changes. Validate render colors and history/branch provenance, then gateway-only deployment with backup.

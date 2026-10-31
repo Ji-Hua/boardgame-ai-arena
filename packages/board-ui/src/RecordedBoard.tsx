@@ -17,7 +17,7 @@
 
 import React from 'react'
 import { PLAYER_COLORS } from './theme/playerColors'
-interface EvalReplayState { p1: [number, number]; p2: [number, number]; h_walls: [number, number][]; v_walls: [number, number][] }
+interface EvalReplayState { p1: [number, number]; p2: [number, number]; h_walls: [number, number][]; v_walls: [number, number][]; wall_owners?: Record<string, 1 | 2> }
 
 // -------------------------------------------------------------------------
 // Board geometry constants
@@ -71,8 +71,8 @@ const CELL_GOAL_P2 = 'var(--board-goal-p2, #dbeafe)'   // light red   — P2 goa
 const GRID_COLOR = 'var(--board-grid, #c8a96e)'
 
 /** Build a CSS colour from a wall array element's owner. */
-function wallColor(player: 'P1' | 'P2' | null): string {
-  return player === 'P1' ? P1_WALL_COLOR : player === 'P2' ? P2_WALL_COLOR : '#555'
+function wallColor(player?: 1 | 2): string {
+  return player === 1 ? P1_WALL_COLOR : player === 2 ? P2_WALL_COLOR : '#888'
 }
 
 export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
@@ -112,8 +112,7 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
     }
   }
 
-  // Walls — derive owner from position order for colouring (no owner in snapshot)
-  // We render all walls in a neutral colour since ownership isn't tracked in snapshots
+  // Ownership comes from explicit recorded actions; missing provenance remains neutral.
   const hWallRects = state.h_walls.map(([wx, wy], i) => {
     // H wall: between screen rows (7-wy) and (8-wy), spanning cols wx and wx+1
     const left = cellLeft(wx)
@@ -121,10 +120,11 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
     const width = 2 * CELL + GAP
     const height = GAP
     const isLast = lastActionType === 'hwall' && lastActionX === wx && lastActionY === wy
-    const color = isLast ? (lastActionPlayer === 'P1' ? P1_WALL_COLOR : P2_WALL_COLOR) : '#888'
+    const owner = state.wall_owners?.[`horizontal:${wx}:${wy}`] ?? (isLast ? (lastActionPlayer === 'P1' ? 1 : lastActionPlayer === 'P2' ? 2 : undefined) : undefined)
+    const color = wallColor(owner)
     return (
       <rect
-        key={`hw-${i}`} onClick={()=>onWallClick?.(wx,wy,"horizontal")}
+        data-wall={`horizontal:${wx}:${wy}`} data-owner={owner??'unknown'} aria-label={`${owner?'P'+owner:'归属未知'} · horizontal ${String.fromCharCode(97+wx)}${wy+1}`} key={`hw-${i}`} onClick={()=>onWallClick?.(wx,wy,"horizontal")}
         x={left}
         y={top}
         width={width}
@@ -142,10 +142,11 @@ export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
     const width = GAP
     const height = 2 * CELL + GAP
     const isLast = lastActionType === 'vwall' && lastActionX === wx && lastActionY === wy
-    const color = isLast ? (lastActionPlayer === 'P1' ? P1_WALL_COLOR : P2_WALL_COLOR) : '#888'
+    const owner = state.wall_owners?.[`vertical:${wx}:${wy}`] ?? (isLast ? (lastActionPlayer === 'P1' ? 1 : lastActionPlayer === 'P2' ? 2 : undefined) : undefined)
+    const color = wallColor(owner)
     return (
       <rect
-        key={`vw-${i}`} onClick={()=>onWallClick?.(wx,wy,"vertical")}
+        data-wall={`vertical:${wx}:${wy}`} data-owner={owner??'unknown'} aria-label={`${owner?'P'+owner:'归属未知'} · vertical ${String.fromCharCode(97+wx)}${wy+1}`} key={`vw-${i}`} onClick={()=>onWallClick?.(wx,wy,"vertical")}
         x={left}
         y={top}
         width={width}
