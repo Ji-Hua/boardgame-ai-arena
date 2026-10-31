@@ -60,7 +60,7 @@ def create_app(controller, token_file=None):
     @router.get('/entrypoints')
     def entrypoints(): return call(controller.entrypoints)
 
-    @router.get('/templates/{entrypoint}/{name}', response_class=PlainTextResponse)
+    @router.get('/templates/{entrypoint}/{name:path}', response_class=PlainTextResponse)
     def template(entrypoint: str, name: str): return call(controller.template, entrypoint, name)
 
     @router.post('')

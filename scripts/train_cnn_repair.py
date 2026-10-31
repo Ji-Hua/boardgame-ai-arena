@@ -9,6 +9,7 @@ import argparse
 from dataclasses import asdict
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -55,7 +56,8 @@ def main():
                       for p in (ROOT/base).rglob("*.py") if "artifacts" not in p.parts})
     manifest = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources}
     (output / "source-manifest.json").write_text(json.dumps({"files": manifest,
-        "git_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        # Platform Jobs run from an exported snapshot without .git and pass the pinned commit instead.
+        "git_head": os.environ.get("QUORIDOR_SOURCE_COMMIT") or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "torch": str(torch.__version__), "gpu": torch.cuda.get_device_name(0)}, indent=2))
     with tarfile.open(output / "source.tar.gz", "w:gz") as archive:
         for p in sources:

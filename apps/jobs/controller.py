@@ -30,6 +30,9 @@ from .store import ACTIVE, Store
 
 log = logging.getLogger('quoridor.jobs')
 NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}\Z')
+TEMPLATE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}(/[A-Za-z0-9][A-Za-z0-9._ -]{0,79})?\Z')
+# Metric files in preference order: the training contract, then the CNN research runner.
+METRIC_FILES = ('metrics.jsonl', 'experiment/metrics.jsonl', 'experiment/research-metrics.jsonl')
 LIMITS = dict(cpus=(1, 12), memory_gb=(2, 48), timeout_h=(0.05, 72))
 DEFAULTS = dict(gpu=dict(cpus=6, memory_gb=24, timeout_h=12), cpu=dict(cpus=4, memory_gb=8, timeout_h=6))
 
@@ -59,13 +62,14 @@ class Controller:
         for name, meta in ENTRYPOINTS.items():
             row = dict(meta)
             if 'templates' in meta:
-                row['templates'] = [f for f in self.git.files(commit, meta['templates']) if f.endswith(('.yaml', '.yml'))]
+                pattern = re.compile(meta.get('template_pattern', r'[^/]+\.ya?ml'))
+                row['templates'] = [f for f in self.git.files(commit, meta['templates']) if pattern.fullmatch(f)]
             rows[name] = row
         return dict(source_ref=self.source_ref, source_commit=commit, image=self.image, entrypoints=rows)
 
     def template(self, entrypoint, name):
         meta = ENTRYPOINTS[entrypoint]
-        if 'templates' not in meta or not NAME.fullmatch(name):
+        if 'templates' not in meta or not TEMPLATE.fullmatch(name) or '..' in name:
             raise KeyError(name)
         return self.git.show(self.git.resolve(self.source_ref), f"{meta['templates']}/{name}")
 
@@ -149,6 +153,7 @@ class Controller:
                 '-e', f"OMP_NUM_THREADS={int(r['cpus'])}", '-e', 'HOME=/tmp',
                 # The host uid has no passwd entry in the image; getpass and torch caches read these instead.
                 '-e', 'USER=quoridor-job', '-e', 'LOGNAME=quoridor-job', '-e', 'TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor',
+                '-e', f"QUORIDOR_SOURCE_COMMIT={job['spec']['source']['commit']}",
                 '-v', f'{self.data_root}:{self.data_root}:ro',
                 '-v', f'{control / "job.json"}:/job/job.json:ro', '-v', f'{control / "source"}:/job/source:ro',
                 '-v', f'{run}:/job/run:rw']
@@ -266,6 +271,11 @@ class Controller:
         job['events'] = [json.loads(x) for x in events.read_text().splitlines() if x.strip()] if events.exists() else []
         job['run_id'] = identifier
         job['run_files'] = sorted(p.name for p in run.iterdir()) if run.exists() else []
+        diagnoses = run / 'experiment' / 'diagnoses.json'
+        try:
+            job['diagnoses'] = json.loads(diagnoses.read_text()) if diagnoses.exists() else []
+        except ValueError:
+            job['diagnoses'] = []  # rewritten after every checkpoint; may be mid-write
         return job
 
     def log_text(self, identifier, tail=400):
@@ -284,6 +294,11 @@ class Controller:
             raise KeyError(identifier)
         run = self.runs / identifier
 
+        def flat(value, prefix=''):
+            if isinstance(value, dict):
+                return {k: v for key, item in value.items() for k, v in flat(item, f'{prefix}{key}.').items()}
+            return {prefix[:-1]: value} if isinstance(value, (int, float, str)) and not isinstance(value, bool) else {}
+
         def rows(name):
             path = run / name
             if not path.exists():
@@ -291,11 +306,12 @@ class Controller:
             values = []
             for line in path.read_text(errors='replace').splitlines()[-limit:]:
                 try:
-                    values.append(json.loads(line))
+                    values.append(flat(json.loads(line)))
                 except ValueError:
                     continue  # a line may be partially written while the Job runs
             return values
-        return dict(metrics=rows('metrics.jsonl'), evaluations=rows('eval_results.jsonl'))
+        source = next((name for name in METRIC_FILES if (run / name).exists()), None)
+        return dict(metrics=rows(source) if source else [], metric_source=source, evaluations=rows('eval_results.jsonl'))
 
     def loop(self, stop: threading.Event, interval=2.0):
         while not stop.is_set():

@@ -27,8 +27,13 @@ import time
 ENTRYPOINTS = {
     'train_dqn': dict(
         kind='train', gpu=True, format='yaml', title='DQN / CNN-DQN 训练',
-        templates='agent_system/training/configs/dqn',
+        templates='agent_system/training/configs/dqn', template_pattern=r'[^/]+\.ya?ml',
         description='scripts/train_dqn.py with the submitted YAML. checkpoint_dir and device are set by the Job.'),
+    'train_cnn_experiment': dict(
+        kind='train', gpu=True, format='json', title='CNN 研究实验（蒸馏 / PPO / DAgger / DDQN / AlphaZero-lite）',
+        templates='agent_system/training/configs', template_pattern=r'cnn_[^/]+/[^/]+\.json',
+        description='scripts/train_cnn_repair.py with the submitted experiment JSON, including per-checkpoint '
+                    'diagnosis. output, checkpoint_dir and device are set by the Job; input paths must be under the data root.'),
     'evaluate_checkpoints': dict(
         kind='evaluate', gpu=False, format='json', title='Checkpoint 评测',
         template={'checkpoints': [], 'opponents': [{'name': 'greedy', 'type': 'greedy'},
@@ -54,13 +59,23 @@ def sha256(path: Path) -> str:
         return hashlib.file_digest(handle, 'sha256').hexdigest()
 
 
-def write_manifest(run: Path, semantics: str | None) -> list[dict]:
+def infer_semantics(metadata: dict) -> str | None:
+    algorithm = str((metadata.get('model_config') or {}).get('algorithm') or '')
+    if not algorithm:
+        return None
+    return 'q_values' if 'dqn' in algorithm else 'policy_logits'
+
+
+def write_manifest(run: Path, semantics: str | None, directory: Path | None = None, known: dict | None = None) -> list[dict]:
+    """List checkpoints; semantics come from the caller, a diagnosis of the same SHA, or the recorded algorithm."""
     import torch
     rows = []
-    for path in sorted((run / 'checkpoints').glob('*.pt')):
+    for path in sorted((directory or run / 'checkpoints').glob('*.pt')):
         raw = torch.load(path, map_location='cpu', weights_only=True)
-        rows.append(dict(file=str(path.relative_to(run)), sha256=sha256(path), output_semantics=semantics,
-                         metadata={k: raw.get(k) for k in CHECKPOINT_METADATA}))
+        metadata = {k: raw.get(k) for k in CHECKPOINT_METADATA}
+        digest = sha256(path)
+        rows.append(dict(file=str(path.relative_to(run)), sha256=digest, metadata=metadata,
+                         output_semantics=semantics or (known or {}).get(digest) or infer_semantics(metadata)))
     (run / 'manifest.json').write_text(json.dumps(dict(checkpoints=rows), indent=2))
     return rows
 
@@ -80,6 +95,24 @@ def train_dqn(job: dict, run: Path, events: Events):
                     '--checkpoint-dir', config['checkpoint_dir'], '--device', device], check=True)
     algorithm = str(config.get('algorithm', 'dqn'))
     return write_manifest(run, 'q_values' if 'dqn' in algorithm else None)
+
+
+def train_cnn_experiment(job: dict, run: Path, events: Events):
+    experiment = json.loads(job['config']) if isinstance(job['config'], str) else dict(job['config'])
+    if not isinstance(experiment.get('training'), dict):
+        raise ValueError('CNN experiment config needs a training object')
+    output = run / 'experiment'
+    experiment['output'] = str(output)
+    experiment['training'].update(checkpoint_dir=str(output / 'checkpoints'), device='cuda')
+    experiment['training'].setdefault('agent_id', job['id'])
+    path = run / 'job-experiment.json'
+    path.write_text(json.dumps(experiment, indent=2))
+    events.emit('process', command='scripts/train_cnn_repair.py', method=next(
+        (k for k in ('alphazero', 'research', 'distillation', 'teacher') if k in experiment), 'cnn_dqn'))
+    subprocess.run([sys.executable, '-u', 'scripts/train_cnn_repair.py', '--config', str(path)], check=True)
+    diagnoses = output / 'diagnoses.json'
+    known = {d['sha256']: d.get('output_semantics') for d in json.loads(diagnoses.read_text())} if diagnoses.exists() else {}
+    return write_manifest(run, None, output / 'checkpoints', known)
 
 
 def load_train_script(path='scripts/train_dqn.py'):
@@ -130,7 +163,7 @@ def evaluate_checkpoints(job: dict, run: Path, events: Events):
     return []
 
 
-RUNNERS = {'train_dqn': train_dqn, 'evaluate_checkpoints': evaluate_checkpoints}
+RUNNERS = {'train_dqn': train_dqn, 'train_cnn_experiment': train_cnn_experiment, 'evaluate_checkpoints': evaluate_checkpoints}
 
 
 def main(path: str) -> int:

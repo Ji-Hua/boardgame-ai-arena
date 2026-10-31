@@ -72,7 +72,8 @@ class Git:
             raise RuntimeError(f'Source export failed for {commit}: {extract.stderr.strip()}')
 
     def files(self, commit, directory):
-        result = _run(['git', '-C', self.repo, 'ls-tree', '--name-only', f'{commit}:{directory}'])
+        """Paths of committed files below directory, relative to it."""
+        result = _run(['git', '-C', self.repo, 'ls-tree', '-r', '--name-only', f'{commit}:{directory}'])
         return sorted(result.stdout.splitlines()) if result.returncode == 0 else []
 
     def show(self, commit, path):

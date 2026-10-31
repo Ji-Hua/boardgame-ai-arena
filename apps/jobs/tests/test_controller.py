@@ -24,12 +24,14 @@ class FakeGit:
         (Path(target) / 'README').write_text(commit)
 
     def files(self, commit, directory):
-        return ['smoke.yaml', 'notes.txt']
+        return ['smoke.yaml', 'notes.txt', 'cnn_x/01-arm.json', 'dqn/nested.yaml']
 
     def show(self, commit, path):
-        if not path.endswith('smoke.yaml'):
-            raise KeyError(path)
-        return YAML
+        if path.endswith('smoke.yaml'):
+            return YAML
+        if path.endswith('cnn_x/01-arm.json'):
+            return '{"training": {}}'
+        raise KeyError(path)
 
 
 class FakeDocker:
@@ -86,7 +88,12 @@ class ControllerTests(unittest.TestCase):
                     dict(entrypoint='train_dqn', config=YAML, resources={'cpus': 99})):
             with self.assertRaises(ValueError):
                 self.controller.submit(bad)
-        self.assertEqual(self.controller.entrypoints()['entrypoints']['train_dqn']['templates'], ['smoke.yaml'])
+        rows = self.controller.entrypoints()['entrypoints']
+        self.assertEqual(rows['train_dqn']['templates'], ['smoke.yaml'])
+        self.assertEqual(rows['train_cnn_experiment']['templates'], ['cnn_x/01-arm.json'])
+        self.assertEqual(self.controller.template('train_cnn_experiment', 'cnn_x/01-arm.json'), '{"training": {}}')
+        with self.assertRaises(KeyError):
+            self.controller.template('train_cnn_experiment', 'cnn_x/../../x.json')
         self.assertEqual(self.controller.template('train_dqn', 'smoke.yaml'), YAML)
         with self.assertRaises(KeyError):
             self.controller.template('train_dqn', '../secret.yaml')
@@ -102,6 +109,7 @@ class ControllerTests(unittest.TestCase):
         self.assertIn('none', args)  # --network none
         self.assertIn('USER=quoridor-job', args)
         self.assertIn('--init', args)
+        self.assertIn(f'QUORIDOR_SOURCE_COMMIT={COMMIT}', args)
         self.assertIn(f'{self.root / "jobs" / "runs" / first["id"]}:/job/run:rw', args)
         self.assertNotIn('nvidia.com/gpu=all', self.docker.runs[1])
         spec = json.loads((self.root / 'jobs' / first['id'] / 'job.json').read_text())
@@ -132,6 +140,18 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(catalog['models'][0]['run_ref'], dict(source='legacy', run_id=job['id']))
         self.assertEqual((self.root / 'jobs' / job['id'] / 'stdout.log').read_text(), 'log line\n')
         self.assertIn(f'qjob-{job["id"]}', self.docker.removed)
+
+    def test_research_metrics_are_flattened_and_diagnoses_exposed(self):
+        job = self.submit()
+        run = self.root / 'jobs' / 'runs' / job['id']
+        (run / 'experiment').mkdir()
+        (run / 'experiment' / 'research-metrics.jsonl').write_text(
+            json.dumps({'episode': 32, 'totals': {'learner_wins': 6}, 'imitation_ce': 1.38, 'flag': True}) + '\n{"partial')
+        (run / 'experiment' / 'diagnoses.json').write_text(json.dumps([{'model_id': 'm', 'games': 50}]))
+        metrics = self.controller.metrics(job['id'])
+        self.assertEqual(metrics['metric_source'], 'experiment/research-metrics.jsonl')
+        self.assertEqual(metrics['metrics'], [{'episode': 32, 'totals.learner_wins': 6, 'imitation_ce': 1.38}])
+        self.assertEqual(self.controller.detail(job['id'])['diagnoses'][0]['games'], 50)
 
     def test_tampered_checkpoint_fails_registration(self):
         job = self.submit()

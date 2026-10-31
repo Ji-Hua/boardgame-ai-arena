@@ -47,6 +47,17 @@ it('prefills an evaluation Job with the model SHA',async()=>{
  await waitFor(()=>expect(JSON.parse((screen.getByLabelText('任务配置') as HTMLTextAreaElement).value).checkpoints).toEqual([sha]))
 })
 
+it('shows research metrics source and per-checkpoint diagnoses',async()=>{
+ mock({'/api/v1/jobs/job-1':()=>({...job,status:'succeeded',finished:1761900100,events:[],run_id:'job-1',run_files:['experiment'],diagnoses:[{model_id:'arm_ep01024',sha256:'d'.repeat(64),games:50,unique_openings:24,counts:{wins:38,losses:12,missed_immediate_win:0,immediate_win_available:38},tactical_wins:18,tactical_count:18,repetition_rate:0,mean_decision_ms:0.73,output_semantics:'policy_logits'}]}),
+  '/api/v1/jobs/job-1/metrics':()=>({metrics:[{episode:32,'totals.learner_wins':6,imitation_ce:1.38}],metric_source:'experiment/research-metrics.jsonl',evaluations:[]})})
+ at('/jobs/job-1?tab=diagnosis')
+ expect(await screen.findByRole('link',{name:'arm_ep01024'})).toBeTruthy()
+ expect(screen.getByText('18 / 18')).toBeTruthy()
+ expect(screen.getByText('38 / 12')).toBeTruthy()
+ fireEvent.click(screen.getByRole('tab',{name:'训练曲线'}))
+ expect(await screen.findByText(/experiment\/research-metrics.jsonl/)).toBeTruthy()
+})
+
 it('shows live curves, registered models and cancels with the token',async()=>{
  localStorage.setItem('quoridor-platform-token','secret')
  const calls=mock({'/api/v1/jobs/job-1':()=>({...job,events:[{event:'started',time:1761900000}],run_id:'job-1',run_files:['metrics.jsonl'],registered:['b'.repeat(64)]}),

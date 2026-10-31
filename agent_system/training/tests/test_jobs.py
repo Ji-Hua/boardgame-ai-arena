@@ -39,6 +39,20 @@ class JobEntrypointTests(unittest.TestCase):
         self.assertEqual(saved[0]['metadata']['action_count'], 209)
         self.assertNotIn('extra', saved[0]['metadata'])
 
+    def test_manifest_semantics_prefer_diagnosis_then_algorithm(self):
+        (self.run_dir / 'experiment' / 'checkpoints').mkdir(parents=True)
+        for name, algorithm in (('a.pt', 'ppo_imitation'), ('b.pt', 'double_dqn'), ('c.pt', None)):
+            torch.save(dict(model_config=dict(algorithm=algorithm)), self.run_dir / 'experiment' / 'checkpoints' / name)
+        directory = self.run_dir / 'experiment' / 'checkpoints'
+        known = {jobs.sha256(directory / 'c.pt'): 'policy_logits'}
+        rows = jobs.write_manifest(self.run_dir, None, directory, known)
+        self.assertEqual([r['file'] for r in rows], ['experiment/checkpoints/a.pt', 'experiment/checkpoints/b.pt', 'experiment/checkpoints/c.pt'])
+        self.assertEqual([r['output_semantics'] for r in rows], ['policy_logits', 'q_values', 'policy_logits'])
+
+    def test_cnn_experiment_requires_a_training_object(self):
+        with self.assertRaises(ValueError):
+            jobs.train_cnn_experiment(dict(id='j', config='{}'), self.run_dir, jobs.Events(self.run_dir))
+
     def test_evaluation_rejects_abbreviated_or_unregistered_checkpoints(self):
         events = jobs.Events(self.run_dir)
         for config in ({'checkpoints': []}, {'checkpoints': ['abc']}):
