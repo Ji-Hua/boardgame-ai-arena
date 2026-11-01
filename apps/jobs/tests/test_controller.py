@@ -169,6 +169,22 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual([r['episode'] for r in tail['metrics']], [3, 9])
         self.assertEqual(self.controller.metrics(job['id'], limit=2)['offset'], 3)
 
+    def test_checkpoints_and_sample_games_are_listed_in_training_order(self):
+        job = self.submit()
+        run = self.root / 'jobs' / 'runs' / job['id']
+        (run / 'checkpoints').mkdir()
+        for name in ('ep00100_step900.pt', 'ep00050_step400.pt'):
+            (run / 'checkpoints' / name).write_bytes(b'x')
+        (run / 'eval_replays.jsonl').write_text(json.dumps(dict(episode=50, opponent_name='greedy', game_length=20,
+                                                                replay_path='replays/eval_ep00050_greedy_game0000.json')) + '\n')
+        rows = self.controller.detail(job['id'])['checkpoints']
+        self.assertEqual([(r['episode'], r['step'], r['sha256']) for r in rows], [(50, 400, None), (100, 900, None)])
+        (run / 'manifest.json').write_text(json.dumps(dict(checkpoints=[
+            dict(file='checkpoints/ep00100_step900.pt', sha256='e' * 64, metadata=dict(episode_count=100))])))
+        self.assertEqual([(r['name'], r['sha256']) for r in self.controller.detail(job['id'])['checkpoints']],
+                         [('ep00100_step900.pt', 'e' * 64)])
+        self.assertEqual(self.controller.metrics(job['id'])['replays'][0]['game_length'], 20)
+
     def test_stream_sends_rows_then_ends_for_a_finished_job(self):
         job = self.submit()
         run = self.root / 'jobs' / 'runs' / job['id']

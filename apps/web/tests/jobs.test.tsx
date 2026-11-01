@@ -3,6 +3,7 @@ import {afterEach,expect,it,vi} from 'vitest'
 import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react'
 import {MemoryRouter,Route,Routes} from 'react-router-dom'
 import {JobList,JobNew,JobDetail} from '../src/views/agent/Jobs'
+import {JobCompare} from '../src/views/agent/JobCompare'
 
 const commit='c'.repeat(40)
 const job={id:'job-1',name:'smoke',entrypoint:'train_dqn',experiment:null,status:'running',created:1761900000,started:1761900000,finished:null,exit_code:null,error:null,cancel_requested:false,registered:[],spec:{entrypoint:'train_dqn',resources:{gpu:true,cpus:6,memory_gb:24,timeout_h:12},source:{ref:'feature/x',commit},image:'img'}}
@@ -13,7 +14,7 @@ function mock(routes:Record<string,(init?:RequestInit)=>unknown>){
  return calls
 }
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();localStorage.clear()})
-const at=(path:string)=>render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/jobs" element={<JobList/>}/><Route path="/jobs/new" element={<JobNew/>}/><Route path="/jobs/:id" element={<JobDetail/>}/></Routes></MemoryRouter>)
+const at=(path:string)=>render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/jobs" element={<JobList/>}/><Route path="/jobs/new" element={<JobNew/>}/><Route path="/jobs/compare" element={<JobCompare/>}/><Route path="/jobs/:id" element={<JobDetail/>}/></Routes></MemoryRouter>)
 
 it('lists Jobs with status, pinned commit and GPU state',async()=>{
  mock({'/api/v1/jobs':()=>({jobs:[job],counts:{running:1}}),'/api/v1/jobs/system':()=>({gpu:{available:true,gpus:[{name:'RTX',memory_used_mib:100,memory_total_mib:12288,utilization:5}]},writes_enabled:true})})
@@ -118,4 +119,43 @@ it('streams metrics into dashboard panels with health alerts',async()=>{
  act(()=>FakeSource.last.emit('update',{status:'running',offset:0,total:2,metric_source:'metrics.jsonl',evaluations:[],alerts:[],
   metrics:[{type:'train',episode:5,loss:0.5},{type:'train',episode:10,loss:0.4}]}))
  expect(await screen.findByText(/2 个记录点/)).toBeTruthy()
+})
+
+it('lists checkpoints with evaluations, sample games and next steps',async()=>{
+ const sha='e'.repeat(64)
+ mock({'/api/v1/jobs/job-1':()=>({...job,status:'succeeded',events:[],run_id:'job-1',run_files:['metrics.jsonl'],registered:[sha],diagnoses:[],
+   checkpoints:[{file:'checkpoints/ep00050_step400.pt',name:'ep00050_step400.pt',sha256:null,episode:50,step:400},{file:'checkpoints/ep00100_step900.pt',name:'ep00100_step900.pt',sha256:sha,episode:100,step:900}]}),
+  '/api/v1/jobs/job-1/metrics':()=>({metrics:[],evaluations:[{type:'eval',episode:50,opponent_name:'greedy',wins:1,draws:0,losses:3,win_rate:0.25},{type:'eval',episode:100,opponent_name:'greedy',wins:3,draws:0,losses:1,win_rate:0.75}],
+   replays:[{episode:100,checkpoint:'ep00100_step900.pt',opponent_name:'greedy',result_from_dqn_perspective:'win',game_length:42,replay_path:'replays/eval_ep00100_greedy_game0000.json'}],alerts:[]})})
+ at('/jobs/job-1?tab=checkpoints')
+ const sample=await screen.findByRole('link',{name:'greedy · 胜 · 42 步'})
+ expect(sample.getAttribute('href')).toBe('/replays/job-1?replay=replays%2Feval_ep00100_greedy_game0000.json&ply=0')
+ expect(screen.getByText('对 greedy')).toBeTruthy()
+ expect(screen.getByText('75%')).toBeTruthy()
+ expect(screen.getByRole('link',{name:'门槛评测'}).getAttribute('href')).toBe('/jobs/new?entrypoint=run_arena_matrix&sha='+sha)
+ expect(screen.getByRole('link',{name:sha.slice(0,12)}).getAttribute('href')).toBe('/models/'+sha)
+ expect(screen.getByText('任务结束后登记')).toBeTruthy()
+})
+
+it('selects Jobs in the list and overlays them on the compare page',async()=>{
+ const other={...job,id:'job-2',name:'wider'}
+ const metricsOf=(win:number)=>({metrics:[{type:'train',episode:10,win_rate:win/2,loss:0.2},{type:'train',episode:20,win_rate:win,loss:0.1,buffer_size:9}],
+  evaluations:[{episode:20,opponent_name:'greedy',win_rate:win}],alerts:[]})
+ mock({'/api/v1/jobs':()=>({jobs:[job,other],counts:{running:2}}),'/api/v1/jobs/system':()=>({gpu:{gpus:[]},writes_enabled:true}),
+  '/api/v1/jobs/job-1':()=>({...job,events:[]}),'/api/v1/jobs/job-2':()=>({...other,events:[]}),
+  '/api/v1/jobs/job-1/metrics':()=>metricsOf(0.4),'/api/v1/jobs/job-2/metrics':()=>metricsOf(0.8)})
+ at('/jobs')
+ fireEvent.click(await screen.findByLabelText('选择 smoke'))
+ expect(screen.queryByRole('link',{name:/对比所选/})).toBeNull()
+ fireEvent.click(screen.getByLabelText('选择 wider'))
+ expect(screen.getByRole('link',{name:'对比所选（2）'}).getAttribute('href')).toBe('/jobs/compare?ids=job-1,job-2')
+ cleanup()
+ at('/jobs/compare?ids=job-1,job-2')
+ expect(await screen.findByRole('link',{name:'wider'})).toBeTruthy()
+ expect(screen.getAllByText('80%')).toHaveLength(2)  // latest window win rate and best evaluation
+ expect(screen.getByRole('region',{name:'胜率（最近窗口）'})).toBeTruthy()
+ expect(screen.getByRole('region',{name:'评测胜率对比'})).toBeTruthy()
+ expect((screen.getByLabelText('对比指标') as HTMLSelectElement).value).toBe('buffer_size')
+ fireEvent.click(screen.getByRole('button',{name:'移除 smoke'}))
+ expect(await screen.findByText(/请在/)).toBeTruthy()
 })

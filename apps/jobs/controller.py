@@ -35,6 +35,7 @@ NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}\Z')
 TEMPLATE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}(/[A-Za-z0-9][A-Za-z0-9._ -]{0,79})?\Z')
 # Metric files in preference order: the training contract, then the CNN research runner.
 METRIC_FILES = ('metrics.jsonl', 'experiment/metrics.jsonl', 'experiment/research-metrics.jsonl')
+CHECKPOINT_NAME = re.compile(r'ep(\d+)(?:_step(\d+))?')
 LIMITS = dict(cpus=(1, 12), memory_gb=(2, 48), timeout_h=(0.05, 72))
 DEFAULTS = dict(gpu=dict(cpus=6, memory_gb=24, timeout_h=12), cpu=dict(cpus=4, memory_gb=8, timeout_h=6))
 
@@ -309,7 +310,29 @@ class Controller:
             job['diagnoses'] = json.loads(diagnoses.read_text()) if diagnoses.exists() else []
         except ValueError:
             job['diagnoses'] = []  # rewritten after every checkpoint; may be mid-write
+        job['checkpoints'] = self._checkpoints(run)
         return job
+
+    def _checkpoints(self, run):
+        """Saved checkpoints in training order: the manifest (with SHA-256) once written, the files before that.
+        Episode and environment step come from the file name (``ep00050_step14841.pt``), as in the evaluation rows."""
+        listed = None
+        manifest = run / 'manifest.json'
+        if manifest.is_file():
+            try:
+                listed = [(c['file'], c['sha256'], c.get('metadata') or {}) for c in json.loads(manifest.read_text())['checkpoints']]
+            except (ValueError, KeyError):
+                listed = None
+        if listed is None:
+            listed = [(str(p.relative_to(run)), None, {}) for d in ('checkpoints', 'experiment/checkpoints')
+                      for p in sorted((run / d).glob('*.pt'))]
+        rows = []
+        for file, sha, metadata in listed:
+            match = CHECKPOINT_NAME.search(Path(file).stem)
+            episode = int(match[1]) if match else metadata.get('episode_count')
+            rows.append(dict(file=file, name=Path(file).name, sha256=sha, episode=episode,
+                             step=int(match[2]) if match and match[2] else None))
+        return sorted(rows, key=lambda r: (r['episode'] is None, r['episode'] or 0, r['name']))
 
     def log_text(self, identifier, tail=400):
         job = self.store.get(identifier)
@@ -353,11 +376,13 @@ class Controller:
         source = next((name for name in METRIC_FILES if (run / name).exists()), None)
         metrics, total = rows(source) if source else ([], 0)
         evaluations = [row for _, row in rows('eval_results.jsonl')[0]]
+        replays = [row for _, row in rows('eval_replays.jsonl')[0]]
         alerts = assess([row for _, row in metrics], evaluations, running=job['status'] == 'running',
                         last_write=(run / source).stat().st_mtime if source else job['started'], now=self.clock())
         start = max(after, total - limit)
         return dict(metrics=[finite(row) for index, row in metrics if index >= start], metric_source=source,
-                    offset=start, total=total, evaluations=[finite(row) for row in evaluations], alerts=alerts)
+                    offset=start, total=total, evaluations=[finite(row) for row in evaluations], alerts=alerts,
+                    replays=[finite(row) for row in replays])
 
     def loop(self, stop: threading.Event, interval=2.0):
         while not stop.is_set():

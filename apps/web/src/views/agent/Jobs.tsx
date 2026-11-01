@@ -1,7 +1,8 @@
 import {useEffect, useRef, useState} from 'react'
 import {Link, useNavigate, useParams, useSearchParams} from 'react-router-dom'
 import {type Obj, request, useV1, enc, fmt, when, ErrorBox, Json} from './shared'
-import {EvalCurve, JobAlerts, JobCurves} from './JobCurves'
+import {COLORS, EvalCurve, JobAlerts, JobCurves} from './JobCurves'
+import {CheckpointTimeline} from './JobTimeline'
 
 const ACTIVE=['queued','preparing','running']
 const STATUS:Record<string,string>={queued:'排队中',preparing:'准备中',running:'运行中',succeeded:'已完成',failed:'失败',cancelled:'已取消'}
@@ -42,10 +43,14 @@ function useJobMetrics(id:string,active:boolean){
 export function JobList(){
  const jobs=useLive('/api/v1/jobs',true,5000),system=useV1('/jobs/system')
  const rows:Obj[]=jobs.data?.jobs??[];const gpu=system.data?.gpu?.gpus?.[0]
- return <><div className="aw-toolbar"><h1>任务</h1><small>训练、评测在独立容器中运行，固定到已提交的源码版本</small><Link className="pf-primary" to="/jobs/new">新建任务</Link></div>
+ const [picked,setPicked]=useState<string[]>([])
+ const toggle=(id:string)=>setPicked(p=>p.includes(id)?p.filter(x=>x!==id):p.length<COLORS.length?[...p,id]:p)
+ return <><div className="aw-toolbar"><h1>任务</h1><small>训练、评测在独立容器中运行，固定到已提交的源码版本</small>
+  {picked.length>=2?<Link className="button-link" to={'/jobs/compare?ids='+picked.map(enc).join(',')}>对比所选（{picked.length}）</Link>:<small>勾选 2–{COLORS.length} 个任务可对比曲线</small>}
+  <Link className="pf-primary" to="/jobs/new">新建任务</Link></div>
  <div className="aw-toolbar aw-metrics"><span>{gpu?`${gpu.name} · 显存 ${gpu.memory_used_mib}/${gpu.memory_total_mib} MiB · 利用率 ${gpu.utilization}%`:system.data?'GPU 不可用':'读取 GPU…'}</span>{jobs.data&&Object.entries(jobs.data.counts as Record<string,number>).filter(([,n])=>n>0).map(([s,n])=><span key={s}>{STATUS[s]} {n}</span>)}{system.data&&!system.data.writes_enabled&&<span>未配置写入令牌</span>}</div>
  <ErrorBox text={jobs.error||system.error}/>{!jobs.data&&!jobs.error&&<p role="status">加载任务…</p>}
- {jobs.data&&<div className="aw-table"><table><thead><tr><th>任务</th><th>入口</th><th>状态</th><th>创建</th><th>用时</th></tr></thead><tbody>{rows.map(j=><tr key={j.id}><td><Link to={'/jobs/'+enc(j.id)}>{j.name}</Link><small>{j.id}{j.experiment?' · '+j.experiment:''}</small></td><td>{j.entrypoint}<small>{j.spec.resources.gpu?'GPU':'CPU'} · {j.spec.source.commit.slice(0,8)}</small></td><td><JobStatus status={j.status}/>{j.error&&<small>{j.error}</small>}</td><td>{when(j.created)}</td><td>{duration(j)}</td></tr>)}</tbody></table></div>}
+ {jobs.data&&<div className="aw-table"><table><thead><tr><th aria-label="选择"/><th>任务</th><th>入口</th><th>状态</th><th>创建</th><th>用时</th></tr></thead><tbody>{rows.map(j=><tr key={j.id}><td><input type="checkbox" aria-label={'选择 '+j.name} checked={picked.includes(j.id)} disabled={!picked.includes(j.id)&&picked.length>=COLORS.length} onChange={()=>toggle(j.id)}/></td><td><Link to={'/jobs/'+enc(j.id)}>{j.name}</Link><small>{j.id}{j.experiment?' · '+j.experiment:''}</small></td><td>{j.entrypoint}<small>{j.spec.resources.gpu?'GPU':'CPU'} · {j.spec.source.commit.slice(0,8)}</small></td><td><JobStatus status={j.status}/>{j.error&&<small>{j.error}</small>}</td><td>{when(j.created)}</td><td>{duration(j)}</td></tr>)}</tbody></table></div>}
  {jobs.data&&!rows.length&&<p>还没有任务</p>}</>
 }
 
@@ -80,7 +85,7 @@ export function JobDetail(){
  const [active,setActive]=useState(true)
  const job=useLive('/api/v1/jobs/'+enc(id),active,3000)
  const metrics=useJobMetrics(id,active)
- const tab=['curves','evaluation','diagnosis','log','events','spec'].includes(params.get('tab')??'')?params.get('tab')!:'curves'
+ const tab=['curves','checkpoints','evaluation','diagnosis','log','events','spec'].includes(params.get('tab')??'')?params.get('tab')!:'curves'
  const log=useLive<string>(tab==='log'?'/api/v1/jobs/'+enc(id)+'/log?tail=500':null,active,3000,true)
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),logRef=useRef<HTMLPreElement>(null)
  const j=job.data
@@ -95,9 +100,10 @@ export function JobDetail(){
  <div className="aw-toolbar aw-metrics"><span>{j.entrypoint}</span><span>{j.spec.resources.gpu?'GPU':'CPU'} · {j.spec.resources.cpus} CPU · {j.spec.resources.memory_gb} GB</span><span>源码 {j.spec.source.commit.slice(0,10)}</span><span>用时 {duration(j)}</span>{j.exit_code!=null&&<span>退出码 {j.exit_code}</span>}</div>
  {j.error&&<p className="warning">{j.error}</p>}<ErrorBox text={error}/><JobAlerts alerts={metrics.data?.alerts??[]}/>
  <div className="aw-toolbar">{j.run_files.includes('metrics.jsonl')&&<Link to={'/training?run='+enc(j.run_id)}>在训练工作区查看</Link>}{j.registered.map((sha:string)=><Link key={sha} to={'/models/'+sha}>模型 {sha.slice(0,12)}</Link>)}{j.experiment&&<Link to={'/experiments/'+enc(j.experiment)}>实验 {j.experiment}</Link>}{j.season&&<Link to={'/ladder?season='+enc(j.season)}>天梯评测批次 {j.season}</Link>}{j.spec.follow_up?.gate&&<small>成功后门槛评测 {j.spec.follow_up.gate}</small>}</div>
- <div className="aw-tabs" role="tablist" aria-label="任务视图">{[['curves','训练曲线'],['evaluation',`评测 · ${metrics.data?.evaluations?.length??0}`],['diagnosis',`诊断 · ${j.diagnoses?.length??0}`],['log','日志'],['events',`事件 · ${j.events.length}`],['spec','规格']].map(([k,label])=><button key={k} role="tab" aria-selected={tab===k} onClick={()=>setTab(k)}>{label}</button>)}</div>
+ <div className="aw-tabs" role="tablist" aria-label="任务视图">{[['curves','训练曲线'],['checkpoints',`Checkpoint · ${j.checkpoints?.length??0}`],['evaluation',`评测 · ${metrics.data?.evaluations?.length??0}`],['diagnosis',`诊断 · ${j.diagnoses?.length??0}`],['log','日志'],['events',`事件 · ${j.events.length}`],['spec','规格']].map(([k,label])=><button key={k} role="tab" aria-selected={tab===k} onClick={()=>setTab(k)}>{label}</button>)}</div>
  <div className="pf-tab-body" role="tabpanel">
  {tab==='curves'&&(rows.length?<JobCurves rows={rows} source={metrics.data?.metric_source} live={metrics.live}/>:<><ErrorBox text={metrics.error}/><p>{active?'等待第一批训练指标…':'没有训练指标'}</p></>)}
+ {tab==='checkpoints'&&<CheckpointTimeline job={j} evaluations={metrics.data?.evaluations??[]} replays={metrics.data?.replays??[]}/>}
  {tab==='evaluation'&&((metrics.data?.evaluations?.length??0)?<><EvalCurve rows={metrics.data!.evaluations}/><div className="aw-table"><table><thead><tr><th>对手</th><th>进度</th><th>局数</th><th>胜 / 平 / 负</th><th>胜率</th></tr></thead><tbody>{metrics.data!.evaluations.map((r:Obj,i:number)=><tr key={i}><td>{r.opponent??r.opponent_name??r.opponent_id??'—'}{r.checkpoint_sha&&<small>{String(r.checkpoint_sha).slice(0,12)}</small>}</td><td>{r.episode??'最终'}</td><td>{r.games??r.num_games??r.eval_games??'—'}</td><td>{r.wins??'—'} / {r.draws??'—'} / {r.losses??'—'}</td><td>{fmt(r.win_rate,3)}</td></tr>)}</tbody></table></div></>:<p>暂无评测记录</p>)}
  {tab==='diagnosis'&&((j.diagnoses?.length??0)?<DiagnosisTable rows={j.diagnoses}/>:<p>{active?'每个 checkpoint 保存后自动诊断…':'此任务没有 checkpoint 诊断'}</p>)}
  {tab==='log'&&<><ErrorBox text={log.error}/><pre ref={logRef} className="pf-log">{log.data??'读取日志…'}</pre></>}

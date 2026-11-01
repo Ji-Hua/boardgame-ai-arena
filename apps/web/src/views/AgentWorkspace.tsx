@@ -17,6 +17,7 @@ import {Overview} from './agent/Overview'
 import {ExperimentList, ExperimentDetail} from './agent/Experiments'
 import {ModelList, ModelDetail} from './agent/Models'
 import {JobList, JobNew, JobDetail} from './agent/Jobs'
+import {JobCompare} from './agent/JobCompare'
 import {Ladder} from './agent/Ladder'
 import {AgentDetail} from './agent/AgentDetail'
 import {CheckpointPage} from './agent/CheckpointPage'
@@ -66,6 +67,7 @@ export default function AgentWorkspace(){
   <Route path="/replays/:runId" element={<ReplaysView/>}/>
   <Route path="/jobs" element={<JobList/>}/>
   <Route path="/jobs/new" element={<JobNew/>}/>
+  <Route path="/jobs/compare" element={<JobCompare/>}/>
   <Route path="/jobs/:id" element={<JobDetail/>}/>
   <Route path="/arena" element={<ArenaView/>}/>
   <Route path="/models" element={<ModelList season={season}/>}/>

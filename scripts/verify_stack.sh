@@ -16,6 +16,7 @@ ARTIFACTS=/home/jihua/workspace/boardgame-ai-arena/agent_system/training/artifac
 NAME=quoridor-verify-gateway
 JOBS_IMAGE=${JOBS_IMAGE:-quoridor-train-gpu:latest}
 TOKEN_FILE=${JOBS_TOKEN_FILE:-/home/jihua/quoridor-releases/jobs/private/token}
+JOBS_DATA=${VERIFY_JOBS_DATA:-$DATA}
 
 stop() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true
@@ -34,17 +35,17 @@ start)
     --app-dir "$ROOT" --host 127.0.0.1 --port 18794 >"$EVIDENCE/lab.log" 2>&1 &
   echo $! >"$EVIDENCE/lab.pid"
   PLATFORM_MODEL_CATALOGS=discover QUORIDOR_DATA_ROOT=$DATA MLFLOW_TRACKING_URI=http://127.0.0.1:8742 \
-  TRAINING_DASHBOARD_ARTIFACT_ROOTS="$ARTIFACTS/dqn:$ARTIFACTS:$DATA/jobs/runs" PLATFORM_FRONTEND_DIST="$ROOT/apps/web/dist" \
+  TRAINING_DASHBOARD_ARTIFACT_ROOTS="$ARTIFACTS/dqn:$ARTIFACTS:$JOBS_DATA/jobs/runs" PLATFORM_FRONTEND_DIST="$ROOT/apps/web/dist" \
   TRAINING_DASHBOARD_SOURCE_ROOT="$ROOT" PLATFORM_LAB_UPSTREAM=http://127.0.0.1:18794 \
     nohup "$PY" -m uvicorn platform_entry:create_app --factory --app-dir "$ROOT/training-dashboard" \
     --host 127.0.0.1 --port 18793 >"$EVIDENCE/platform.log" 2>&1 &
   echo $! >"$EVIDENCE/platform.pid"
-  JOBS_DATA_ROOT=${VERIFY_JOBS_DATA:-$DATA} JOBS_IMAGE="$JOBS_IMAGE" JOBS_TOKEN_FILE="$TOKEN_FILE" JOBS_PORT=18796 \
+  JOBS_DATA_ROOT=$JOBS_DATA JOBS_IMAGE="$JOBS_IMAGE" JOBS_TOKEN_FILE="$TOKEN_FILE" JOBS_PORT=18796 \
   JOBS_SOURCE_REF=${JOBS_SOURCE_REF:-feature/unified-rl-platform} nohup "$PY" -m apps.jobs >"$EVIDENCE/jobs.log" 2>&1 &
   echo $! >"$EVIDENCE/jobs.pid"
   rm -f "$EVIDENCE"/games.sqlite*
   PLATFORM_MODEL_CATALOGS=discover QUORIDOR_DATA_ROOT=$DATA GAMEPLAY_DB="$EVIDENCE/games.sqlite" GAMEPLAY_PORT=18797 \
-  TRAINING_DASHBOARD_ARTIFACT_ROOTS="$ARTIFACTS/dqn:$ARTIFACTS:$DATA/jobs/runs" TRAINING_DASHBOARD_SOURCE_ROOT="$ROOT" \
+  TRAINING_DASHBOARD_ARTIFACT_ROOTS="$ARTIFACTS/dqn:$ARTIFACTS:$JOBS_DATA/jobs/runs" TRAINING_DASHBOARD_SOURCE_ROOT="$ROOT" \
     nohup "$PY" -m apps.gameplay >"$EVIDENCE/gameplay.log" 2>&1 &
   echo $! >"$EVIDENCE/gameplay.pid"
   sed -e 's/listen 8080;/listen 127.0.0.1:18795;/' -e 's/${GAMEPLAY_UPSTREAM}/127.0.0.1:18797/g' \

@@ -3,7 +3,7 @@ import {LineChart} from '../../components/LineChart'
 import type {AxisKey, MetricPoint} from '../../types'
 import {type Obj, fmt} from './shared'
 
-const COLORS=['#4f9eff','#f5a524','#3ecf8e','#e5484d']
+export const COLORS=['#4f9eff','#f5a524','#3ecf8e','#e5484d']
 /** Fixed panels for the training contract; any other numeric field stays reachable under "其他指标". */
 const PANELS:{title:string;keys:[string,string][];log?:boolean}[]=[
  {title:'对局结果（最近窗口）',keys:[['win_rate','胜'],['loss_rate','负'],['truncation_rate','截断']]},
@@ -16,11 +16,11 @@ const PANELS:{title:string;keys:[string,string][];log?:boolean}[]=[
 const PANEL_KEYS=new Set(PANELS.flatMap(p=>p.keys.map(([k])=>k)))
 const SUMMARY:[string,string,(v:number)=>string][]=[['win_rate','胜率',v=>fmt(100*v,0)+'%'],['truncation_rate','截断率',v=>fmt(100*v,0)+'%'],['repeat_rate','重复局面',v=>fmt(100*v,0)+'%'],['loss','loss',v=>fmt(v,4)],['episodes_per_s','局 / 秒',v=>fmt(v,2)]]
 
-const numeric=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v)
+export const numeric=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v)
 export const curveKeys=(rows:Obj[])=>[...new Set(rows.flatMap(r=>Object.entries(r).filter(([k,v])=>typeof v==='number'&&!['episode','step'].includes(k)).map(([k])=>k)))]
 
 /** Exponential moving average per key (TensorBoard style); log scale drops non-positive values. */
-function series(rows:Obj[],keys:string[],smooth:number,log:boolean):MetricPoint[]{
+export function series(rows:Obj[],keys:string[],smooth:number,log:boolean):MetricPoint[]{
  const state:Record<string,number|undefined>={}
  return rows.map(r=>({episode:r.episode??null,step:r.step??null,values:Object.fromEntries(keys.map(k=>{
   let v=numeric(r[k])?r[k]:null
