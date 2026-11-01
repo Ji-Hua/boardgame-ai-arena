@@ -32,6 +32,13 @@ P3 (2026-10-31), `020eba4`, `1c807f2`, `84282eb`, `e52c034`:
 - `c7c7797` failure mining: Agent detail lists recorded games it lost, drew by repetition or ply limit, or where it missed a win (from recorded outcomes and per-game decision diagnostics only); for a recorded missed win the Rust engine locates the plies with a legal winning pawn move and links to them.
 - `728dd73` `diagnose_checkpoint` Jobs run the existing CNN diagnosis on registered checkpoints; `/api/v1/models/{sha}/diagnoses` collects every diagnosis of the exact SHA from experiment and Job outputs, shown on model detail.
 - Versioned probe suites as separate data (design section 7) were not created: the tactical probes stay inside `cnn_diagnostics` and books are referenced by manifest path and recorded `book_sha256`.
+P6a training visibility (2026-11-01), `d054bf4` plus fixes:
+- `scripts/train_dqn.py` adds window metrics to every `metrics.jsonl` record (`_window_metrics`): `win_rate`, `loss_rate`, `truncation_rate`, `wall_ratio`, `repeat_rate` (learner decisions in a position already seen this episode; the observations have no move counter), `max_episode_length`, `q_mean`, `target_mean`, `td_error_max`, `grad_norm`, `elapsed_s`, `episodes_per_s`. Existing fields are unchanged.
+- `apps/jobs/health.py` turns rows into alerts: NaN/Inf, truncation >= 30%, repetition >= 25%, mean |Q| > 5, loss > 10x the earlier median, evaluation win rate 20 points below the best earlier one per opponent, and no new metrics for 10 minutes while running. Alerts never stop a Job.
+- `GET /api/v1/jobs/{id}/metrics?after=N` returns `offset`, `total` and `alerts`; NaN/Inf become null (they previously made the response fail). `GET /api/v1/jobs/{id}/stream` sends the same data as server-sent events every 2 s while it changes, a keep-alive comment every 15 s, and `end` for a finished Job. The existing `/api/v1/jobs` gateway locations already disable buffering, so no gateway change.
+- Job page: alert banner, latest values, six grouped multi-series panels (results, behaviour, length, loss, value, optimisation), EMA smoothing, log scale for loss panels, episode or environment-step axis, any other field under 其他指标, and an evaluation win-rate curve per opponent. EventSource while the Job is active (a reconnect replaces rows instead of duplicating), polling otherwise.
+- `scripts/verify_stack.sh` accepts `VERIFY_JOBS_DATA` so a test controller does not share the live Job database.
+- Not in P6a: the CNN research runner (`train_cnn_experiment`) keeps its own metrics; the dashboard shows them under 其他指标.
 ## Verification commands and observed results
 - `npm run typecheck`, `npm run test:ui` (55 passed), `npm run build`: passed before and after the split.
 - Backend (documented command, see docs/WORKSPACES.md): 134 run, all passed, 1 optional skip; with `ARENA_REPLAY_TEST_ROOT` set, 0 skipped. An earlier run reported a `backend.test_mlflow` import error only because `training-dashboard` was missing from `PYTHONPATH`; the test imports the local adapter, not the MLflow package. Five new tests pass.
@@ -111,6 +118,7 @@ P5 (2026-10-31), `54593aa`, `379a943`: entry and gameplay on Dev; Training keeps
 - The Dev mirror `~/quoridor-data` (5.8 GB) stays in place for the real cutover; every test stack and test unit was removed.
 - The images are already loaded on Dev.
 
+- P6a (2026-11-01): Jobs 20 tests, `test_jobs` 10, training regression set 181 passed, platform backend OK, typecheck, UI 66 passed (new stream test with a fake EventSource). Live check on loopback with a throwaway Job data root (`VERIFY_JOBS_DATA`): GPU Job `job-20261101-224802-e9d4a5` (smoke config, 150 episodes, source `d054bf4`) streamed a row every ~2 s through the gateway and ended with `end`; it raised the truncation (40%) and repetition (62%) alerts, matching the smoothed curves (win rate down from 40% to about 10%). Screenshots desktop and 390 px without horizontal overflow: `/home/jihua/quoridor-backups/unified-rl-platform-p6a/shots/`.
 ## External artifacts and deployment impact
 P5 cutover package (prepared, not run): `/home/jihua/quoridor-releases/p5-cutover-379a943/`, containing `cutover.sh`, `rollback.sh`, `lib.sh`, the Training compose, the redirect, the Dev files and a README.
 - Run on Training after the P4 deploy.

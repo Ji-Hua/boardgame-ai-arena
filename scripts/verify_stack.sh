@@ -2,7 +2,8 @@
 # Isolated loopback stack for browser verification of this worktree on Training.
 # Never touches the live 8790 preview: Platform 18793, Lab 18794, gateway 18795, Jobs 18796, gameplay 18797
 # on 127.0.0.1. Games go to a throwaway database under the evidence directory.
-# Jobs use the real data root: submitted Jobs run on the GPU and register checkpoints into catalog-jobs.json.
+# Jobs use the real data root unless VERIFY_JOBS_DATA names a throwaway one; set it while the live Jobs
+# controller runs, since only one controller may use a data root. Submitted Jobs run on the GPU.
 # Usage: scripts/verify_stack.sh start|stop  (EVIDENCE_DIR overrides the log directory)
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -38,7 +39,7 @@ start)
     nohup "$PY" -m uvicorn platform_entry:create_app --factory --app-dir "$ROOT/training-dashboard" \
     --host 127.0.0.1 --port 18793 >"$EVIDENCE/platform.log" 2>&1 &
   echo $! >"$EVIDENCE/platform.pid"
-  JOBS_DATA_ROOT=$DATA JOBS_IMAGE="$JOBS_IMAGE" JOBS_TOKEN_FILE="$TOKEN_FILE" JOBS_PORT=18796 \
+  JOBS_DATA_ROOT=${VERIFY_JOBS_DATA:-$DATA} JOBS_IMAGE="$JOBS_IMAGE" JOBS_TOKEN_FILE="$TOKEN_FILE" JOBS_PORT=18796 \
   JOBS_SOURCE_REF=${JOBS_SOURCE_REF:-feature/unified-rl-platform} nohup "$PY" -m apps.jobs >"$EVIDENCE/jobs.log" 2>&1 &
   echo $! >"$EVIDENCE/jobs.pid"
   rm -f "$EVIDENCE"/games.sqlite*
