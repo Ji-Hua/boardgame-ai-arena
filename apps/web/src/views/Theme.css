@@ -98,6 +98,7 @@
 
 /* Checkpoint timeline and Job comparison. */
 .pf-timeline td{vertical-align:top}
+.pf-timeline th small{display:block;font-weight:400}
 .pf-wdl{display:inline-flex;flex-direction:column;gap:2px;padding:4px 8px;border-radius:6px;font-variant-numeric:tabular-nums;background:color-mix(in srgb,var(--good) calc(var(--rate)*45%),transparent);border:1px solid var(--border)}
 .pf-samples{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:12px}
 .pf-next{display:flex;gap:10px;flex-wrap:wrap;font-size:12px}
