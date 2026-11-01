@@ -98,10 +98,13 @@ def train_dqn(job: dict, run: Path, events: Events):
         raise ValueError('train_dqn config must be a YAML mapping')
     device = 'cuda' if job['resources'].get('gpu') else 'cpu'
     config.update(checkpoint_dir=str(run / 'checkpoints'), device=device)
-    config.setdefault('agent_id', job['id'])
+    # The replay writer records agent_id as the run id, and the research API only serves replays whose
+    # run id is the run directory, i.e. the Job id. A template agent_id is kept in the events.
+    template_agent = config.get('agent_id')
+    config['agent_id'] = job['id']
     path = run / 'job-config.yaml'
     path.write_text(yaml.safe_dump(config, sort_keys=False))
-    events.emit('process', command='scripts/train_dqn.py', device=device)
+    events.emit('process', command='scripts/train_dqn.py', device=device, template_agent_id=template_agent)
     subprocess.run([sys.executable, '-u', 'scripts/train_dqn.py', '--config', str(path),
                     '--checkpoint-dir', config['checkpoint_dir'], '--device', device], check=True)
     algorithm = str(config.get('algorithm', 'dqn'))
