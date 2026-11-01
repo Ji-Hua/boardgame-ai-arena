@@ -1,8 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
 import {Link, useNavigate, useParams, useSearchParams} from 'react-router-dom'
-import {LineChart} from '../../components/LineChart'
-import type {MetricPoint} from '../../types'
 import {type Obj, request, useV1, enc, fmt, when, ErrorBox, Json} from './shared'
+import {EvalCurve, JobAlerts, JobCurves} from './JobCurves'
 
 const ACTIVE=['queued','preparing','running']
 const STATUS:Record<string,string>={queued:'排队中',preparing:'准备中',running:'运行中',succeeded:'已完成',failed:'失败',cancelled:'已取消'}
@@ -24,6 +23,20 @@ function useLive<T=Obj>(url:string|null,active:boolean,ms=3000,text=false){
   load.then(d=>{if(!c.signal.aborted){setData(d as T);setError('')}}).catch(e=>{if(!c.signal.aborted)setError(String(e))});return()=>c.abort()},[url,tick])
  useEffect(()=>{if(!active||!url)return;const t=setInterval(()=>setTick(v=>v+1),ms);return()=>clearInterval(t)},[active,url,ms])
  return {data,error,refresh:()=>setTick(v=>v+1)}
+}
+
+/** Metrics over server-sent events while the Job runs; polling when EventSource is missing or the stream closes. */
+function useJobMetrics(id:string,active:boolean){
+ const [failed,setFailed]=useState(false),[live,setLive]=useState<Obj|null>(null)
+ const streaming=active&&!failed&&typeof EventSource!=='undefined'
+ const polled=useLive(streaming?null:'/api/v1/jobs/'+enc(id)+'/metrics',active,5000)
+ useEffect(()=>{if(!streaming)return;const source=new EventSource('/api/v1/jobs/'+enc(id)+'/stream')
+  // Append when the update continues the rows we hold; a reconnect starts over and replaces them.
+  source.addEventListener('update',e=>{const d=JSON.parse((e as MessageEvent).data);setLive(prev=>prev&&d.offset===prev.offset+prev.metrics.length?{...d,offset:prev.offset,metrics:[...prev.metrics,...d.metrics]}:d)})
+  source.addEventListener('end',()=>source.close())
+  source.onerror=()=>{if(source.readyState===EventSource.CLOSED)setFailed(true)}
+  return()=>source.close()},[id,streaming])
+ return streaming?{data:live,error:'',live:true}:{data:polled.data??live,error:polled.error,live:false}
 }
 
 export function JobList(){
@@ -62,33 +75,30 @@ export function JobNew(){
  </div>}</>
 }
 
-function curveKeys(rows:Obj[]){return [...new Set(rows.flatMap(r=>Object.entries(r).filter(([k,v])=>typeof v==='number'&&!['episode','step'].includes(k)).map(([k])=>k)))]}
-
 export function JobDetail(){
  const {id=''}=useParams();const [params,setParams]=useSearchParams()
  const [active,setActive]=useState(true)
  const job=useLive('/api/v1/jobs/'+enc(id),active,3000)
- const metrics=useLive('/api/v1/jobs/'+enc(id)+'/metrics',active,5000)
+ const metrics=useJobMetrics(id,active)
  const tab=['curves','evaluation','diagnosis','log','events','spec'].includes(params.get('tab')??'')?params.get('tab')!:'curves'
  const log=useLive<string>(tab==='log'?'/api/v1/jobs/'+enc(id)+'/log?tail=500':null,active,3000,true)
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),logRef=useRef<HTMLPreElement>(null)
  const j=job.data
  useEffect(()=>{if(j)setActive(ACTIVE.includes(j.status))},[j?.status])
  useEffect(()=>{logRef.current?.scrollTo(0,logRef.current.scrollHeight)},[log.data])
- const rows:Obj[]=(metrics.data?.metrics??[]).filter((r:Obj)=>!r.type||r.type==='train');const keys=curveKeys(rows)
- const [key,setKey]=useState('');const chosen=keys.includes(key)?key:keys.find(k=>k==='loss')??keys[0]
- const points:MetricPoint[]=rows.map(r=>({episode:r.episode??null,step:r.step??null,values:Object.fromEntries(keys.map(k=>[k,typeof r[k]==='number'?r[k]:null]))}))
+ useEffect(()=>{if(j&&metrics.data?.status&&metrics.data.status!==j.status)job.refresh()},[metrics.data?.status])
+ const rows:Obj[]=(metrics.data?.metrics??[]).filter((r:Obj)=>!r.type||r.type==='train')
  async function cancel(){setBusy(true);setError('');try{await request('/api/v1/jobs/'+enc(id)+'/cancel',{method:'POST',headers:{'X-Platform-Token':readToken()}});job.refresh()}catch(e){setError(String(e)+'（令牌在新建任务页设置）')}finally{setBusy(false)}}
  const setTab=(t:string)=>{const p=new URLSearchParams(params);p.set('tab',t);setParams(p,{replace:true})}
  return <><div className="aw-breadcrumb"><Link to="/jobs">任务</Link> / {id}</div><ErrorBox text={job.error}/>{!j&&!job.error&&<p role="status">加载任务…</p>}
  {j&&<><div className="aw-toolbar"><h1>{j.name}</h1><JobStatus status={j.status}/>{ACTIVE.includes(j.status)&&<button disabled={busy||j.cancel_requested} onClick={()=>void cancel()}>{j.cancel_requested?'正在取消…':'取消任务'}</button>}</div>
  <div className="aw-toolbar aw-metrics"><span>{j.entrypoint}</span><span>{j.spec.resources.gpu?'GPU':'CPU'} · {j.spec.resources.cpus} CPU · {j.spec.resources.memory_gb} GB</span><span>源码 {j.spec.source.commit.slice(0,10)}</span><span>用时 {duration(j)}</span>{j.exit_code!=null&&<span>退出码 {j.exit_code}</span>}</div>
- {j.error&&<p className="warning">{j.error}</p>}<ErrorBox text={error}/>
+ {j.error&&<p className="warning">{j.error}</p>}<ErrorBox text={error}/><JobAlerts alerts={metrics.data?.alerts??[]}/>
  <div className="aw-toolbar">{j.run_files.includes('metrics.jsonl')&&<Link to={'/training?run='+enc(j.run_id)}>在训练工作区查看</Link>}{j.registered.map((sha:string)=><Link key={sha} to={'/models/'+sha}>模型 {sha.slice(0,12)}</Link>)}{j.experiment&&<Link to={'/experiments/'+enc(j.experiment)}>实验 {j.experiment}</Link>}{j.season&&<Link to={'/ladder?season='+enc(j.season)}>天梯评测批次 {j.season}</Link>}{j.spec.follow_up?.gate&&<small>成功后门槛评测 {j.spec.follow_up.gate}</small>}</div>
  <div className="aw-tabs" role="tablist" aria-label="任务视图">{[['curves','训练曲线'],['evaluation',`评测 · ${metrics.data?.evaluations?.length??0}`],['diagnosis',`诊断 · ${j.diagnoses?.length??0}`],['log','日志'],['events',`事件 · ${j.events.length}`],['spec','规格']].map(([k,label])=><button key={k} role="tab" aria-selected={tab===k} onClick={()=>setTab(k)}>{label}</button>)}</div>
  <div className="pf-tab-body" role="tabpanel">
- {tab==='curves'&&(chosen?<><div className="aw-toolbar"><label>指标<select aria-label="任务指标" value={chosen} onChange={e=>setKey(e.target.value)}>{keys.map(k=><option key={k} value={k}>{k}</option>)}</select></label><small>{rows.length} 个记录点 · {metrics.data?.metric_source??'metrics.jsonl'}{active?' · 实时刷新':''}</small></div><div className="chart-card"><LineChart points={points} xKey="episode" xLabel="episode" yKey={chosen} yLabel={chosen} width={900} height={320}/></div></>:<p>{active?'等待第一批训练指标…':'没有训练指标'}</p>)}
- {tab==='evaluation'&&((metrics.data?.evaluations?.length??0)?<div className="aw-table"><table><thead><tr><th>对手</th><th>进度</th><th>局数</th><th>胜 / 平 / 负</th><th>胜率</th></tr></thead><tbody>{metrics.data!.evaluations.map((r:Obj,i:number)=><tr key={i}><td>{r.opponent??r.opponent_name??r.opponent_id??'—'}{r.checkpoint_sha&&<small>{String(r.checkpoint_sha).slice(0,12)}</small>}</td><td>{r.episode??'最终'}</td><td>{r.games??r.num_games??'—'}</td><td>{r.wins??'—'} / {r.draws??'—'} / {r.losses??'—'}</td><td>{fmt(r.win_rate,3)}</td></tr>)}</tbody></table></div>:<p>暂无评测记录</p>)}
+ {tab==='curves'&&(rows.length?<JobCurves rows={rows} source={metrics.data?.metric_source} live={metrics.live}/>:<><ErrorBox text={metrics.error}/><p>{active?'等待第一批训练指标…':'没有训练指标'}</p></>)}
+ {tab==='evaluation'&&((metrics.data?.evaluations?.length??0)?<><EvalCurve rows={metrics.data!.evaluations}/><div className="aw-table"><table><thead><tr><th>对手</th><th>进度</th><th>局数</th><th>胜 / 平 / 负</th><th>胜率</th></tr></thead><tbody>{metrics.data!.evaluations.map((r:Obj,i:number)=><tr key={i}><td>{r.opponent??r.opponent_name??r.opponent_id??'—'}{r.checkpoint_sha&&<small>{String(r.checkpoint_sha).slice(0,12)}</small>}</td><td>{r.episode??'最终'}</td><td>{r.games??r.num_games??'—'}</td><td>{r.wins??'—'} / {r.draws??'—'} / {r.losses??'—'}</td><td>{fmt(r.win_rate,3)}</td></tr>)}</tbody></table></div></>:<p>暂无评测记录</p>)}
  {tab==='diagnosis'&&((j.diagnoses?.length??0)?<DiagnosisTable rows={j.diagnoses}/>:<p>{active?'每个 checkpoint 保存后自动诊断…':'此任务没有 checkpoint 诊断'}</p>)}
  {tab==='log'&&<><ErrorBox text={log.error}/><pre ref={logRef} className="pf-log">{log.data??'读取日志…'}</pre></>}
  {tab==='events'&&<ul className="pf-list">{j.events.map((e:Obj,i:number)=><li key={i}><strong>{e.event}</strong><small>{when(e.time)} · {Object.entries(e).filter(([k])=>!['event','time'].includes(k)).map(([k,v])=>k+'='+(typeof v==='object'?JSON.stringify(v):v)).join(' · ')}</small></li>)}</ul>}

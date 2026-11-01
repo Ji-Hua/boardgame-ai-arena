@@ -225,6 +225,7 @@ class TrainResult:
     recent_target_mean: list[float] = field(default_factory=list)
     recent_td_error_max_abs: list[float] = field(default_factory=list)
     recent_batch_done_count: list[int] = field(default_factory=list)
+    recent_grad_norm: list[float] = field(default_factory=list)
     final_checkpoint_path: str = ""
     # Trained network param count (set after network is built in train())
     param_count: int = 0
@@ -243,6 +244,11 @@ class TrainResult:
     # Per-episode reward breakdown lists (parallel to episode_rewards)
     episode_terminal_rewards: list[float] = field(default_factory=list)
     episode_distance_rewards: list[float] = field(default_factory=list)
+    # Per-episode learner behaviour (parallel to episode_rewards); outcome is "win", "loss" or "truncated"
+    episode_outcomes: list[str] = field(default_factory=list)
+    episode_learner_moves: list[int] = field(default_factory=list)
+    episode_wall_moves: list[int] = field(default_factory=list)
+    episode_repeated_positions: list[int] = field(default_factory=list)
     # Evaluation
     eval_result: dict = field(default_factory=dict)
     eval_results: list[dict] = field(default_factory=list)    # periodic evaluation results
@@ -267,6 +273,10 @@ def _update_diag_windows(result: TrainResult, step_result: TrainStepResult, wind
     result.recent_target_mean.append(step_result.target_mean)
     result.recent_td_error_max_abs.append(step_result.td_error_max_abs)
     result.recent_batch_done_count.append(step_result.done_count)
+    if step_result.grad_norm is not None:
+        result.recent_grad_norm.append(step_result.grad_norm)
+        if len(result.recent_grad_norm) > window:
+            result.recent_grad_norm.pop(0)
     if len(result.recent_q_min) > window:
         result.recent_q_min.pop(0)
     if len(result.recent_q_mean) > window:
@@ -277,6 +287,31 @@ def _update_diag_windows(result: TrainResult, step_result: TrainStepResult, wind
         result.recent_td_error_max_abs.pop(0)
     if len(result.recent_batch_done_count) > window:
         result.recent_batch_done_count.pop(0)
+
+
+def _mean(values: list) -> float | None:
+    return round(sum(values) / len(values), 6) if values else None
+
+
+def _window_metrics(result: TrainResult, recent: int, elapsed: float) -> dict:
+    """Behaviour and optimisation health over the last ``recent`` episodes, for the Job dashboard."""
+    outcomes = result.episode_outcomes[-recent:]
+    moves = sum(result.episode_learner_moves[-recent:])
+    n = len(outcomes) or 1
+    return {
+        "win_rate": round(outcomes.count("win") / n, 6),
+        "loss_rate": round(outcomes.count("loss") / n, 6),
+        "truncation_rate": round(outcomes.count("truncated") / n, 6),
+        "wall_ratio": round(sum(result.episode_wall_moves[-recent:]) / moves, 6) if moves else None,
+        "repeat_rate": round(sum(result.episode_repeated_positions[-recent:]) / moves, 6) if moves else None,
+        "max_episode_length": max(result.episode_lengths[-recent:], default=None),
+        "q_mean": _mean(result.recent_q_mean[-100:]),
+        "target_mean": _mean(result.recent_target_mean[-100:]),
+        "td_error_max": _mean(result.recent_td_error_max_abs[-100:]),
+        "grad_norm": _mean(result.recent_grad_norm[-100:]),
+        "elapsed_s": round(elapsed, 1),
+        "episodes_per_s": round(result.total_episodes / elapsed, 4) if elapsed > 0 else None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -556,6 +591,10 @@ def train(cfg: TrainConfig, *, checkpoint_callback=None) -> TrainResult:
         episode_illegal = 0
         ep_learner_won = False
         ep_opponent_won = False
+        episode_learner_moves = 0
+        episode_wall_moves = 0
+        episode_positions: set[int] = set()  # learner decision positions; the observation has no move counter
+        episode_repeats = 0
 
         # Deferred-push state: hold the learner's (obs, action_id, prev_state)
         # until after the opponent responds, so that:
@@ -579,7 +618,11 @@ def train(cfg: TrainConfig, *, checkpoint_callback=None) -> TrainResult:
                 obs = _encode(state)
                 epsilon = compute_epsilon(learner_decision_step, cfg)
 
-                obs_tensor = torch.tensor(obs, dtype=torch.float32).to(device)
+                obs_cpu = torch.tensor(obs, dtype=torch.float32)
+                position = hash(tuple(obs_cpu.view(-1).tolist()))
+                episode_repeats += position in episode_positions
+                episode_positions.add(position)
+                obs_tensor = obs_cpu.to(device)
                 online_net.eval()
                 with torch.no_grad():
                     q_values, type_q = network_outputs(online_net, obs_tensor)
@@ -589,6 +632,8 @@ def train(cfg: TrainConfig, *, checkpoint_callback=None) -> TrainResult:
                              if type_q is not None else select_epsilon_greedy_action(q_values, mask, epsilon=epsilon, rng=rng))
                 if not mask[action_id]:
                     episode_illegal += 1
+                episode_learner_moves += 1
+                episode_wall_moves += action_id >= 81  # ids 81..208 place walls (dqn_action_v1)
 
                 pending_obs = obs
                 pending_action_id = action_id
@@ -746,6 +791,10 @@ def train(cfg: TrainConfig, *, checkpoint_callback=None) -> TrainResult:
         result.episode_terminal_rewards.append(episode_terminal_reward)
         result.episode_distance_rewards.append(episode_distance_reward)
         result.episode_lengths.append(episode_steps)
+        result.episode_outcomes.append("win" if ep_learner_won else "loss" if ep_opponent_won else "truncated")
+        result.episode_learner_moves.append(episode_learner_moves)
+        result.episode_wall_moves.append(episode_wall_moves)
+        result.episode_repeated_positions.append(episode_repeats)
 
         # Periodic checkpoint
         is_checkpoint_ep = (episode + 1) % cfg.checkpoint_interval == 0 or episode == cfg.episodes - 1
@@ -941,6 +990,7 @@ def train(cfg: TrainConfig, *, checkpoint_callback=None) -> TrainResult:
                 # For schedule, emit the current phase label + per-opponent breakdown
                 _metrics_record["train_opponent_phase"] = _current_schedule_label
             _metrics_record["train_opponent_name"] = ep_opponent_label
+            _metrics_record.update(_window_metrics(result, recent_ep, time.time() - t_start))
             _metrics_fh.write(json.dumps(_metrics_record) + "\n")
             _metrics_fh.flush()
 

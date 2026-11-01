@@ -156,6 +156,31 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(metrics['metrics'], [{'episode': 32, 'totals.learner_wins': 6, 'imitation_ce': 1.38}])
         self.assertEqual(self.controller.detail(job['id'])['diagnoses'][0]['games'], 50)
 
+    def test_metrics_resume_from_an_offset_with_alerts_and_no_nan(self):
+        job = self.submit()
+        run = self.root / 'jobs' / 'runs' / job['id']
+        rows = [dict(type='train', episode=i, loss=0.01, truncation_rate=0.6 if i == 3 else 0.0) for i in range(4)]
+        (run / 'metrics.jsonl').write_text('\n'.join(json.dumps(r) for r in rows) + '\n{"type": "train", "episode": 9, "loss": NaN}\n')
+        full = self.controller.metrics(job['id'])
+        self.assertEqual((full['offset'], full['total'], len(full['metrics'])), (0, 5, 5))
+        self.assertIsNone(full['metrics'][-1]['loss'])
+        self.assertEqual([a['code'] for a in full['alerts']], ['non_finite'])
+        tail = self.controller.metrics(job['id'], after=3)
+        self.assertEqual([r['episode'] for r in tail['metrics']], [3, 9])
+        self.assertEqual(self.controller.metrics(job['id'], limit=2)['offset'], 3)
+
+    def test_stream_sends_rows_then_ends_for_a_finished_job(self):
+        job = self.submit()
+        run = self.root / 'jobs' / 'runs' / job['id']
+        (run / 'metrics.jsonl').write_text(json.dumps(dict(type='train', episode=1, loss=0.2)) + '\n')
+        self.controller.store.update(job['id'], status='succeeded')
+        client = TestClient(create_app(self.controller, None, stream_interval=0.01))
+        body = client.get(f'/api/v1/jobs/{job["id"]}/stream').text
+        update = json.loads(body.split('event: update\ndata: ')[1].split('\n\n')[0])
+        self.assertEqual((update['status'], update['offset'], update['metrics'][0]['loss']), ('succeeded', 0, 0.2))
+        self.assertTrue(body.rstrip().endswith('event: end\ndata: {}'))
+        self.assertEqual(client.get('/api/v1/jobs/job-missing/stream').status_code, 404)
+
     def test_research_runs_register_without_a_training_run_ref(self):
         job = self.submit('evaluate_checkpoints', experiment='exp-1')
         self.controller.tick()

@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import re
@@ -26,6 +27,7 @@ import time
 import yaml
 
 from agent_system.training.jobs import ENTRYPOINTS
+from .health import assess
 from .store import ACTIVE, Store
 
 log = logging.getLogger('quoridor.jobs')
@@ -320,8 +322,10 @@ class Controller:
             return '\n'.join(saved.read_text(errors='replace').splitlines()[-tail:])
         return ''
 
-    def metrics(self, identifier, limit=5000):
-        if self.store.get(identifier) is None:
+    def metrics(self, identifier, limit=5000, after=0):
+        """Metric rows from line ``after`` on (the stream sends only new lines), evaluations and health alerts."""
+        job = self.store.get(identifier)
+        if job is None:
             raise KeyError(identifier)
         run = self.runs / identifier
 
@@ -331,18 +335,29 @@ class Controller:
             return {prefix[:-1]: value} if isinstance(value, (int, float, str)) and not isinstance(value, bool) else {}
 
         def rows(name):
+            """(line index, row) pairs of the last ``limit`` lines, and the file's line count."""
             path = run / name
             if not path.exists():
-                return []
+                return [], 0
+            lines = path.read_text(errors='replace').splitlines()
             values = []
-            for line in path.read_text(errors='replace').splitlines()[-limit:]:
+            for index in range(max(0, len(lines) - limit), len(lines)):
                 try:
-                    values.append(flat(json.loads(line)))
+                    values.append((index, flat(json.loads(lines[index]))))
                 except ValueError:
                     continue  # a line may be partially written while the Job runs
-            return values
+            return values, len(lines)
+
+        def finite(row):  # JSON responses cannot carry NaN or Inf; the alerts already reported them
+            return {k: None if isinstance(v, float) and not math.isfinite(v) else v for k, v in row.items()}
         source = next((name for name in METRIC_FILES if (run / name).exists()), None)
-        return dict(metrics=rows(source) if source else [], metric_source=source, evaluations=rows('eval_results.jsonl'))
+        metrics, total = rows(source) if source else ([], 0)
+        evaluations = [row for _, row in rows('eval_results.jsonl')[0]]
+        alerts = assess([row for _, row in metrics], evaluations, running=job['status'] == 'running',
+                        last_write=(run / source).stat().st_mtime if source else job['started'], now=self.clock())
+        start = max(after, total - limit)
+        return dict(metrics=[finite(row) for index, row in metrics if index >= start], metric_source=source,
+                    offset=start, total=total, evaluations=[finite(row) for row in evaluations], alerts=alerts)
 
     def loop(self, stop: threading.Event, interval=2.0):
         while not stop.is_set():

@@ -28,6 +28,19 @@ class JobEntrypointTests(unittest.TestCase):
         self.assertEqual((cfg.eval_games, cfg.seed), (3, 1))
         self.assertTrue(callable(script.run_evaluation))
 
+    def test_window_metrics_summarise_recent_behaviour(self):
+        script = jobs.load_train_script(str(ROOT / 'scripts' / 'train_dqn.py'))
+        result = script.TrainResult(config=script.TrainConfig(), total_episodes=4)
+        result.episode_outcomes = ['win', 'loss', 'truncated', 'truncated']
+        result.episode_lengths = [30, 40, 401, 400]
+        result.episode_learner_moves = [15, 20, 200, 200]
+        result.episode_wall_moves = [5, 0, 10, 10]
+        result.episode_repeated_positions = [0, 0, 100, 60]
+        result.recent_grad_norm = [1.0, 3.0]
+        row = script._window_metrics(result, 2, 8.0)
+        self.assertEqual((row['win_rate'], row['truncation_rate'], row['wall_ratio'], row['repeat_rate']), (0.0, 1.0, 0.05, 0.4))
+        self.assertEqual((row['max_episode_length'], row['grad_norm'], row['episodes_per_s'], row['q_mean']), (401, 2.0, 0.5, None))
+
     def test_manifest_lists_checkpoint_sha_and_metadata(self):
         (self.run_dir / 'checkpoints').mkdir()
         torch.save(dict(observation_version='dqn_obs_v1', action_count=209, model_config=dict(obs_size=292), extra=1),

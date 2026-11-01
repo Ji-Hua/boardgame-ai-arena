@@ -1,6 +1,6 @@
 import React from 'react'
 import {afterEach,expect,it,vi} from 'vitest'
-import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react'
+import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react'
 import {MemoryRouter,Route,Routes} from 'react-router-dom'
 import {JobList,JobNew,JobDetail} from '../src/views/agent/Jobs'
 
@@ -12,7 +12,7 @@ function mock(routes:Record<string,(init?:RequestInit)=>unknown>){
  vi.spyOn(globalThis,'fetch').mockImplementation((input:RequestInfo|URL,init?:RequestInit)=>{const url=String(input);calls.push({url,init});const handler=routes[url];return handler?reply(handler(init) as any):reply({detail:'not mocked'},404)})
  return calls
 }
-afterEach(()=>{cleanup();vi.restoreAllMocks();localStorage.clear()})
+afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();localStorage.clear()})
 const at=(path:string)=>render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/jobs" element={<JobList/>}/><Route path="/jobs/new" element={<JobNew/>}/><Route path="/jobs/:id" element={<JobDetail/>}/></Routes></MemoryRouter>)
 
 it('lists Jobs with status, pinned commit and GPU state',async()=>{
@@ -91,4 +91,31 @@ it('shows live curves, registered models and cancels with the token',async()=>{
  expect(screen.getByRole('link',{name:/模型 bbbbbb/}).getAttribute('href')).toBe('/models/'+'b'.repeat(64))
  fireEvent.click(screen.getByRole('button',{name:'取消任务'}))
  await waitFor(()=>expect(calls.some(c=>c.url==='/api/v1/jobs/job-1/cancel'&&(c.init?.headers as Record<string,string>)['X-Platform-Token']==='secret')).toBe(true))
+})
+
+it('streams metrics into dashboard panels with health alerts',async()=>{
+ class FakeSource{static last:FakeSource;static CLOSED=2;readyState=1;onerror:null|(()=>void)=null;listeners:Record<string,(e:{data:string})=>void>={}
+  constructor(public url:string){FakeSource.last=this}
+  addEventListener(type:string,fn:(e:{data:string})=>void){this.listeners[type]=fn}
+  close(){this.readyState=2}
+  emit(type:string,data:unknown){this.listeners[type]?.({data:JSON.stringify(data)})}}
+ vi.stubGlobal('EventSource',FakeSource)
+ mock({'/api/v1/jobs/job-1':()=>({...job,events:[],run_id:'job-1',run_files:['metrics.jsonl']})})
+ at('/jobs/job-1')
+ await waitFor(()=>expect(FakeSource.last?.url).toBe('/api/v1/jobs/job-1/stream'))
+ act(()=>FakeSource.last.emit('update',{status:'running',offset:0,total:1,metric_source:'metrics.jsonl',evaluations:[],
+  metrics:[{type:'train',episode:5,step:50,loss:0.5,win_rate:0.2,truncation_rate:0.6}],
+  alerts:[{level:'warning',code:'truncation',message:'最近 60% 的对局达到步数上限，可能在绕圈',episode:5}]}))
+ expect(await screen.findByText(/可能在绕圈/)).toBeTruthy()
+ act(()=>FakeSource.last.emit('update',{status:'running',offset:1,total:2,metric_source:'metrics.jsonl',evaluations:[],alerts:[],
+  metrics:[{type:'train',episode:10,step:100,loss:0.4,win_rate:0.4,truncation_rate:0.2}]}))
+ expect(await screen.findByText(/2 个记录点 · metrics.jsonl · 实时/)).toBeTruthy()
+ expect(screen.queryByText(/可能在绕圈/)).toBeNull()
+ expect(screen.getByRole('region',{name:'对局结果（最近窗口）'})).toBeTruthy()
+ expect(screen.getByRole('region',{name:'损失'})).toBeTruthy()
+ expect(screen.getByText('40%')).toBeTruthy()
+ // A reconnect starts from offset 0 and replaces the rows instead of duplicating them.
+ act(()=>FakeSource.last.emit('update',{status:'running',offset:0,total:2,metric_source:'metrics.jsonl',evaluations:[],alerts:[],
+  metrics:[{type:'train',episode:5,loss:0.5},{type:'train',episode:10,loss:0.4}]}))
+ expect(await screen.findByText(/2 个记录点/)).toBeTruthy()
 })

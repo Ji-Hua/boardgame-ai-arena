@@ -5,14 +5,18 @@ platform token (``X-Platform-Token``). Without a token file writes are disabled.
 """
 from __future__ import annotations
 
+import asyncio
 import hmac
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 
 from .docker import gpu_status
+from .store import ACTIVE
 
 
 class Submission(BaseModel):
@@ -26,7 +30,7 @@ class Submission(BaseModel):
     follow_up: dict[str, str] | None = None
 
 
-def create_app(controller, token_file=None):
+def create_app(controller, token_file=None, stream_interval=2.0, heartbeat=15.0):
     app = FastAPI(title='Quoridor platform Jobs')
     router = APIRouter(prefix='/api/v1/jobs')
 
@@ -76,7 +80,34 @@ def create_app(controller, token_file=None):
     def log(identifier: str, tail: int = 400): return call(controller.log_text, identifier, max(1, min(tail, 5000)))
 
     @router.get('/{identifier}/metrics')
-    def metrics(identifier: str): return call(controller.metrics, identifier)
+    def metrics(identifier: str, after: int = 0): return call(controller.metrics, identifier, 5000, max(0, after))
+
+    @router.get('/{identifier}/stream')
+    async def stream(identifier: str):
+        """Server-sent events: ``update`` carries new metric rows (from ``offset``), status, evaluations and alerts;
+        ``end`` follows the last update of a finished Job. Comment lines keep idle proxies open."""
+        if controller.store.get(identifier) is None:
+            raise HTTPException(404, 'Job not found')
+
+        async def events():
+            after, last, idle = 0, None, 0.0
+            while True:
+                job = await run_in_threadpool(controller.store.get, identifier)
+                data = await run_in_threadpool(controller.metrics, identifier, 5000, after)
+                state = (job['status'], data['total'], len(data['evaluations']), json.dumps(data['alerts']))
+                if state != last or data['metrics']:
+                    last, idle, after = state, 0.0, data['total']
+                    yield 'event: update\ndata: ' + json.dumps(dict(data, status=job['status'])) + '\n\n'
+                elif idle >= heartbeat:
+                    idle = 0.0
+                    yield ': keep-alive\n\n'
+                if job['status'] not in ACTIVE:
+                    yield 'event: end\ndata: {}\n\n'
+                    return
+                await asyncio.sleep(stream_interval)
+                idle += stream_interval
+        return StreamingResponse(events(), media_type='text/event-stream',
+                                 headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
     @router.post('/{identifier}/cancel')
     def cancel(identifier: str, x_platform_token: str = Header(default='')):
