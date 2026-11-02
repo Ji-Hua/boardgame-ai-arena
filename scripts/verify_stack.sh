@@ -35,7 +35,7 @@ start)
   LAB_MODEL_CATALOG="$LAB_CATALOG" nohup "$PY" -m uvicorn agent_system.analysis.app:app \
     --app-dir "$ROOT" --host 127.0.0.1 --port 18794 >"$EVIDENCE/lab.log" 2>&1 &
   echo $! >"$EVIDENCE/lab.pid"
-  PLATFORM_MODEL_CATALOGS=discover QUORIDOR_DATA_ROOT=$DATA MLFLOW_TRACKING_URI=http://127.0.0.1:8742 \
+  PLATFORM_MODEL_CATALOGS=discover QUORIDOR_DATA_ROOT=$DATA MLFLOW_TRACKING_URI=http://127.0.0.1:8742 PLATFORM_PROMOTIONS=$JOBS_DATA/promotions.jsonl \
   TRAINING_DASHBOARD_ARTIFACT_ROOTS="$ARTIFACTS/dqn:$ARTIFACTS:$JOBS_DATA/jobs/runs" PLATFORM_FRONTEND_DIST="$ROOT/apps/web/dist" \
   TRAINING_DASHBOARD_SOURCE_ROOT="$ROOT" PLATFORM_LAB_UPSTREAM=http://127.0.0.1:18794 \
     nohup "$PY" -m uvicorn platform_entry:create_app --factory --app-dir "$ROOT/training-dashboard" \

@@ -19,6 +19,13 @@ from .docker import gpu_status
 from .store import ACTIVE
 
 
+class Promotion(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    sha256: str = Field(max_length=64)
+    season: str | None = Field(default=None, max_length=80)
+    note: str = Field(max_length=2000)
+
+
 class Submission(BaseModel):
     model_config = ConfigDict(extra='forbid')
     entrypoint: str = Field(max_length=80)
@@ -114,8 +121,29 @@ def create_app(controller, token_file=None, stream_interval=2.0, heartbeat=15.0)
         authorize(x_platform_token)
         return call(controller.cancel, identifier)
 
+    promotions = APIRouter(prefix='/api/v1/promotions')
+
+    @promotions.get('')
+    def promotion_log():
+        return dict(deployed=list(controller.promotions.current().values()), history=controller.promotions.history())
+
+    @promotions.get('/candidates/{sha}')
+    def promotion_candidates(sha: str):
+        return dict(sha256=sha, deployed=controller.promotions.current().get(sha), gates=call(controller.promotions.gates, sha))
+
+    @promotions.post('')
+    def promote(body: Promotion, x_platform_token: str = Header(default='')):
+        authorize(x_platform_token)
+        return call(controller.promotions.promote, body.sha256, body.season, body.note)
+
+    @promotions.post('/withdraw')
+    def withdraw(body: Promotion, x_platform_token: str = Header(default='')):
+        authorize(x_platform_token)
+        return call(controller.promotions.withdraw, body.sha256, body.note)
+
     @app.get('/health')
     def health(): return dict(status='ok', service='jobs')
 
     app.include_router(router)
+    app.include_router(promotions)
     return app

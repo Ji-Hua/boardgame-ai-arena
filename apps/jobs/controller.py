@@ -28,6 +28,7 @@ import yaml
 
 from agent_system.training.jobs import ENTRYPOINTS
 from .health import assess
+from .promotions import Promotions
 from .store import ACTIVE, Store
 
 log = logging.getLogger('quoridor.jobs')
@@ -59,6 +60,7 @@ class Controller:
         self.catalog_lock = threading.Lock()
         self.mlflow, self.mlflow_lock, self.mlflow_busy = mlflow, threading.Lock(), set()
         self.model_store = model_store  # verification ledger and merged index (model_store.ModelStore)
+        self.promotions = Promotions(self.data_root, self.store, clock)
 
     # ---- submission -------------------------------------------------------------------------
     def entrypoints(self):

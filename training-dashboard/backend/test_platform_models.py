@@ -77,6 +77,17 @@ class ModelIndexTests(unittest.TestCase):
             store.write_bytes(b"changed checkpoint")  # a rewritten store file (new size) no longer matches its entry
             self.assertFalse(self.index().listing()["models"][0]["sha_verified"])
 
+    def test_deployment_is_the_replay_of_the_promotion_log(self):
+        self.assertFalse(self.index().listing()["models"][0]["deployed"])
+        log = self.root / "promotions.jsonl"
+        log.write_text(json.dumps(dict(action="promote", sha256=self.sha, season="job-1", note="gate passed")) + "\n")
+        row = self.index().listing()["models"][0]
+        self.assertTrue(row["deployed"])
+        self.assertEqual(row["deployment_evidence"]["season"], "job-1")
+        with log.open("a") as stream:
+            stream.write(json.dumps(dict(action="withdraw", sha256=self.sha, note="regressed")) + "\n{\"partial")
+        self.assertFalse(self.index().listing()["models"][0]["deployed"])
+
     def test_hash_cache_stat_invalidation_and_mismatch(self):
         index = self.index()
         original = hashlib.file_digest

@@ -12,6 +12,13 @@ server {
         proxy_read_timeout 120s;
         proxy_buffering off;
     }
+    # Promotion decisions are written by the Job controller (the only writer of the data root).
+    location ^~ /api/v1/promotions {
+        proxy_connect_timeout 5s;
+        proxy_pass http://${JOBS_UPSTREAM};
+        proxy_set_header Host $http_host;
+        proxy_read_timeout 60s;
+    }
     # Gameplay service: the only owner of game state.
     location ^~ /api/v1/play {
         proxy_connect_timeout 5s;

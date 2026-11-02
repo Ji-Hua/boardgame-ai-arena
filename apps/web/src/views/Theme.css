@@ -104,3 +104,8 @@
 .pf-next{display:flex;gap:10px;flex-wrap:wrap;font-size:12px}
 .pf-swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:baseline}
 .pf-probe{display:block;white-space:nowrap}.pf-probe b{font-variant-numeric:tabular-nums}
+
+/* Deployment decision. */
+.pf-note{color:var(--text-muted);font-size:12px;max-width:80ch}
+.pf-promotion blockquote{margin:6px 0 0;padding:6px 12px;border-left:3px solid var(--accent);color:var(--text)}
+.pf-promotion .aw-panel{margin-bottom:12px}

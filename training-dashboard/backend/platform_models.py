@@ -48,7 +48,8 @@ class ModelIndex:
     PLATFORM_MODEL_REGISTRY, PLATFORM_AGENT_SPEC_DIR and
     PLATFORM_MODEL_APPROVED_ROOTS (os.pathsep-separated extra read roots).
     Explicit ``catalog_paths`` replaces, rather than extends, defaults.
-    ``deployed_shas`` is an optional trusted *observed* deployment snapshot;
+    ``deployed_shas`` is an optional trusted *observed* deployment snapshot; otherwise deployment is the
+    replay of the promotion log (``promotions.jsonl``, human-confirmed decisions written by the Job controller);
     registry aliases and AgentSpec presence alone never establish deployment.
     """
 
@@ -91,6 +92,28 @@ class ModelIndex:
         self._hash_cache: dict[tuple, str] = {}
         self._lock = threading.RLock()
         self._ledger: tuple = (None, {})
+        self.promotions_path = Path(os.environ.get("PLATFORM_PROMOTIONS", self.data_root / "promotions.jsonl"))
+        self._promotions: tuple = (None, {})
+
+    def _deployments(self) -> dict:
+        """SHA -> current promotion record, replayed from the append-only log the Job controller writes."""
+        try:
+            stamp = self.promotions_path.stat().st_mtime_ns
+        except OSError:
+            return {}
+        if self._promotions[0] != stamp:
+            deployed = {}
+            for line in self.promotions_path.read_text().splitlines():
+                try:
+                    record = json.loads(line)
+                except ValueError:
+                    continue  # a line may be mid-append
+                if record.get("action") == "promote":
+                    deployed[record.get("sha256")] = record
+                elif record.get("action") == "withdraw":
+                    deployed.pop(record.get("sha256"), None)
+            self._promotions = (stamp, deployed)
+        return self._promotions[1]
 
     def _verified(self, path: Path, digest: str) -> bool:
         """True when the immutable store copy ``models/<sha>.pt`` matches the host verification ledger
@@ -383,7 +406,7 @@ class ModelIndex:
         play_blockers = list(analysis_blockers)
         if not playable_specs:
             play_blockers.append("no_pinned_top1_agent_spec")
-        observed = self.deployed_shas.get(digest)
+        observed = self.deployed_shas.get(digest) or self._deployments().get(digest)
         deployment_blockers = list(blockers)
         if not observed:
             deployment_blockers.append("deployment_not_observed")
