@@ -11,7 +11,8 @@ import torch
 from quoridor_engine import Player
 
 from agent_system.analysis.neural import Runner
-from agent_system.analysis.state import ENGINE, Move, Position, build_state, to_position, wire_action
+from agent_system.analysis.state import ENGINE, Move, to_position, wire_action
+from agent_system.evaluation import probes
 from agent_system.evaluation.arena.agents.scorers import _build_state
 from agent_system.evaluation.arena.matrix import play_block, stable_hash, _materialized, decision_summary
 from agent_system.evaluation.arena.ratings import score_interval
@@ -19,11 +20,13 @@ from agent_system.training.dqn.action_space import encode_engine_action
 from agent_system.training.dqn.model import policy_argmax
 
 
-def diagnose_checkpoint(checkpoint, model_id, book, output, max_plies=300, search=None):
+def diagnose_checkpoint(checkpoint, model_id, book, output, max_plies=300, search=None, probe_suites=None):
     """Evaluation never changes weights or applies a tactical action override.
 
     Games within each opening are correlated; confidence bounds use the mean
     of each seat-swapped pair. Development results must not be sold as holdout.
+    ``probe_suites`` are loaded suites (``probes.load``); by default the built-in
+    ``probes.DEFAULT`` suites. ``tactical`` keeps the immediate-win v1 results.
     """
     checkpoint, output = Path(checkpoint), Path(output)
     output.mkdir(parents=True, exist_ok=False)
@@ -91,23 +94,22 @@ def diagnose_checkpoint(checkpoint, model_id, book, output, max_plies=300, searc
                             "winning": [wire_action(a) for a in wins]})
                 state = after
         pair_scores.append(sum(points) / 2)
-    tactical = []
-    for seat in (1, 2):
-        for x in range(9):
-            position = Position(pawns=((x, 7), (4, 3)) if seat == 1 else ((4, 5), (x, 1)), turn=seat)
-            state = build_state(position)
-            _, q, _, _, type_q = runner.forward(state, heads=True)
-            legal = sorted(ENGINE.legal_actions(state), key=encode_engine_action)
-            mask = torch.zeros_like(q, dtype=torch.bool)
-            mask[[encode_engine_action(a) for a in legal]] = True
-            chosen_index = int(policy_argmax(q, mask, type_q))
-            if search_scorer is not None:
-                from backend.adapters.engine_adapter import _serialize_state
-                chosen_wire = max(search_scorer.score(_serialize_state(state)), key=lambda pair: pair[1])[0]
-                chosen_index = encode_engine_action(Move(**chosen_wire).engine_action())
-            chosen = next(a for a in legal if encode_engine_action(a) == chosen_index)
-            tactical.append({"position": position.model_dump(mode="json"), "action": wire_action(chosen),
-                             "win": ENGINE.is_game_over(ENGINE.apply_action(state, chosen))})
+    def choose(state):
+        _, q, _, _, type_q = runner.forward(state, heads=True)
+        legal = sorted(ENGINE.legal_actions(state), key=encode_engine_action)
+        mask = torch.zeros_like(q, dtype=torch.bool)
+        mask[[encode_engine_action(a) for a in legal]] = True
+        chosen_index = int(policy_argmax(q, mask, type_q))
+        if search_scorer is not None:
+            from backend.adapters.engine_adapter import _serialize_state
+            chosen_wire = max(search_scorer.score(_serialize_state(state)), key=lambda pair: pair[1])[0]
+            chosen_index = encode_engine_action(Move(**chosen_wire).engine_action())
+        return next(a for a in legal if encode_engine_action(a) == chosen_index)
+
+    suites = probe_suites if probe_suites is not None else [probes.build(*key) for key in probes.DEFAULT]
+    probe_results = [probes.evaluate(suite, choose) for suite in suites]
+    immediate = next((r for r in probe_results if (r["name"], r["version"]) == ("immediate-win", "v1")), None)
+    tactical = [{"position": i["position"], "action": i["action"], "win": i["ok"]} for i in (immediate or {}).get("items", [])]
     result = {"model_id": model_id, "checkpoint": str(checkpoint), "sha256": digest,
               "search": search, **decision_summary([g for b in blocks for g in b["games"]], model_id),
               "output_semantics": runner.inference.metadata["output_semantics"],
@@ -119,7 +121,9 @@ def diagnose_checkpoint(checkpoint, model_id, book, output, max_plies=300, searc
               "interval_method": "fixed-sample Hoeffding over seat-swapped opening pairs",
               "hidden_units_ever_active": int(active.sum()), "max_abs_legal_q": max_q,
               "tactical_wins": sum(t['win'] for t in tactical), "tactical_count": len(tactical),
-              "tactical": tactical, "missed_win_examples": examples}
+              "tactical": tactical, "missed_win_examples": examples,
+              "probe_suites": [{k: r[k] for k in ("name", "version", "sha256", "passed", "count")} for r in probe_results],
+              "probe_results": probe_results}
     (output / "diagnosis.json").write_text(json.dumps(result, indent=2, ensure_ascii=False))
     _materialized.cache_clear()
     print(json.dumps({k: result[k] for k in ("model_id", "counts", "score", "tactical_wins", "max_abs_legal_q")}), flush=True)

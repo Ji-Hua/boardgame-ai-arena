@@ -9,9 +9,13 @@ const STATUS:Record<string,string>={queued:'排队中',preparing:'准备中',run
 const TOKEN_KEY='quoridor-platform-token'
 const readToken=()=>{try{return localStorage.getItem(TOKEN_KEY)??''}catch{return ''}}
 const duration=(job:Obj)=>{if(!job.started)return '—';const s=Math.round((job.finished??Date.now()/1000)-job.started);return s<60?s+' 秒':s<3600?Math.round(s/60)+' 分钟':(s/3600).toFixed(1)+' 小时'}
-/** Per-checkpoint diagnosis rows from the CNN diagnosis (development games, tactical probes). */
+/** Versioned probe suites as "name passed/count"; older diagnoses only recorded the unversioned tactical set. */
+export function ProbeSummary({d}:{d:Obj}){
+ return d.probe_suites?.length?<>{d.probe_suites.map((p:Obj)=><span key={p.name} className="pf-probe" title={`${p.name}/${p.version} · sha256 ${p.sha256}`}>{p.name} <b>{p.passed} / {p.count}</b></span>)}</>:<>{d.tactical_wins??'—'} / {d.tactical_count??'—'}<small>战术题（未版本化）</small></>
+}
+/** Per-checkpoint diagnosis rows from the CNN diagnosis (development games, probe suites). */
 export function DiagnosisTable({rows,source=false}:{rows:Obj[];source?:boolean}){
- return <div className="aw-table"><table><thead><tr><th>{source?'来源':'Checkpoint'}</th><th>开发对局 胜 / 负</th><th>战术题</th><th>错过立即获胜</th><th>重复率</th><th>决策耗时</th></tr></thead><tbody>{rows.map((d:Obj,i:number)=>{const c=d.counts??d;return <tr key={(d.source??'')+(d.sha256??d.model_id)+i}><td>{source?<>{d.source}<small>{d.model_id}</small></>:d.sha256?<Link to={'/models/'+d.sha256}>{d.model_id}</Link>:d.model_id}<small>{d.output_semantics??'语义未记录'}{d.search?' · 搜索':''}</small></td><td>{c.wins??'—'} / {c.losses??'—'}<small>{d.games} 局 · {d.unique_openings??'—'} 个开局</small></td><td>{d.tactical_wins??'—'} / {d.tactical_count??'—'}</td><td>{c.missed_immediate_win??'—'} / {c.immediate_win_available??'—'}</td><td>{fmt(d.repetition_rate,3)}</td><td>{fmt(d.mean_decision_ms,2)} ms</td></tr>})}</tbody></table></div>
+ return <div className="aw-table"><table><thead><tr><th>{source?'来源':'Checkpoint'}</th><th>开发对局 胜 / 负</th><th>探针集</th><th>错过立即获胜</th><th>重复率</th><th>决策耗时</th></tr></thead><tbody>{rows.map((d:Obj,i:number)=>{const c=d.counts??d;return <tr key={(d.source??'')+(d.sha256??d.model_id)+i}><td>{source?<>{d.source}<small>{d.model_id}</small></>:d.sha256?<Link to={'/models/'+d.sha256}>{d.model_id}</Link>:d.model_id}<small>{d.output_semantics??'语义未记录'}{d.search?' · 搜索':''}</small></td><td>{c.wins??'—'} / {c.losses??'—'}<small>{d.games} 局 · {d.unique_openings??'—'} 个开局</small></td><td><ProbeSummary d={d}/></td><td>{c.missed_immediate_win??'—'} / {c.immediate_win_available??'—'}</td><td>{fmt(d.repetition_rate,3)}</td><td>{fmt(d.mean_decision_ms,2)} ms</td></tr>})}</tbody></table></div>
 }
 export function JobStatus({status}:{status:string}){return <span className={'pf-job-status '+status}>{STATUS[status]??status}</span>}
 

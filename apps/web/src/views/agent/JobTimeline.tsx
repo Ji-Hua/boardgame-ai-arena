@@ -3,6 +3,7 @@ import {Link} from 'react-router-dom'
 import {replayRoute} from '../../platform'
 import {type Obj, enc, fmt} from './shared'
 import {EvalCurve} from './JobCurves'
+import {ProbeSummary} from './Jobs'
 
 const RESULT:Record<string,string>={win:'胜',loss:'负',draw:'平'}
 const opponentOf=(r:Obj)=>String(r.opponent_name??r.opponent??r.opponent_id??'—')
@@ -24,7 +25,7 @@ export function CheckpointTimeline({job,evaluations,replays}:{job:Obj;evaluation
     {opponents.map(o=>{const e=c.episode!=null?evalAt(c.episode,o):undefined;const w=e&&rate(e)
      return <td key={o}>{e?<span className="pf-wdl" style={{'--rate':w??0} as CSSProperties}>{e.wins??'—'} / {e.draws??'—'} / {e.losses??'—'}{w!=null&&<small>{fmt(100*w,0)}%</small>}</span>:'—'}</td>})}
     <td>{samples.length?<ul className="pf-samples">{samples.map(r=><li key={r.replay_path}><Link to={replayRoute(job.run_id,{replay:r.replay_path,ply:0})}>{opponentOf(r)} · {RESULT[r.result_from_dqn_perspective]??r.result_from_dqn_perspective??'?'} · {r.game_length} 步</Link></li>)}</ul>:'—'}</td>
-    <td>{diagnosis?<>{diagnosis.tactical_wins??'—'} / {diagnosis.tactical_count??'—'} 战术题<small>开发对局 {diagnosis.counts?.wins??'—'} / {diagnosis.counts?.losses??'—'}</small></>:'—'}</td>
+    <td>{diagnosis?<><ProbeSummary d={diagnosis}/><small>开发对局 {diagnosis.counts?.wins??'—'} / {diagnosis.counts?.losses??'—'}</small></>:'—'}</td>
     <td>{registered?<div className="pf-next"><Link to={'/jobs/new?entrypoint=diagnose_checkpoint&sha='+enc(c.sha256)}>诊断</Link><Link to={'/jobs/new?entrypoint=run_arena_matrix&sha='+enc(c.sha256)}>门槛评测</Link></div>:<small>{c.sha256?'未登记':'任务结束后登记'}</small>}</td>
    </tr>})}
   </tbody></table></div></>

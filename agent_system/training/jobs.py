@@ -42,9 +42,10 @@ ENTRYPOINTS = {
     'diagnose_checkpoint': dict(
         kind='evaluate', gpu=False, format='json', title='Checkpoint 诊断（开发对局 + 战术题）',
         template={'checkpoints': [], 'book': '/home/jihua/quoridor-data/arena/cnn-architecture-20261021-213018/manifest.json',
-                  'max_plies': 300},
+                  'max_plies': 300, 'probe_suites': ['immediate-win/v1', 'must-block/v1']},
         description='agent_system.evaluation.cnn_diagnostics.diagnose_checkpoint on registered checkpoints (full SHA): '
-                    'paired development games on a locked book plus the tactical probes. Development results are not holdout.'),
+                    'paired development games on a locked book plus versioned probe suites published under '
+                    '<data root>/probes. Development results are not holdout.'),
     'evaluate_checkpoints': dict(
         kind='evaluate', gpu=False, format='json', title='Checkpoint 评测',
         template={'checkpoints': [], 'opponents': [{'name': 'greedy', 'type': 'greedy'},
@@ -179,13 +180,17 @@ def diagnose_checkpoints(job: dict, run: Path, events: Events):
         raise ValueError('The book must be under the data root')
     loaded = json.loads(book_path.read_text())
     book = loaded if isinstance(loaded, list) else loaded['book']
+    from agent_system.evaluation import probes
+    names = config.get('probe_suites') or [f'{n}/{v}' for n, v in probes.DEFAULT]
+    suites = [probes.load(job['data_root'], *item.split('/', 1)) for item in names]
+    events.emit('probes', suites=[f"{s['name']}/{s['version']}@{s['sha256'][:12]}" for s in suites])
     rows = []
     for sha in dict.fromkeys(shas):
         path = Path(job['data_root']) / 'models' / f'{sha}.pt'
         if not path.is_file() or sha256(path) != sha:
             raise ValueError(f'Checkpoint {sha} is not a verified registered model')
         rows.append(diagnose_checkpoint(path, f'diag-{sha[:12]}', book, run / 'diagnostics' / sha[:12],
-                                        max_plies=int(config.get('max_plies', 300))))
+                                        max_plies=int(config.get('max_plies', 300)), probe_suites=suites))
         (run / 'diagnoses.json').write_text(json.dumps(rows, indent=2, ensure_ascii=False))
         events.emit('diagnosis', sha256=sha, wins=rows[-1]['counts']['wins'], games=rows[-1]['games'])
     return []

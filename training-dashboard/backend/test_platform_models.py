@@ -74,7 +74,7 @@ class ModelIndexTests(unittest.TestCase):
             row = self.index().listing()["models"][0]
             self.assertTrue(row["sha_verified"])
             self.assertEqual(row["checkpoints"][0]["reason"], "verified_ledger")
-            store.write_bytes(b"changed!!!")  # a changed file no longer matches its ledger entry
+            store.write_bytes(b"changed checkpoint")  # a rewritten store file (new size) no longer matches its entry
             self.assertFalse(self.index().listing()["models"][0]["sha_verified"])
 
     def test_hash_cache_stat_invalidation_and_mismatch(self):

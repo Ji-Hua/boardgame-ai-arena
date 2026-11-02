@@ -64,7 +64,8 @@ def diagnoses_index(data_root):
                         tactical_wins=row.get('tactical_wins'), tactical_count=row.get('tactical_count'),
                         repetition_rate=row.get('repetition_rate'), mean_decision_ms=row.get('mean_decision_ms'),
                         output_semantics=row.get('output_semantics'), search=row.get('search'),
-                        book_sha256=row.get('book_sha256'), unique_openings=row.get('unique_openings')))
+                        book_sha256=row.get('book_sha256'), unique_openings=row.get('unique_openings'),
+                        probe_suites=row.get('probe_suites')))
     return index, warnings
 
 

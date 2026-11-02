@@ -159,3 +159,12 @@ it('selects Jobs in the list and overlays them on the compare page',async()=>{
  fireEvent.click(screen.getByRole('button',{name:'移除 smoke'}))
  expect(await screen.findByText(/请在/)).toBeTruthy()
 })
+
+it('shows versioned probe suites in diagnoses',async()=>{
+ mock({'/api/v1/jobs/job-1':()=>({...job,status:'succeeded',events:[],run_id:'job-1',run_files:[],diagnoses:[{model_id:'m',sha256:'d'.repeat(64),games:2,counts:{wins:1,losses:1},tactical_wins:18,tactical_count:18,
+   probe_suites:[{name:'immediate-win',version:'v1',sha256:'a'.repeat(64),passed:18,count:18},{name:'must-block',version:'v1',sha256:'b'.repeat(64),passed:11,count:18}]}]}),
+  '/api/v1/jobs/job-1/metrics':()=>({metrics:[],evaluations:[],alerts:[]})})
+ at('/jobs/job-1?tab=diagnosis')
+ expect(await screen.findByText('11 / 18')).toBeTruthy()
+ expect(screen.getByTitle('must-block/v1 · sha256 '+'b'.repeat(64))).toBeTruthy()
+})
