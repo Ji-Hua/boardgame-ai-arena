@@ -1,4 +1,8 @@
 # Unified web rollout and rollback
+
+> Historical (2026-10-25 releases). The services described here were retired on 2026-10-31;
+> current topology and release procedure: [RELEASE.md](RELEASE.md).
+
 User authorization: replace running components, preserve old code/configuration/data.
 
 ## Components and boundaries

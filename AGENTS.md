@@ -14,7 +14,7 @@ Record uncertain decisions without blocking independent authorized work.
 
 The active unified UI is `apps/web`; run npm workspace checks from the repository root.
 Shared board source is `packages/board-ui`. Read `apps/web/README.md` and
-`deploy/UNIFIED_WEB_RUNBOOK.md` before changing frontend or deployment.
+`deploy/RELEASE.md` before changing frontend or deployment.
 
 ## Read first
 

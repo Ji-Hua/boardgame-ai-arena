@@ -1,4 +1,8 @@
 # Release deployment
+
+> Historical (2026-10-25 releases). The services described here were retired on 2026-10-31;
+> current topology and release procedure: [RELEASE.md](RELEASE.md).
+
 These definitions prepare the approved distributed topology; no live rollout is implied.
 They contain image references only, with no build or source mounts.
 Generate validated nonsecret variables with scripts/project.py release-env. Supply machine paths and service credentials separately in a private environment file.

@@ -8,7 +8,6 @@ COPY packages/board-ui/package.json packages/board-ui/package.json
 RUN npm ci --ignore-scripts
 COPY apps/web apps/web
 COPY packages/board-ui packages/board-ui
-COPY frontend/src frontend/src
 RUN npm run typecheck && npm run test:ui && npm run build
 
 FROM ${RUNTIME_IMAGE}
