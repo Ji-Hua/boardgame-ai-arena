@@ -2,7 +2,8 @@
 
 Environment: JOBS_DATA_ROOT (default /home/jihua/quoridor-data), JOBS_REPO (git repository
 holding the submitted commits), JOBS_IMAGE (GPU training image), JOBS_SOURCE_REF (default
-ref for new Jobs), JOBS_TOKEN_FILE (shared write token), JOBS_HOST/JOBS_PORT, JOBS_MAX_CPU_JOBS.
+ref for new Jobs), JOBS_TOKEN_FILE (shared write token), JOBS_HOST/JOBS_PORT, JOBS_MAX_CPU_JOBS,
+JOBS_MLFLOW_URI (MLflow tracking server; finished Jobs are logged there when set).
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ import uvicorn
 from .app import create_app
 from .controller import Controller
 from .docker import Docker, Git
+from .mlflow_log import MlflowLog
 
 
 def main():
@@ -24,9 +26,11 @@ def main():
                             git=Git(env('JOBS_REPO', '/home/jihua/workspace/boardgame-ai-arena')), docker=Docker(),
                             image=env('JOBS_IMAGE', 'quoridor-train-gpu:latest'),
                             source_ref=env('JOBS_SOURCE_REF', 'feature/unified-rl-platform'),
-                            uid_gid=f'{os.getuid()}:{os.getgid()}', max_cpu_jobs=int(env('JOBS_MAX_CPU_JOBS', '2')))
+                            uid_gid=f'{os.getuid()}:{os.getgid()}', max_cpu_jobs=int(env('JOBS_MAX_CPU_JOBS', '2')),
+                            mlflow=MlflowLog(env('JOBS_MLFLOW_URI')) if env('JOBS_MLFLOW_URI') else None)
     stop = threading.Event()
     threading.Thread(target=controller.loop, args=(stop,), daemon=True, name='scheduler').start()
+    threading.Thread(target=controller.backfill_mlflow, daemon=True, name='mlflow-backfill').start()
     try:
         uvicorn.run(create_app(controller, env('JOBS_TOKEN_FILE')), host=env('JOBS_HOST', '127.0.0.1'),
                     port=int(env('JOBS_PORT', '18796')), log_level='info')

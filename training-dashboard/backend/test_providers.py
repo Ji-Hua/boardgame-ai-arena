@@ -94,6 +94,16 @@ class ProviderTests(unittest.TestCase):
         self.assertIsNone(detail["checkpoints"][0]["episode"])
         self.assertEqual(detail["source"], "mlflow")
 
+    def test_platform_job_runs_are_left_to_their_run_directory(self):
+        job = registration("job-run", sha="d" * 64)
+        job["metrics"] = {"loss": 0.1}
+        job["tags"]["quoridor.job_id"] = "job-20261101-000000-abcdef"
+        self.assertEqual(len(MLflowAdapter(ttl=0).listing()[0]), 1)
+        self.rows.append(job)
+        ids = [r["run_id"] for r in MLflowAdapter().listing()[0]]
+        self.assertIn("registered", ids)
+        self.assertFalse(any("job-run" in i for i in ids))
+
     def test_empty_history_does_not_invent_curve(self):
         (self.source / "distillation-metrics.jsonl").unlink()
         metrics = MLflowAdapter().metrics("registered")

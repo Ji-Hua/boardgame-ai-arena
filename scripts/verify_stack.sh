@@ -4,6 +4,7 @@
 # on 127.0.0.1. Games go to a throwaway database under the evidence directory.
 # Jobs use the real data root unless VERIFY_JOBS_DATA names a throwaway one; set it while the live Jobs
 # controller runs, since only one controller may use a data root. Submitted Jobs run on the GPU.
+# VERIFY_JOBS_MLFLOW is the tracking server the test controller logs finished Jobs to (none by default).
 # Usage: scripts/verify_stack.sh start|stop  (EVIDENCE_DIR overrides the log directory)
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -40,7 +41,7 @@ start)
     nohup "$PY" -m uvicorn platform_entry:create_app --factory --app-dir "$ROOT/training-dashboard" \
     --host 127.0.0.1 --port 18793 >"$EVIDENCE/platform.log" 2>&1 &
   echo $! >"$EVIDENCE/platform.pid"
-  JOBS_DATA_ROOT=$JOBS_DATA JOBS_IMAGE="$JOBS_IMAGE" JOBS_TOKEN_FILE="$TOKEN_FILE" JOBS_PORT=18796 \
+  JOBS_MLFLOW_URI=${VERIFY_JOBS_MLFLOW:-} JOBS_DATA_ROOT=$JOBS_DATA JOBS_IMAGE="$JOBS_IMAGE" JOBS_TOKEN_FILE="$TOKEN_FILE" JOBS_PORT=18796 \
   JOBS_SOURCE_REF=${JOBS_SOURCE_REF:-feature/unified-rl-platform} nohup "$PY" -m apps.jobs >"$EVIDENCE/jobs.log" 2>&1 &
   echo $! >"$EVIDENCE/jobs.pid"
   rm -f "$EVIDENCE"/games.sqlite*
@@ -49,7 +50,7 @@ start)
     nohup "$PY" -m apps.gameplay >"$EVIDENCE/gameplay.log" 2>&1 &
   echo $! >"$EVIDENCE/gameplay.pid"
   sed -e 's/listen 8080;/listen 127.0.0.1:18795;/' -e 's/${GAMEPLAY_UPSTREAM}/127.0.0.1:18797/g' \
-      -e 's/${PLATFORM_UPSTREAM}/127.0.0.1:18793/g' -e 's/${JOBS_UPSTREAM}/127.0.0.1:18796/g' "$ROOT/deploy/gateway.conf.template" >"$EVIDENCE/gateway.conf"
+      -e 's/${PLATFORM_UPSTREAM}/127.0.0.1:18793/g' -e 's/${JOBS_UPSTREAM}/127.0.0.1:18796/g' -e 's/${MLFLOW_UPSTREAM}/127.0.0.1:8742/g' "$ROOT/deploy/gateway.conf.template" >"$EVIDENCE/gateway.conf"
   docker run -d --name "$NAME" --network host -v "$EVIDENCE/gateway.conf:/etc/nginx/conf.d/default.conf:ro" \
     -v "$ROOT/apps/web/dist:/usr/share/nginx/html:ro" --entrypoint nginx "$GATEWAY_IMAGE" -g 'daemon off;' >/dev/null
   for _ in $(seq 1 60); do

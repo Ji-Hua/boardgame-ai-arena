@@ -55,7 +55,7 @@ export default function AgentWorkspace(){
   {seasons.data?.seasons?.length===0&&<p>暂无已完成的天梯报告</p>}
   {season&&!roster.data&&!roster.error&&<p role="status">加载 Agent…</p>}
   {roster.data&&render(roster.data)}</>
- return <div className="app agent-workspace"><header className="aw-header"><Link to="/" className="aw-brand"><Grid3X3 aria-hidden="true"/>Quoridor</Link><nav aria-label="主要入口">{NAV.map(([path,label,Icon,active])=><Link key={path} to={target(path)} aria-current={active(location.pathname)?'page':undefined}><Icon aria-hidden="true"/>{label}</Link>)}</nav><span className="aw-preview">独立预览</span><button className="aw-theme-toggle" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}>{theme==='light'?<Moon aria-hidden="true"/>:<Sun aria-hidden="true"/>}{theme==='light'?'深色':'浅色'}</button></header><main className="aw-main">
+ return <div className="app agent-workspace"><header className="aw-header"><Link to="/" className="aw-brand"><Grid3X3 aria-hidden="true"/>Quoridor</Link><nav aria-label="主要入口">{NAV.map(([path,label,Icon,active])=><Link key={path} to={target(path)} aria-current={active(location.pathname)?'page':undefined}><Icon aria-hidden="true"/>{label}</Link>)}</nav><a className="aw-preview" href="/mlflow/" title="MLflow 跟踪服务器（同一入口代理）">MLflow</a><button className="aw-theme-toggle" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}>{theme==='light'?<Moon aria-hidden="true"/>:<Sun aria-hidden="true"/>}{theme==='light'?'深色':'浅色'}</button></header><main className="aw-main">
  <Routes>
   <Route path="/" element={<Overview season={season} roster={roster.data}/>}/>
   <Route path="/experiments" element={<ExperimentList/>}/>

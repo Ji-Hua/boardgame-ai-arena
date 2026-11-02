@@ -47,7 +47,7 @@ def _sha256(path):
 
 class Controller:
     def __init__(self, *, data_root, git, docker, image, source_ref, uid_gid='1000:1000',
-                 max_cpu_jobs=2, clock=time.time):
+                 max_cpu_jobs=2, clock=time.time, mlflow=None):
         self.data_root = Path(data_root).resolve()
         self.root = self.data_root / 'jobs'
         self.runs = self.root / 'runs'
@@ -57,6 +57,7 @@ class Controller:
         self.uid_gid, self.max_cpu_jobs, self.clock = uid_gid, max_cpu_jobs, clock
         self.lock = threading.RLock()
         self.catalog_lock = threading.Lock()
+        self.mlflow, self.mlflow_lock, self.mlflow_busy = mlflow, threading.Lock(), set()
 
     # ---- submission -------------------------------------------------------------------------
     def entrypoints(self):
@@ -223,6 +224,8 @@ class Controller:
             fields.update(status='failed', error=f'exit code {exit_code}')
         self.store.update(identifier, **fields)
         self.docker.remove(job['container'])
+        if self.mlflow:
+            threading.Thread(target=self.log_mlflow, args=(identifier,), daemon=True).start()
         gate = job['spec'].get('follow_up', {}).get('gate')
         if gate and fields.get('status') == 'succeeded' and fields.get('registered'):
             # Gate the final registered checkpoint; the follow-up Job keeps the source commit and experiment.
@@ -294,6 +297,39 @@ class Controller:
             partial.write_text(json.dumps(catalog, indent=2))
             os.replace(partial, path)
 
+    # ---- MLflow -------------------------------------------------------------------------------
+    def log_mlflow(self, identifier):
+        """Record a finished Job as an MLflow run once (``<run>/mlflow.json``); errors are logged, never raised."""
+        record = self.runs / identifier / 'mlflow.json'
+        with self.mlflow_lock:
+            if record.exists() or identifier in self.mlflow_busy:
+                return None
+            self.mlflow_busy.add(identifier)
+        try:
+            job = self.store.get(identifier)
+            if job is None or job['status'] in ACTIVE:
+                return None
+            data = self.metrics(identifier)
+            train = [r for r in data['metrics'] if r.get('type', 'train') == 'train']
+            result = self.mlflow.log(job, job['spec']['config'], train, data['evaluations'])
+            partial = record.with_suffix('.partial')
+            partial.write_text(json.dumps(result, indent=2))
+            os.replace(partial, record)
+            log.info('logged %s to MLflow run %s', identifier, result['run_id'])
+            return result
+        except Exception:
+            log.exception('MLflow logging failed for %s', identifier)
+            return None
+        finally:
+            with self.mlflow_lock:
+                self.mlflow_busy.discard(identifier)
+
+    def backfill_mlflow(self):
+        """Log every finished Job that has no MLflow run yet (oldest first)."""
+        if self.mlflow:
+            for job in reversed(self.store.listing(('succeeded', 'failed', 'cancelled'))):
+                self.log_mlflow(job['id'])
+
     # ---- reads ------------------------------------------------------------------------------
     def detail(self, identifier):
         job = self.store.get(identifier)
@@ -311,6 +347,10 @@ class Controller:
         except ValueError:
             job['diagnoses'] = []  # rewritten after every checkpoint; may be mid-write
         job['checkpoints'] = self._checkpoints(run)
+        try:
+            job['mlflow'] = json.loads((run / 'mlflow.json').read_text()) if (run / 'mlflow.json').exists() else None
+        except ValueError:
+            job['mlflow'] = None
         return job
 
     def _checkpoints(self, run):

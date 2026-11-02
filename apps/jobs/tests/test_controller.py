@@ -185,6 +185,24 @@ class ControllerTests(unittest.TestCase):
                          [('ep00100_step900.pt', 'e' * 64)])
         self.assertEqual(self.controller.metrics(job['id'])['replays'][0]['game_length'], 20)
 
+    def test_finished_jobs_are_logged_to_mlflow_once(self):
+        class FakeMlflow:
+            def __init__(self):
+                self.calls = []
+
+            def log(self, job, config, train, evaluations):
+                self.calls.append((job['id'], config, len(train)))
+                return dict(run_id='r-' + job['id'], experiment_id='3', experiment='platform/jobs', metrics=len(train))
+        self.controller.mlflow = FakeMlflow()
+        job = self.submit()
+        (self.root / 'jobs' / 'runs' / job['id'] / 'metrics.jsonl').write_text(json.dumps(dict(type='train', episode=1, loss=0.2)) + '\n')
+        self.assertIsNone(self.controller.log_mlflow(job['id']))  # still queued
+        self.controller.store.update(job['id'], status='succeeded')
+        self.controller.backfill_mlflow()
+        self.controller.backfill_mlflow()
+        self.assertEqual(self.controller.mlflow.calls, [(job['id'], YAML, 1)])
+        self.assertEqual(self.controller.detail(job['id'])['mlflow']['run_id'], 'r-' + job['id'])
+
     def test_stream_sends_rows_then_ends_for_a_finished_job(self):
         job = self.submit()
         run = self.root / 'jobs' / 'runs' / job['id']

@@ -492,6 +492,8 @@ class MLflowAdapter:
             for row in rows:
                 if self._evaluation(row):
                     continue
+                if row.get("tags", {}).get("quoridor.job_id"):
+                    continue  # platform Jobs are listed from their run directory, which links the MLflow run
                 source = self._source(row)
                 # Benchmark containers and empty orchestration parents are not training runs.
                 if not source and not row.get("metrics") and row["run_id"] in parents:

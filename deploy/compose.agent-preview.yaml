@@ -56,6 +56,7 @@ services:
       PLATFORM_UPSTREAM: platform:8741
       GAMEPLAY_UPSTREAM: gameplay:18797
       JOBS_UPSTREAM: host.docker.internal:18796
+      MLFLOW_UPSTREAM: 192.168.68.88:8742
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports: ['192.168.68.88:8790:8080']
     mem_limit: 128m

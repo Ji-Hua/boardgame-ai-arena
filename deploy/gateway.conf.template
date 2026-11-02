@@ -3,7 +3,7 @@ server {
     root /usr/share/nginx/html;
     index index.html;
     client_max_body_size 1m;
-    # Every deployment using this template must set PLATFORM_UPSTREAM, JOBS_UPSTREAM and GAMEPLAY_UPSTREAM.
+    # Every deployment using this template must set PLATFORM_UPSTREAM, JOBS_UPSTREAM, GAMEPLAY_UPSTREAM and MLFLOW_UPSTREAM.
     # Job controller (host process).
     location ^~ /api/v1/jobs {
         proxy_connect_timeout 5s;
@@ -26,6 +26,17 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 180s;
         proxy_buffering off;
+    }
+    # MLflow tracking UI under /mlflow/ (it loads assets and ajax-api relative to the page). MLflow only accepts its
+    # allowed hosts, so the upstream address doubles as the Host header; the browser Origin is not forwarded.
+    location = /mlflow { return 301 /mlflow/; }
+    location ^~ /mlflow/ {
+        proxy_connect_timeout 5s;
+        proxy_pass http://${MLFLOW_UPSTREAM}/;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header Origin "";
+        proxy_read_timeout 120s;
+        client_max_body_size 10m;
     }
     location /assets/ { try_files $uri =404; }
     location = /index.html { add_header Cache-Control "no-cache"; }
