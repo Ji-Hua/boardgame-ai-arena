@@ -11,7 +11,8 @@ services:
       PLATFORM_MODEL_CATALOGS: discover
     volumes:
       - /home/jihua/quoridor-data:/home/jihua/quoridor-data:ro
-      - /home/jihua/workspace/boardgame-ai-arena/agent_system/training/artifacts:/data/training_artifacts:ro
+      # Verified read-only copy of the original checkout's training artifacts (P8); same container path, same run ids.
+      - /home/jihua/quoridor-data/legacy-artifacts/training-artifacts:/data/training_artifacts:ro
     read_only: true
     tmpfs: [/tmp]
     mem_limit: 3g

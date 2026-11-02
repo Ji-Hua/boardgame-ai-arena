@@ -33,5 +33,13 @@ class ModelStoreTests(unittest.TestCase):
         self.assertEqual(self.store.verify()[:2], (1, 2))
 
 
+    def test_refresh_runs_the_sync_command_even_when_export_fails(self):
+        marker = self.root / 'synced'
+        store = ModelStore(self.root, sync_command=f'touch {marker}')
+        store.export_index = lambda: (_ for _ in ()).throw(RuntimeError('no index'))
+        store.refresh()
+        self.assertTrue(marker.exists())
+
+
 if __name__ == '__main__':
     unittest.main()

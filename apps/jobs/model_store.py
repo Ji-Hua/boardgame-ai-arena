@@ -6,6 +6,8 @@
 * ``platform-p1-p2/catalogs/research-catalog-current.json`` - the merged model index (every catalog,
   registry, Job registration and AgentSpec) exported by ``platform_entry.py --generate-lab-catalog``
   and published atomically under a stable name, so the Lab sees new checkpoints without a restart.
+* ``sync_command`` (optional) runs afterwards, e.g. to start the Dev evidence mirror so a new checkpoint is
+  playable on Dev at once instead of after the next timer run.
 Source catalogs are never rewritten.
 """
 from __future__ import annotations
@@ -15,6 +17,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -38,12 +41,13 @@ def _publish(path, text):
 
 
 class ModelStore:
-    def __init__(self, data_root, mlflow_uri=None, clock=time.time):
+    def __init__(self, data_root, mlflow_uri=None, clock=time.time, sync_command=None):
         self.data_root = Path(data_root).resolve()
         self.models = self.data_root / 'models'
         self.ledger = self.models / 'verified.json'
         self.catalogs = self.data_root / 'platform-p1-p2' / 'catalogs'
         self.mlflow_uri, self.clock, self.lock = mlflow_uri, clock, threading.Lock()
+        self.sync_command = shlex.split(sync_command) if sync_command else None
 
     def verify(self):
         """Hash store files that are new or changed since the ledger; returns (verified, hashed, mismatched)."""
@@ -92,3 +96,9 @@ class ModelStore:
                 log.info('model store: %d verified (%d hashed, %d mismatched); index %s', count, hashed, len(mismatched), generated.name)
             except Exception:
                 log.exception('model store refresh failed')
+            if self.sync_command:
+                try:
+                    subprocess.run(self.sync_command, timeout=300, check=True, capture_output=True)
+                    log.info('sync command finished')
+                except Exception:
+                    log.exception('sync command failed')
