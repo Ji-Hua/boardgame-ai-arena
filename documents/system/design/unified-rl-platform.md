@@ -268,6 +268,7 @@ jobs/<id>/
 | **P7b 统一模型索引**（2026-11-01 已上线） | 不可变模型库校验账本 `models/verified.json`；合并索引 `research-catalog-current.json` 供平台与实验室共用，登记后自动刷新 | 线上 136/136 模型 SHA 已校验；实验室可分析 128 个（原 92） |
 | **P7c 探针集版本化**（2026-11-01 已上线） | `probes/<name>/<version>.json` 一次写入、带 SHA；`immediate-win/v1`（原 18 题）与新增 `must-block/v1`（引擎校验）；诊断记录套件版本与 SHA | 线上诊断任务记录两个套件版本；旧题结果与历史记录逐题一致 |
 | **P7d 晋升流程**（2026-11-01 已上线） | 门槛评测候选 + 已校验 checkpoint + 书面理由 → 人工确认上线；`promotions.jsonl` 只追加审计日志；可撤下；模型页“上线”标签 | 测试端口浏览器完成上线与撤下；线上未晋升任何模型（由用户决定） |
+| **P8 整合与清理**（2026-11-01 已上线） | 历史 artifacts 校验复制并改挂载；登记后立即同步 Dev；删除已下线的 Classic 栈与旧发布文件；发布模板入库（`deploy/release/`、`deploy/RELEASE.md`） | 线上检查全部通过；研究运行与历史一致（111） |
 
 ## 12. 待决问题
 
@@ -278,4 +279,4 @@ jobs/<id>/
 3. **GPU 训练镜像**：新建带 CUDA PyTorch 的镜像（推荐，可复现），还是 P2 先用 Training 的 `.venv` 以 host 进程方式运行（更快，但违背"稳定服务用镜像"原则，只建议作为临时方案）。
 4. **MLflow 界面**：通过 `/mlflow/` 反向代理放进同一入口（推荐，需要验证 MLflow 3.x 子路径静态资源），还是只放外链。
 5. **Classic 对弈**：需要保留哪些功能（房间、观战、调速、认输、重试）。
-6. **历史 artifacts 迁移**：何时把旧 dirty worktree 的 `agent_system/training/artifacts` 复制并校验到 `quoridor-data/legacy-artifacts/`，以解除对旧目录的挂载依赖。
+6. **历史 artifacts 迁移**（2026-11-01 P8 已完成）：何时把旧 dirty worktree 的 `agent_system/training/artifacts` 复制并校验到 `quoridor-data/legacy-artifacts/`，以解除对旧目录的挂载依赖。

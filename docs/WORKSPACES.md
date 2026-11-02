@@ -1,6 +1,6 @@
 # Worktrees and workspace layout
 
-**Last verified:** 2026-10-31. Active development branch: `feature/unified-rl-platform`.
+**Last verified:** 2026-11-01. Since the 10-31 retirement and P8, only the shared repository `~/workspace/boardgame-ai-arena` (git objects for Job snapshots, `JOBS_REPO`, and the venv used by the Job controller and tests) is still used by a running service; the other worktrees below run nothing and can be archived. Releases: [deploy/RELEASE.md](../deploy/RELEASE.md). Active development branch: `feature/unified-rl-platform`.
 
 Every removed or archived worktree had its commits contained in `feature/unified-rl-platform`; branches were kept, so any of them can be recreated with `git worktree add <path> <branch>`. Uncommitted changes were saved as patches before archiving.
 
@@ -11,7 +11,7 @@ Every removed or archived worktree had its commits contained in `feature/unified
 | `~/worktrees/quoridor/unified-rl-platform` | `feature/unified-rl-platform` | Active development (unified platform, design `documents/system/design/unified-rl-platform.md`). |
 | `~/worktrees/quoridor/agent-ladder-preview` | `feature/agent-ladder-preview` | Source of the running 8790 preview images. |
 | `~/worktrees/quoridor/monorepo-migration-20261025` | `codex/monorepo-migration-20261025` | Source of the running 8740/8741 unified frontend release. |
-| `~/workspace/boardgame-ai-arena` | `codex/environment-deployment` | Original checkout with intentional uncommitted experiment outputs; its `agent_system/training/artifacts` is mounted by the 8790 and 8741 platforms, and its venv runs the 8743 Agent Service. Do not modify. |
+| `~/workspace/boardgame-ai-arena` | `codex/environment-deployment` | Original checkout with intentional uncommitted experiment outputs; shared git repository for every worktree and the venv of the Job controller. Its `agent_system/training/artifacts` is no longer mounted: a verified copy is in `~/quoridor-data/legacy-artifacts/` (P8). Do not modify. |
 | `~/workspace/boardgame-ai-arena-unified-dashboard` | `feature/unified-training-dashboard` | Source of the systemd Decision Lab on 8744. |
 | `~/worktrees/archive/boardgame-ai-arena-platform` | `feature/unified-platform-p1-p2` | Archived; uncommitted diff is identical to commit `bc49843`. |
 | `~/worktrees/archive/quoridor-preserve-20261025` | `codex/preserve-training-fixes-20261025` | Archived; only an untracked `node_modules`. |
