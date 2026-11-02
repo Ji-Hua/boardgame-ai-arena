@@ -20,7 +20,7 @@ import yaml
 log = logging.getLogger('quoridor.jobs.mlflow')
 STATUS = dict(succeeded='FINISHED', failed='FAILED', cancelled='KILLED')
 SKIP = ('episode', 'step', 'timestamp', 'type')
-BATCH = 1000  # MLflow log-batch limits: 1000 metrics, 100 params, 100 tags per request
+BATCH = 1000  # MLflow log-batch limit: 1000 metrics, params and tags together (at most 100 params) per request
 
 
 def flatten(value, prefix=''):
@@ -34,17 +34,18 @@ def _metric(key, value, step, stamp):
 
 
 def rows_to_metrics(train_rows, eval_rows, stamp):
-    """MLflow metric records; non-numeric and non-finite values are left out."""
+    """MLflow metric records; non-numeric and non-finite values are left out. Each row gets its own timestamp
+    (start + row index in ms), so a file that repeats an episode still yields distinct (key, step, timestamp) records."""
     out = []
     for index, row in enumerate(train_rows):
         step = row.get('episode', index)
         for key, value in row.items():
             if key not in SKIP and isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
-                out.append(_metric(key, value, step, stamp))
-    for row in eval_rows:
+                out.append(_metric(key, value, step, stamp + index))
+    for index, row in enumerate(eval_rows):
         name = row.get('opponent_name') or row.get('opponent') or row.get('opponent_id')
         if name and isinstance(row.get('win_rate'), (int, float)) and row.get('episode') is not None:
-            out.append(_metric(f'eval/{name}/win_rate', row['win_rate'], row['episode'], stamp))
+            out.append(_metric(f'eval/{name}/win_rate', row['win_rate'], row['episode'], stamp + index))
     return out
 
 
@@ -56,8 +57,12 @@ class MlflowLog:
         url = f'{self.uri}/api/2.0/mlflow/{path}' + (f'?{urllib.parse.urlencode(query)}' if query else '')
         data = json.dumps(payload).encode() if payload is not None else None
         request = urllib.request.Request(url, data=data, method=method, headers={'Content-Type': 'application/json'})
-        with urllib.request.urlopen(request, timeout=self.timeout) as response:
-            return json.loads(response.read() or b'{}')
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                return json.loads(response.read() or b'{}')
+        except urllib.error.HTTPError as exc:
+            exc.msg = f'{exc.msg}: {exc.read()[:500].decode(errors="replace")}'
+            raise
 
     def experiment(self, name):
         try:
@@ -77,14 +82,25 @@ class MlflowLog:
         run_id = self._call('POST', 'runs/create', dict(experiment_id=experiment_id, start_time=start, run_name=job['name'],
                                                        tags=[dict(key=k, value=str(v)) for k, v in tags.items()]))['run']['info']['run_id']
         try:
+            return self._fill(run_id, experiment_id, experiment, job, config_text, train_rows, eval_rows, start)
+        except Exception:
+            try:  # leave no half-written run behind; the Job is retried at the next controller start
+                self._call('POST', 'runs/delete', dict(run_id=run_id))
+            except Exception:
+                log.exception('could not delete incomplete MLflow run %s', run_id)
+            raise
+
+    def _fill(self, run_id, experiment_id, experiment, job, config_text, train_rows, eval_rows, start):
+        try:
             config = yaml.safe_load(config_text) if isinstance(config_text, str) else config_text
         except yaml.YAMLError:
             config = None
         params = {'entrypoint': job['entrypoint'], **{k: v for k, v in flatten(config).items() if k}} if isinstance(config, dict) else {}
         params = [dict(key=k[:250], value=json.dumps(v) if isinstance(v, (list, dict)) else str(v)[:500]) for k, v in list(params.items())[:100]]
         metrics = rows_to_metrics(train_rows, eval_rows, start)
-        self._call('POST', 'runs/log-batch', dict(run_id=run_id, params=params, metrics=metrics[:BATCH]))
-        for index in range(BATCH, len(metrics), BATCH):
+        if params:
+            self._call('POST', 'runs/log-batch', dict(run_id=run_id, params=params))
+        for index in range(0, len(metrics), BATCH):
             self._call('POST', 'runs/log-batch', dict(run_id=run_id, metrics=metrics[index:index + BATCH]))
         end = int((job.get('finished') or time.time()) * 1000)
         self._call('POST', 'runs/update', dict(run_id=run_id, status=STATUS.get(job['status'], 'FINISHED'), end_time=end))
