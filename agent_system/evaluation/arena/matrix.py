@@ -9,6 +9,7 @@ import random
 import time
 
 from quoridor_engine import Player, RuleEngine
+from agent_system.games.quoridor import Quoridor
 from backend.adapters.engine_adapter import _action_to_engine, _serialize_state
 from agent_system.definition.agent_spec import parse_agent_spec
 from agent_system.evaluation.arena.agents.core import AgentInstance
@@ -71,11 +72,12 @@ def play_block(spec_a, spec_b, opening, max_plies=500, seed=0):
     seeds = {s["id"]: int(stable_hash([seed, opening["id"], s["id"]])[:12], 16) for s in specs}
     deterministic = all(_memoryless_deterministic(s) for s in specs)
     games = []
-    engine = RuleEngine.standard()
+    game = Quoridor()
+    engine = game.engine
     for order in (specs, specs[::-1]):
         ids = [s["id"] for s in order]
         instances = {i+1: AgentInstance(definitions[key], seeds[key]) for i, key in enumerate(ids)}
-        state = _build_state(opening["state"])
+        state = game.restore(opening["state"])
         actions = []
         times = {key: 0.0 for key in ids}
         moves = {key: 0 for key in ids}
@@ -87,7 +89,7 @@ def play_block(spec_a, spec_b, opening, max_plies=500, seed=0):
         termination = "ply_limit"
         start = time.monotonic()
         for _ in range(max_plies):
-            wire = _serialize_state(state)
+            wire = game.observe(state, game.actor(state) or "p1")
             key = stable_hash(wire)
             repeated_states += key in seen
             if deterministic and key in seen:
@@ -122,7 +124,7 @@ def play_block(spec_a, spec_b, opening, max_plies=500, seed=0):
             try:
                 if action.get("player") != seat:
                     raise ValueError("Wrong action player")
-                state = engine.apply_action(state, _action_to_engine(action))
+                state = game.apply(state, encode_engine_action(_action_to_engine(action)))
             except Exception as exc:
                 offender, winner = active, ids[2-seat]
                 termination, error = "illegal_action", f"{type(exc).__name__}: {exc}"[:300]
@@ -133,7 +135,7 @@ def play_block(spec_a, spec_b, opening, max_plies=500, seed=0):
                 winning_seat = 1 if engine.winner(state) == Player.P1 else 2
                 winner, termination = ids[winning_seat-1], "goal"
                 break
-        final_state = _serialize_state(state)
+        final_state = game.serialize(state)
         final_state["game_over"] = engine.is_game_over(state)
         final_state["winner"] = (ids.index(winner)+1) if termination == "goal" else None
         games.append({

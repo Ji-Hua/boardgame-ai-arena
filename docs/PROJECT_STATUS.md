@@ -1,5 +1,7 @@
 # Project Status
 
+> 2026-11-02 isolated Dev branch: first multi-game foundation completed on codex/multi-game-rl-platform. See [implementation scope, verification and remaining phases](tasks/20261102-multi-game-rl-platform.md). No deployment; this does not supersede the current service baseline.
+
 > Migration update 2026-10-25: use [MIGRATION_STATUS.md](MIGRATION_STATUS.md) for the current candidate baseline. The deployment/preview observations below are historical and do not establish current availability. Existing services have not been switched.
 
 **Last verified:** 2026-10-22

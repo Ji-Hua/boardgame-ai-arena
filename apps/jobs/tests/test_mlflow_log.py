@@ -61,6 +61,20 @@ class MlflowLogTests(unittest.TestCase):
             logger.log(job, '{}', [], [])
         self.assertTrue(Stub.calls[-1][1].endswith('runs/delete'))
 
+    def test_new_projects_namespace_the_same_experiment(self):
+        logger = MlflowLog(f'http://127.0.0.1:{self.server.server_port}')
+        for project in ('study-a', 'study-b'):
+            ref = dict(game_id='quoridor', ruleset='standard-9x9', version=1)
+            job = dict(id=project, name='test', entrypoint='train_dqn', experiment='same',
+                       status='succeeded', created=1.0, finished=2.0,
+                       spec=dict(source=dict(commit=COMMIT), project_id=project, game_ref=ref))
+            result = logger.log(job, '{}', [], [])
+            self.assertEqual(result['experiment'], f'platform/projects/{project}/same')
+            create = [c[2] for c in Stub.calls if c[1].endswith('runs/create')][-1]
+            tags = {t['key']: t['value'] for t in create['tags']}
+            self.assertEqual(tags['platform.project_id'], project)
+            self.assertEqual(json.loads(tags['platform.game_ref']), ref)
+
     def test_finished_job_becomes_a_tagged_run(self):
         job = dict(id='job-1', name='smoke', entrypoint='train_dqn', experiment=None, status='failed', created=10.0,
                    started=11.0, finished=20.0, registered=['a' * 64], spec=dict(source=dict(commit=COMMIT)))

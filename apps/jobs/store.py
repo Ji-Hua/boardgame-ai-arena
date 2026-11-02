@@ -23,6 +23,11 @@ class Store:
         with self.lock:
             self.db.execute('pragma journal_mode=wal')
             self.db.execute(SCHEMA)
+            # Additive migration: preserve historical specs and IDs byte-for-byte.
+            columns = {r[1] for r in self.db.execute('pragma table_info(jobs)')}
+            if 'project_id' not in columns:
+                self.db.execute("alter table jobs add column project_id text not null default 'quoridor-legacy'")
+            self.db.execute('create index if not exists jobs_project_experiment on jobs(project_id,experiment)')
 
     @staticmethod
     def _row(row):
@@ -36,9 +41,9 @@ class Store:
 
     def insert(self, job):
         with self.lock:
-            self.db.execute('insert into jobs(id,name,entrypoint,experiment,spec,status,created) values(?,?,?,?,?,?,?)',
+            self.db.execute('insert into jobs(id,name,entrypoint,experiment,spec,status,created,project_id) values(?,?,?,?,?,?,?,?)',
                             (job['id'], job['name'], job['entrypoint'], job['experiment'], json.dumps(job['spec']),
-                             job['status'], job['created']))
+                             job['status'], job['created'], job.get('project_id', 'quoridor-legacy')))
 
     def update(self, identifier, **fields):
         if 'registered' in fields:
@@ -51,8 +56,11 @@ class Store:
         with self.lock:
             return self._row(self.db.execute('select * from jobs where id=?', (identifier,)).fetchone())
 
-    def listing(self, statuses=None, limit=200, experiment=None):
+    def listing(self, statuses=None, limit=200, experiment=None, project_id=None):
         clauses, args = [], []
+        if project_id is not None:
+            clauses.append('project_id=?')
+            args.append(project_id)
         if statuses:
             clauses.append(f'status in ({",".join("?" * len(statuses))})')
             args += list(statuses)

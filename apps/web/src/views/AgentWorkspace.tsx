@@ -23,11 +23,13 @@ import {AgentDetail} from './agent/AgentDetail'
 import {CheckpointPage} from './agent/CheckpointPage'
 import {Replay} from './agent/Replay'
 import {Play} from './agent/Play'
+import {Projects} from './agent/Projects'
 export {evidence, route, Participant} from './agent/shared'
 export {StepAnalysis} from './agent/StepAnalysis'
 
 const NAV:[string,string,typeof Trophy,(path:string)=>boolean][]=[
  ['/','总览',LayoutDashboard,p=>p==='/'],
+ ['/projects','项目',Boxes,p=>p.startsWith('/projects')],
  ['/experiments','实验',FlaskConical,p=>p.startsWith('/experiments')],
  ['/training','训练',Activity,p=>p.startsWith('/training')||p.startsWith('/replays')],
  ['/jobs','任务',ListChecks,p=>p.startsWith('/jobs')],
@@ -58,6 +60,7 @@ export default function AgentWorkspace(){
  return <div className="app agent-workspace"><header className="aw-header"><Link to="/" className="aw-brand"><Grid3X3 aria-hidden="true"/>Quoridor</Link><nav aria-label="主要入口">{NAV.map(([path,label,Icon,active])=><Link key={path} to={target(path)} aria-current={active(location.pathname)?'page':undefined}><Icon aria-hidden="true"/>{label}</Link>)}</nav><a className="aw-preview" href="/mlflow/" title="MLflow 跟踪服务器（同一入口代理）">MLflow</a><button className="aw-theme-toggle" onClick={()=>setTheme(t=>t==='light'?'dark':'light')}>{theme==='light'?<Moon aria-hidden="true"/>:<Sun aria-hidden="true"/>}{theme==='light'?'深色':'浅色'}</button></header><main className="aw-main">
  <Routes>
   <Route path="/" element={<Overview season={season} roster={roster.data}/>}/>
+  <Route path="/projects" element={<Projects/>}/>
   <Route path="/experiments" element={<ExperimentList/>}/>
   <Route path="/experiments/:slug" element={<ExperimentDetail season={season}/>}/>
   <Route path="/training" element={<TrainingWorkspace season={season}/>}/>

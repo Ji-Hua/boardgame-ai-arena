@@ -45,13 +45,14 @@ function useJobMetrics(id:string,active:boolean){
 }
 
 export function JobList(){
- const jobs=useLive('/api/v1/jobs',true,5000),system=useV1('/jobs/system')
+ const [projectParams]=useSearchParams();const projectId=projectParams.get('project')
+ const jobs=useLive('/api/v1/jobs'+(projectId?'?project_id='+enc(projectId):''),true,5000),system=useV1('/jobs/system')
  const rows:Obj[]=jobs.data?.jobs??[];const gpu=system.data?.gpu?.gpus?.[0]
  const [picked,setPicked]=useState<string[]>([])
  const toggle=(id:string)=>setPicked(p=>p.includes(id)?p.filter(x=>x!==id):p.length<COLORS.length?[...p,id]:p)
  return <><div className="aw-toolbar"><h1>任务</h1><small>训练、评测在独立容器中运行，固定到已提交的源码版本</small>
   {picked.length>=2?<Link className="button-link" to={'/jobs/compare?ids='+picked.map(enc).join(',')}>对比所选（{picked.length}）</Link>:<small>勾选 2–{COLORS.length} 个任务可对比曲线</small>}
-  <Link className="pf-primary" to="/jobs/new">新建任务</Link></div>
+  <Link to="/projects">研究项目</Link>{projectId&&<small>项目：{projectId}</small>}<Link className="pf-primary" to={projectId?"/jobs/new?project="+enc(projectId):"/jobs/new"}>新建任务</Link></div>
  <div className="aw-toolbar aw-metrics"><span>{gpu?`${gpu.name} · 显存 ${gpu.memory_used_mib}/${gpu.memory_total_mib} MiB · 利用率 ${gpu.utilization}%`:system.data?'GPU 不可用':'读取 GPU…'}</span>{jobs.data&&Object.entries(jobs.data.counts as Record<string,number>).filter(([,n])=>n>0).map(([s,n])=><span key={s}>{STATUS[s]} {n}</span>)}{system.data&&!system.data.writes_enabled&&<span>未配置写入令牌</span>}</div>
  <ErrorBox text={jobs.error||system.error}/>{!jobs.data&&!jobs.error&&<p role="status">加载任务…</p>}
  {jobs.data&&<div className="aw-table"><table><thead><tr><th aria-label="选择"/><th>任务</th><th>入口</th><th>状态</th><th>创建</th><th>用时</th></tr></thead><tbody>{rows.map(j=><tr key={j.id}><td><input type="checkbox" aria-label={'选择 '+j.name} checked={picked.includes(j.id)} disabled={!picked.includes(j.id)&&picked.length>=COLORS.length} onChange={()=>toggle(j.id)}/></td><td><Link to={'/jobs/'+enc(j.id)}>{j.name}</Link><small>{j.id}{j.experiment?' · '+j.experiment:''}</small></td><td>{j.entrypoint}<small>{j.spec.resources.gpu?'GPU':'CPU'} · {j.spec.source.commit.slice(0,8)}</small></td><td><JobStatus status={j.status}/>{j.error&&<small>{j.error}</small>}</td><td>{when(j.created)}</td><td>{duration(j)}</td></tr>)}</tbody></table></div>}
@@ -60,6 +61,7 @@ export function JobList(){
 
 export function JobNew(){
  const [params]=useSearchParams();const navigate=useNavigate();const meta=useV1('/jobs/entrypoints')
+ const projectId=params.get('project')??'quoridor-legacy'
  const [entrypoint,setEntrypoint]=useState(params.get('entrypoint')??'train_dqn'),[template,setTemplate]=useState(''),[config,setConfig]=useState('')
  const [name,setName]=useState(''),[experiment,setExperiment]=useState(params.get('experiment')??''),[resources,setResources]=useState<Record<string,string>>({}),[source,setSource]=useState('')
  const [token,setToken]=useState(readToken),[error,setError]=useState(''),[busy,setBusy]=useState(false),[gate,setGate]=useState(false)
@@ -67,10 +69,10 @@ export function JobNew(){
  useEffect(()=>{if(!entry)return;setTemplate('');if(entry.format==='json'&&entry.template){const value={...entry.template};if(params.get('sha')&&Array.isArray(value[entrypoint==='run_arena_matrix'?'candidates':'checkpoints']))value[entrypoint==='run_arena_matrix'?'candidates':'checkpoints']=[params.get('sha')];setConfig(JSON.stringify(value,null,2))}else setConfig('')},[entrypoint,meta.data])
  useEffect(()=>{if(!template)return;const c=new AbortController();fetch('/api/v1/jobs/templates/'+enc(entrypoint)+'/'+enc(template),{signal:c.signal}).then(r=>r.ok?r.text():Promise.reject(new Error('模板读取失败'))).then(setConfig).catch(e=>{if(!c.signal.aborted)setError(String(e))});return()=>c.abort()},[template])
  async function submit(){setBusy(true);setError('');try{try{localStorage.setItem(TOKEN_KEY,token)}catch{/* optional */}
-  const body={entrypoint,config,name:name||undefined,experiment:experiment||undefined,source:source||undefined,follow_up:gate&&entry?.kind==='train'?{gate:'gate-v1'}:undefined,resources:Object.fromEntries(Object.entries(resources).filter(([,v])=>v!=='').map(([k,v])=>[k,Number(v)]))}
+  const body={project_id:projectId,entrypoint,config,name:name||undefined,experiment:experiment||undefined,source:source||undefined,follow_up:gate&&entry?.kind==='train'?{gate:'gate-v1'}:undefined,resources:Object.fromEntries(Object.entries(resources).filter(([,v])=>v!=='').map(([k,v])=>[k,Number(v)]))}
   const job=await request('/api/v1/jobs',{method:'POST',headers:{'Content-Type':'application/json','X-Platform-Token':token},body:JSON.stringify(body)});navigate('/jobs/'+enc(job.id))}catch(e){setError(String(e))}finally{setBusy(false)}}
  return <><div className="aw-breadcrumb"><Link to="/jobs">任务</Link> / 新建</div><div className="aw-toolbar"><h1>新建任务</h1></div><ErrorBox text={meta.error} retry={meta.retry}/>{!meta.data&&!meta.error&&<p role="status">读取入口与源码版本…</p>}
- {meta.data&&<div className="pf-form">
+ {meta.data&&<div className="pf-form"><p>所属项目：<Link to="/projects">{projectId}</Link></p>
   <label>入口<select aria-label="任务入口" value={entrypoint} onChange={e=>setEntrypoint(e.target.value)}>{Object.entries(meta.data.entrypoints as Record<string,Obj>).map(([k,v])=><option key={k} value={k}>{v.title} · {k}</option>)}</select></label>
   {entry&&<small>{entry.description} · {entry.gpu?'GPU':'CPU'}</small>}
   {entry?.templates&&<label>配置模板<select aria-label="配置模板" value={template} onChange={e=>setTemplate(e.target.value)}><option value="">选择模板</option>{entry.templates.map((t:string)=><option key={t} value={t}>{t}</option>)}</select></label>}

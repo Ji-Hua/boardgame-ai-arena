@@ -73,12 +73,17 @@ class MlflowLog:
         return self._call('POST', 'experiments/create', dict(name=name))['experiment_id']
 
     def log(self, job, config_text, train_rows, eval_rows):
-        experiment = f"platform/{job['experiment'] or 'jobs'}"
+        project = job['spec'].get('project_id', 'quoridor-legacy')
+        prefix = 'platform' if project == 'quoridor-legacy' else f'platform/projects/{project}'
+        experiment = f"{prefix}/{job['experiment'] or 'jobs'}"
         experiment_id = self.experiment(experiment)
         start = int((job.get('started') or job['created']) * 1000)
         tags = {'mlflow.runName': job['name'], 'quoridor.job_id': job['id'], 'quoridor.entrypoint': job['entrypoint'],
                 'quoridor.source_commit': job['spec']['source']['commit'], 'quoridor.status': job['status'],
                 'quoridor.experiment': job['experiment'] or '', 'quoridor.registered': ','.join(job.get('registered') or [])[:5000]}
+        tags['platform.project_id'] = project
+        if job['spec'].get('game_ref'):
+            tags['platform.game_ref'] = json.dumps(job['spec']['game_ref'], sort_keys=True)
         run_id = self._call('POST', 'runs/create', dict(experiment_id=experiment_id, start_time=start, run_name=job['name'],
                                                        tags=[dict(key=k, value=str(v)) for k, v in tags.items()]))['run']['info']['run_id']
         try:

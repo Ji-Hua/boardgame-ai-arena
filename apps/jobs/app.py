@@ -35,6 +35,8 @@ class Submission(BaseModel):
     source: str | None = Field(default=None, max_length=200)
     resources: dict[str, float] | None = None
     follow_up: dict[str, str] | None = None
+    project_id: str | None = Field(default=None, max_length=80)
+    game_ref: dict | None = None
 
 
 def create_app(controller, token_file=None, stream_interval=2.0, heartbeat=15.0):
@@ -59,10 +61,22 @@ def create_app(controller, token_file=None, stream_interval=2.0, heartbeat=15.0)
             raise HTTPException(503, str(exc)) from exc
 
     @router.get('')
-    def listing(experiment: str | None = None):
-        jobs = controller.store.listing(experiment=experiment)
+    def listing(experiment: str | None = None, project_id: str | None = None):
+        if project_id is not None:
+            call(controller.projects.get, project_id)
+        jobs = controller.store.listing(experiment=experiment, project_id=project_id)
         return dict(jobs=jobs, counts={s: sum(1 for j in jobs if j['status'] == s) for s in
                                        ('queued', 'preparing', 'running', 'succeeded', 'failed', 'cancelled')})
+
+    @router.get('/projects')
+    def projects():
+        from agent_system.games.registry import DEFINITIONS
+        return dict(projects=controller.projects.listing(), games=DEFINITIONS)
+
+    @router.post('/projects')
+    def create_project(body: dict, x_platform_token: str = Header(default='')):
+        authorize(x_platform_token)
+        return call(controller.projects.create, body)
 
     @router.get('/system')
     def system():

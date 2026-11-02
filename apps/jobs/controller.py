@@ -30,6 +30,8 @@ from agent_system.training.jobs import ENTRYPOINTS
 from .health import assess
 from .promotions import Promotions
 from .store import ACTIVE, Store
+from .projects import Projects, LEGACY_PROJECT
+from agent_system.games.contracts import QUORIDOR
 
 log = logging.getLogger('quoridor.jobs')
 NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}\Z')
@@ -54,6 +56,7 @@ class Controller:
         self.runs = self.root / 'runs'
         self.runs.mkdir(parents=True, exist_ok=True)
         self.store = Store(self.root / 'jobs.sqlite')
+        self.projects = Projects(self.root / 'projects.sqlite')
         self.git, self.docker, self.image, self.source_ref = git, docker, image, source_ref
         self.uid_gid, self.max_cpu_jobs, self.clock = uid_gid, max_cpu_jobs, clock
         self.lock = threading.RLock()
@@ -85,6 +88,13 @@ class Controller:
         if entrypoint not in ENTRYPOINTS:
             raise ValueError(f'Unknown entrypoint: {entrypoint}')
         meta = ENTRYPOINTS[entrypoint]
+        project_id = payload.get('project_id') or LEGACY_PROJECT
+        project = self.projects.get(project_id)
+        # Existing entrypoints are Quoridor-only. Never silently train another game's project.
+        if project['game_ref'] != QUORIDOR.wire():
+            raise ValueError('This entrypoint only supports Quoridor; no training backend is registered for this game')
+        if payload.get('game_ref') is not None and payload['game_ref'] != project['game_ref']:
+            raise ValueError('Job game_ref does not match its project')
         config = payload.get('config')
         if meta['format'] == 'yaml':
             if not isinstance(config, str) or not isinstance(yaml.safe_load(config), dict):
@@ -113,12 +123,13 @@ class Controller:
         commit = self.git.resolve(payload.get('source') or self.source_ref)
         stamp = time.strftime('%Y%m%d-%H%M%S', time.gmtime(self.clock()))
         identifier = f'job-{stamp}-{secrets.token_hex(3)}'
-        spec = dict(entrypoint=entrypoint, config=config, resources=resources, image=self.image,
+        spec = dict(schema_version=2, project_id=project_id, game_ref=project['game_ref'],
+                    entrypoint=entrypoint, config=config, resources=resources, image=self.image,
                     source=dict(ref=payload.get('source') or self.source_ref, commit=commit),
                     follow_up={k: v for k, v in follow_up.items() if v})
         (self.root / identifier).mkdir()
         (self.runs / identifier).mkdir()
-        self.store.insert(dict(id=identifier, name=name, entrypoint=entrypoint, experiment=experiment, spec=spec,
+        self.store.insert(dict(id=identifier, name=name, entrypoint=entrypoint, experiment=experiment, project_id=project_id, spec=spec,
                                status='queued', created=self.clock()))
         return self.store.get(identifier)
 
@@ -235,7 +246,7 @@ class Controller:
         if gate and fields.get('status') == 'succeeded' and fields.get('registered'):
             # Gate the final registered checkpoint; the follow-up Job keeps the source commit and experiment.
             follow = self.submit(dict(entrypoint='run_arena_matrix', name=f"{job['name']}-gate"[:80], experiment=job['experiment'],
-                                      source=job['spec']['source']['commit'],
+                                      source=job['spec']['source']['commit'], project_id=job.get('project_id', LEGACY_PROJECT),
                                       config=dict(candidates=[fields['registered'][-1]], names={fields['registered'][-1]: job['name']},
                                                   gate=gate, workers=4)))
             log.info('queued gate %s after %s', follow['id'], identifier)
@@ -280,7 +291,8 @@ class Controller:
                 partial.rename(target)
             entries.append(dict(id=f"{job['name']}_{source.stem}", sha256=item['sha256'], checkpoint=str(target),
                                 source_path=str(source), training_job=job['id'], training_run=str(run),
-                                experiment=job['experiment'],
+                                experiment=job['experiment'], project_id=job.get('project_id', LEGACY_PROJECT),
+                                game_ref=job['spec'].get('game_ref', QUORIDOR.wire()),
                                 # The Job run directory is a Training artifact root entry named by the Job id.
                                 **(dict(run_ref=dict(source='legacy', run_id=job['id'])) if readable else {}),
                                 output_semantics=item.get('output_semantics'),
