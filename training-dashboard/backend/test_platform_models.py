@@ -33,8 +33,8 @@ class ModelIndexTests(unittest.TestCase):
         return target
 
     def model(self, **extra):
-        return dict(id="C-resnet_seed-42", sha256=self.sha, checkpoint=str(self.checkpoint),
-                    metadata=self.metadata, **extra)
+        return dict(dict(id="C-resnet_seed-42", sha256=self.sha, checkpoint=str(self.checkpoint),
+                    metadata=self.metadata), **extra)
 
     def index(self, **kwargs):
         return ModelIndex(data_root=self.root, catalog_paths=[self.root / "catalog.json"], **kwargs)
@@ -61,6 +61,21 @@ class ModelIndexTests(unittest.TestCase):
         self.assertTrue(row["available"])
         self.assertFalse(row["sha_verified"])
         self.assertFalse(row["deployed"])
+
+    def test_store_copy_is_verified_by_the_ledger_without_hashing(self):
+        store = self.root / "models" / f"{self.sha}.pt"
+        store.parent.mkdir()
+        store.write_bytes(b"checkpoint")
+        self.write("catalog.json", dict(models=[self.model(checkpoint=str(store))]))
+        with patch("backend.platform_models.hashlib.file_digest", side_effect=AssertionError("expensive")):
+            self.assertFalse(self.index().listing()["models"][0]["sha_verified"])
+            stat = store.stat()
+            self.write("models/verified.json", dict(models={self.sha: dict(size=stat.st_size, mtime_ns=stat.st_mtime_ns)}))
+            row = self.index().listing()["models"][0]
+            self.assertTrue(row["sha_verified"])
+            self.assertEqual(row["checkpoints"][0]["reason"], "verified_ledger")
+            store.write_bytes(b"changed!!!")  # a changed file no longer matches its ledger entry
+            self.assertFalse(self.index().listing()["models"][0]["sha_verified"])
 
     def test_hash_cache_stat_invalidation_and_mismatch(self):
         index = self.index()

@@ -90,6 +90,22 @@ class ModelIndex:
         self.deployed_shas = dict(deployed_shas or {})
         self._hash_cache: dict[tuple, str] = {}
         self._lock = threading.RLock()
+        self._ledger: tuple = (None, {})
+
+    def _verified(self, path: Path, digest: str) -> bool:
+        """True when the immutable store copy ``models/<sha>.pt`` matches the host verification ledger
+        (``models/verified.json``, written by the Job controller after hashing) by size and mtime."""
+        if path != self.data_root / "models" / f"{digest}.pt":
+            return False
+        ledger = self.data_root / "models" / "verified.json"
+        try:
+            stamp = ledger.stat().st_mtime_ns
+            if self._ledger[0] != stamp:
+                self._ledger = (stamp, json.loads(ledger.read_text()).get("models", {}))
+            entry, actual = self._ledger[1].get(digest), path.stat()
+        except (OSError, ValueError, AttributeError):
+            return False
+        return bool(entry) and entry.get("size") == actual.st_size and entry.get("mtime_ns") == actual.st_mtime_ns
 
     def _path(self, raw, *, relative_to=None) -> Path:
         text = str(raw)
@@ -320,6 +336,8 @@ class ModelIndex:
                         actual = self._hash(path)
                         state.update(actual_sha256=actual, sha_verified=actual == digest,
                                      reason="verified" if actual == digest else "sha_mismatch")
+                    elif state["available"] and self._verified(path, digest):
+                        state.update(actual_sha256=digest, sha_verified=True, reason="verified_ledger")
                     elif not state["available"]:
                         state["reason"] = "checkpoint_missing"
                 except (OSError, ValueError, TypeError) as exc:

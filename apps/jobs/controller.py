@@ -47,7 +47,7 @@ def _sha256(path):
 
 class Controller:
     def __init__(self, *, data_root, git, docker, image, source_ref, uid_gid='1000:1000',
-                 max_cpu_jobs=2, clock=time.time, mlflow=None):
+                 max_cpu_jobs=2, clock=time.time, mlflow=None, model_store=None):
         self.data_root = Path(data_root).resolve()
         self.root = self.data_root / 'jobs'
         self.runs = self.root / 'runs'
@@ -58,6 +58,7 @@ class Controller:
         self.lock = threading.RLock()
         self.catalog_lock = threading.Lock()
         self.mlflow, self.mlflow_lock, self.mlflow_busy = mlflow, threading.Lock(), set()
+        self.model_store = model_store  # verification ledger and merged index (model_store.ModelStore)
 
     # ---- submission -------------------------------------------------------------------------
     def entrypoints(self):
@@ -226,6 +227,8 @@ class Controller:
         self.docker.remove(job['container'])
         if self.mlflow:
             threading.Thread(target=self.log_mlflow, args=(identifier,), daemon=True).start()
+        if self.model_store and fields.get('registered'):
+            threading.Thread(target=self.model_store.refresh, daemon=True).start()
         gate = job['spec'].get('follow_up', {}).get('gate')
         if gate and fields.get('status') == 'succeeded' and fields.get('registered'):
             # Gate the final registered checkpoint; the follow-up Job keeps the source commit and experiment.
