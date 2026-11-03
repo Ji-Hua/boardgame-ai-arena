@@ -20,7 +20,7 @@ export function Projects(){
  <ErrorBox text={data.error} retry={data.retry}/>
  {!data.data&&!data.error&&<p role="status">加载项目…</p>}
  {data.data&&<><div className="aw-table"><table><thead><tr><th>项目</th><th>研究问题</th><th>游戏</th><th>任务</th></tr></thead><tbody>
- {(data.data.projects as Obj[]).map(p=><tr key={p.id}><td>{p.title}<small>{p.id}</small></td><td>{p.question}</td><td>{p.game_ref.game_id} · {p.game_ref.ruleset} v{p.game_ref.version}</td><td><Link to={'/jobs?project='+enc(p.id)}>查看任务</Link>{games.find(g=>g.ref.game_id===p.game_ref.game_id)?.training_backend?<Link to={'/jobs/new?project='+enc(p.id)}>新建任务</Link>:<small>训练后端尚未接入</small>}</td></tr>)}
+ {(data.data.projects as Obj[]).map(p=><tr key={p.id}><td>{p.title}<small>{p.id}</small></td><td>{p.question}</td><td>{p.game_ref.game_id} · {p.game_ref.ruleset} v{p.game_ref.version}</td><td><Link to={'/projects/'+enc(p.id)+'/policies'}>研究策略</Link><Link to={'/jobs?project='+enc(p.id)}>查看任务</Link>{games.find(g=>g.ref.game_id===p.game_ref.game_id)?.training_backend?<Link to={'/jobs/new?project='+enc(p.id)}>新建任务</Link>:<small>训练后端尚未接入</small>}</td></tr>)}
  </tbody></table></div>
  <h2>新建项目</h2><div className="pf-form">
  <label>项目 ID<input aria-label="项目 ID" value={id} onChange={e=>setId(e.target.value)} placeholder="例如 quoridor-ppo-study"/></label>

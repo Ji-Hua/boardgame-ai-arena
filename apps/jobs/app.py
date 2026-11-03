@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, Header, HTTPException
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse, Response
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -77,6 +77,19 @@ def create_app(controller, token_file=None, stream_interval=2.0, heartbeat=15.0)
     def create_project(body: dict, x_platform_token: str = Header(default='')):
         authorize(x_platform_token)
         return call(controller.projects.create, body)
+
+    @router.get('/projects/{project_id}/policies')
+    def policies(project_id: str):
+        call(controller.projects.get, project_id)
+        return dict(policies=call(controller.policies.listing, project_id))
+
+    @router.get('/projects/{project_id}/policies/{sha}/download')
+    def policy_download(project_id: str, sha: str, x_platform_token: str = Header(default='')):
+        authorize(x_platform_token)
+        call(controller.projects.get, project_id)
+        _, data = call(controller.policies.get, project_id, sha)
+        return Response(data, media_type='application/json',
+                        headers={'Content-Disposition': f'attachment; filename="{sha}.json"'})
 
     @router.get('/system')
     def system():

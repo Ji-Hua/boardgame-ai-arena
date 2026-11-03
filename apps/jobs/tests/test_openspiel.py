@@ -24,11 +24,11 @@ class OpenSpielControllerTests(unittest.TestCase):
 
     def test_game_profile_validation_and_api_filter(self):
         rows = self.c.entrypoints("poker")["entrypoints"]
-        self.assertEqual(list(rows), ["train_openspiel"])
+        self.assertEqual(list(rows), ["train_openspiel", "evaluate_research_policy"])
         self.assertTrue(rows["train_openspiel"]["enabled"])
         self.assertNotIn("train_openspiel", self.c.entrypoints("quoridor-legacy")["entrypoints"])
         client = TestClient(create_app(self.c))
-        self.assertEqual(list(client.get("/api/v1/jobs/entrypoints?project_id=poker").json()["entrypoints"]), ["train_openspiel"])
+        self.assertEqual(list(client.get("/api/v1/jobs/entrypoints?project_id=poker").json()["entrypoints"]), ["train_openspiel", "evaluate_research_policy"])
         with self.assertRaises(ValueError):
             self.submit(follow_up=dict(gate="gate-v1"))
         with self.assertRaises(ValueError):

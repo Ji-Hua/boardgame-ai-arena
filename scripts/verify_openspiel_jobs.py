@@ -47,12 +47,21 @@ def main():
             jobs.append(job)
             c.tick()
             # Recreate the controller while its container is running: no re-export or rerun.
-            c.store.db.close(); c.projects.db.close()
+            c.store.db.close(); c.projects.db.close(); c.policies.db.close()
             c = controller()
             finished = wait(job["id"], "succeeded")
             detail = c.detail(job["id"])
             assert len(detail["research_artifacts"]) == 1
             assert finished["registered"] == []
+        policies = c.policies.listing("poker")
+        assert len(policies) == 2
+        for opponent in (None, policies[1]["sha256"]):
+            evaluation = c.submit(dict(entrypoint="evaluate_research_policy", project_id="poker",
+                config=dict(candidate_sha=policies[0]["sha256"], opponent_sha=opponent, pairs=10, seed=123),
+                resources=dict(cpus=1, memory_gb=2, timeout_h=0.05)))
+            jobs.append(evaluation)
+            wait(evaluation["id"], "succeeded")
+            assert c.detail(evaluation["id"])["research_evaluation"]["games"] == 20
         cancelled = submit("cfr", 100000)
         jobs.append(cancelled)
         c.tick()

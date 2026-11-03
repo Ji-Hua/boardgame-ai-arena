@@ -134,7 +134,21 @@ class PolicyAgent:
             raise ValueError("Invalid policy semantics")
         if stable_hash({k:v for k,v in bundle.items() if k != "digest"}) != bundle.get("digest"):
             raise ValueError("Policy integrity mismatch")
-        self.rows = {(r["role"], r["information_state"]): r["probabilities"] for r in bundle["policies"]}
+        import math
+        rows = bundle.get("policies")
+        if not isinstance(rows, list) or not rows:
+            raise ValueError("Missing policy rows")
+        for row in rows:
+            if (not isinstance(row, dict) or row.get("role") not in ("p1", "p2")
+                    or not isinstance(row.get("information_state"), str)):
+                raise ValueError("Invalid policy information state")
+            probs = row.get("probabilities")
+            if (not isinstance(probs, dict) or not probs
+                    or any(not isinstance(a, str) or not a.isdigit() for a in probs)
+                    or any(type(p) not in (int, float) or not math.isfinite(p) or p < 0 for p in probs.values())
+                    or not math.isclose(sum(probs.values()), 1.0)):
+                raise ValueError("Invalid policy distribution")
+        self.rows = {(r["role"], r["information_state"]): r["probabilities"] for r in rows}
         if len(self.rows) != len(bundle["policies"]):
             raise ValueError("Duplicate policy information state")
 
@@ -145,7 +159,7 @@ class PolicyAgent:
     def reset(self, seed):
         self.rng = random.Random(seed)
 
-    def act(self, decision):
+    def probabilities(self, decision):
         import math
         probs = self.rows[(decision.role, decision.observation["information_state"])]
         if set(probs) != {str(a) for a in decision.legal_actions}:
@@ -153,4 +167,7 @@ class PolicyAgent:
         weights = [probs[str(a)] for a in decision.legal_actions]
         if any(not math.isfinite(p) or p < 0 for p in weights) or not math.isclose(sum(weights), 1.0):
             raise ValueError("Invalid policy distribution")
-        return self.rng.choices(decision.legal_actions, weights=weights)[0]
+        return weights
+
+    def act(self, decision):
+        return self.rng.choices(decision.legal_actions, weights=self.probabilities(decision))[0]

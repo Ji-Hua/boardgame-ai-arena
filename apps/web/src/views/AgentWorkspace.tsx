@@ -24,6 +24,7 @@ import {CheckpointPage} from './agent/CheckpointPage'
 import {Replay} from './agent/Replay'
 import {Play} from './agent/Play'
 import {Projects} from './agent/Projects'
+import {ResearchPolicies} from './agent/ResearchPolicies'
 export {evidence, route, Participant} from './agent/shared'
 export {StepAnalysis} from './agent/StepAnalysis'
 
@@ -61,6 +62,7 @@ export default function AgentWorkspace(){
  <Routes>
   <Route path="/" element={<Overview season={season} roster={roster.data}/>}/>
   <Route path="/projects" element={<Projects/>}/>
+  <Route path="/projects/:id/policies" element={<ResearchPolicies/>}/>
   <Route path="/experiments" element={<ExperimentList/>}/>
   <Route path="/experiments/:slug" element={<ExperimentDetail season={season}/>}/>
   <Route path="/training" element={<TrainingWorkspace season={season}/>}/>

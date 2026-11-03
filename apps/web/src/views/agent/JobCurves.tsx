@@ -43,11 +43,11 @@ export function JobCurves({rows,source,live}:{rows:Obj[];source?:string|null;liv
  const chosen=others.includes(key)?key:others[0]
  const last=rows[rows.length-1]??{}
  return <>
-  <div className="aw-toolbar pf-curve-controls"><label>横轴<select aria-label="横轴" value={axis} onChange={e=>setAxis(e.target.value as AxisKey)}><option value="episode">episode</option><option value="step">{rows[0]?.progress_unit==='solver_iteration'?'求解迭代':rows[0]?.progress_unit==='episode'?'训练局数':'环境步数'}</option></select></label>
+  <div className="aw-toolbar pf-curve-controls"><label>横轴<select aria-label="横轴" value={axis} onChange={e=>setAxis(e.target.value as AxisKey)}><option value="episode">episode</option><option value="step">{rows[0]?.progress_unit==='solver_iteration'?'求解迭代':rows[0]?.progress_unit==='episode'?'训练局数':rows[0]?.progress_unit==='evaluation_pair'?'评测配对':'环境步数'}</option></select></label>
    <label>平滑<select aria-label="平滑" value={smooth} onChange={e=>setSmooth(Number(e.target.value))}>{[0,0.6,0.9].map(v=><option key={v} value={v}>{v?v:'无'}</option>)}</select></label>
    <label className="pf-check"><input type="checkbox" checked={log} onChange={e=>setLog(e.target.checked)}/>损失类用对数坐标</label>
    <small>{rows.length} 个记录点 · {source??'metrics.jsonl'}{live?' · 实时':''}</small></div>
-  <div className="pf-curve-summary" aria-label="最新指标">{last.progress_unit&&<div><span>{last.progress_unit==='solver_iteration'?'求解迭代':'训练局数'}</span><b>{last.step}</b></div>}{last.episode!=null&&<div><span>episode</span><b>{last.episode}</b></div>}{SUMMARY.filter(([k])=>numeric(last[k])).map(([k,label,show])=><div key={k}><span>{label}</span><b>{show(last[k])}</b></div>)}</div>
+  <div className="pf-curve-summary" aria-label="最新指标">{last.progress_unit&&<div><span>{last.progress_unit==='solver_iteration'?'求解迭代':last.progress_unit==='evaluation_pair'?'评测配对':'训练局数'}</span><b>{last.step}</b></div>}{last.episode!=null&&<div><span>episode</span><b>{last.episode}</b></div>}{SUMMARY.filter(([k])=>numeric(last[k])).map(([k,label,show])=><div key={k}><span>{label}</span><b>{show(last[k])}</b></div>)}</div>
   <div className="pf-chart-grid">{PANELS.map(p=><Panel key={p.title} title={p.title} keys={p.keys} rows={rows} axis={axis} smooth={smooth} log={log&&!!p.log}/>)}</div>
   {chosen&&<section className="pf-chart-panel pf-chart-wide" aria-label="其他指标"><header><h3>其他指标</h3><label><select aria-label="任务指标" value={chosen} onChange={e=>setKey(e.target.value)}>{others.map(k=><option key={k} value={k}>{k}</option>)}</select></label></header>
    <LineChart points={series(rows,[chosen],smooth,false)} xKey={axis} xLabel={rows[0]?.progress_unit??axis} yKey={chosen} yLabel={chosen} width={1200} height={240}/></section>}

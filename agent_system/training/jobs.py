@@ -32,6 +32,11 @@ ENTRYPOINTS = {
         profile='openspiel_cpu', game_refs=[KUHN_POKER.wire()],
         template=dict(algorithm='cfr', iterations=200, eval_every=20, seed=42),
         description='Kuhn Poker: CFR solver reference or independent tabular Q-learning. Exact exploitability; JSON policy export.'),
+    'evaluate_research_policy': dict(
+        kind='research_evaluate', gpu=False, format='json', title='研究策略评测 · 双角色配对',
+        profile='openspiel_cpu', game_refs=[KUHN_POKER.wire()],
+        template=dict(candidate_sha='', opponent_sha=None, pairs=100, seed=42),
+        description='Registered project policies by full SHA; paired roles versus random or another policy. Exact exploitability.'),
     'train_dqn': dict(
         kind='train', gpu=True, format='yaml', title='DQN / CNN-DQN 训练',
         templates='agent_system/training/configs/dqn', template_pattern=r'[^/]+\.ya?ml',
@@ -257,7 +262,9 @@ def evaluate_checkpoints(job: dict, run: Path, events: Events):
 
 from agent_system.training.openspiel_job import run_openspiel
 
-RUNNERS = {'train_openspiel': run_openspiel, 'train_dqn': train_dqn, 'train_cnn_experiment': train_cnn_experiment, 'run_arena_matrix': run_arena_matrix,
+from agent_system.evaluation.openspiel_policies import run_evaluation as evaluate_research_policy
+
+RUNNERS = {'evaluate_research_policy': evaluate_research_policy, 'train_openspiel': run_openspiel, 'train_dqn': train_dqn, 'train_cnn_experiment': train_cnn_experiment, 'run_arena_matrix': run_arena_matrix,
            'diagnose_checkpoint': diagnose_checkpoints, 'evaluate_checkpoints': evaluate_checkpoints}
 
 

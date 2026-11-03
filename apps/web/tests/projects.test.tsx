@@ -1,7 +1,8 @@
 import React from 'react'
 import {afterEach,expect,it,vi} from 'vitest'
 import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react'
-import {MemoryRouter} from 'react-router-dom'
+import {MemoryRouter,Routes,Route} from 'react-router-dom'
+import {ResearchPolicies} from '../src/views/agent/ResearchPolicies'
 import {Projects} from '../src/views/agent/Projects'
 import {JobList,JobNew} from '../src/views/agent/Jobs'
 
@@ -64,4 +65,26 @@ it('selects the compatible research entrypoint and blocks an unconfigured worker
  expect(screen.getByRole('alert').textContent).toContain('Worker image is not configured')
  expect((screen.getByRole('button',{name:'提交任务'}) as HTMLButtonElement).disabled).toBe(true)
  expect(screen.queryByRole('checkbox')).toBeNull()
+})
+
+it('lists project policy identities and links evaluation to the exact SHA',async()=>{
+ const sha='a'.repeat(64),urls:string[]=[]
+ vi.spyOn(globalThis,'fetch').mockImplementation(url=>{
+  urls.push(String(url))
+  return response({policies:[{sha256:sha,job_id:'training-1',game_ref:{game_id:'kuhn_poker'},source:{commit:'c'.repeat(40)},algorithm:'cfr',policy_kind:'average_policy',output_semantics:'action_probabilities'}]})
+ })
+ render(<MemoryRouter initialEntries={['/projects/poker/policies']}><Routes><Route path="/projects/:id/policies" element={<ResearchPolicies/>}/></Routes></MemoryRouter>)
+ const link=await screen.findByRole('link',{name:'评测策略'})
+ expect(urls).toContain('/api/v1/jobs/projects/poker/policies')
+ expect(link.getAttribute('href')).toBe('/jobs/new?project=poker&entrypoint=evaluate_research_policy&policy='+sha)
+ expect(screen.getByText(sha)).toBeTruthy()
+ expect(screen.getByLabelText('策略下载令牌').getAttribute('type')).toBe('password')
+})
+it('prefills evaluation with immutable policy identity from the project link',async()=>{
+ const sha='b'.repeat(64)
+ vi.spyOn(globalThis,'fetch').mockImplementation(()=>response({source_ref:'test',source_commit:'c'.repeat(40),entrypoints:{
+  evaluate_research_policy:{title:'Eval',format:'json',enabled:true,template:{candidate_sha:'',opponent_sha:null,pairs:100,seed:42}}
+ }}))
+ render(<MemoryRouter initialEntries={['/jobs/new?project=poker&entrypoint=evaluate_research_policy&policy='+sha]}><JobNew/></MemoryRouter>)
+ await waitFor(()=>expect(JSON.parse((screen.getByLabelText('任务配置') as HTMLTextAreaElement).value).candidate_sha).toBe(sha))
 })

@@ -31,6 +31,7 @@ from .health import assess
 from .promotions import Promotions
 from .store import ACTIVE, Store
 from .projects import Projects, LEGACY_PROJECT
+from .policy_store import PolicyStore
 from agent_system.games.contracts import QUORIDOR
 
 log = logging.getLogger('quoridor.jobs')
@@ -57,6 +58,7 @@ class Controller:
         self.runs.mkdir(parents=True, exist_ok=True)
         self.store = Store(self.root / 'jobs.sqlite')
         self.projects = Projects(self.root / 'projects.sqlite')
+        self.policies = PolicyStore(self.data_root)
         self.git, self.docker, self.image, self.source_ref = git, docker, image, source_ref
         self.profile_images = dict(quoridor_legacy=image, openspiel_cpu=openspiel_image)
         self.uid_gid, self.max_cpu_jobs, self.clock = uid_gid, max_cpu_jobs, clock
@@ -119,6 +121,14 @@ class Controller:
             if entrypoint == 'train_openspiel':
                 from agent_system.training.openspiel_job import validate_config
                 parsed = validate_config(parsed)
+            if entrypoint == 'evaluate_research_policy':
+                from agent_system.evaluation.openspiel_policies import validate_config
+                parsed = validate_config(parsed)
+                for key in ('candidate_sha', 'opponent_sha'):
+                    if parsed.get(key):
+                        policy, _ = self.policies.get(project_id, parsed[key])
+                        if policy['game_ref'] != project['game_ref']:
+                            raise ValueError('Policy game mismatch')
             config = json.dumps(parsed)
         name = payload.get('name') or entrypoint
         experiment = payload.get('experiment') or None
@@ -286,7 +296,11 @@ class Controller:
     def register(self, job):
         run = self.runs / job['id']
         if job['spec'].get('profile') == 'openspiel_cpu':
-            self.verify_research_policy(job, run)
+            if job['entrypoint'] == 'evaluate_research_policy':
+                self.research_evaluation(job)
+            else:
+                self.verify_research_policy(job, run)
+                self.policies.register(job, run / 'policy.json')
             return []
         manifest = run / 'manifest.json'
         if not manifest.is_file():
@@ -342,6 +356,21 @@ class Controller:
                 or bundle.get('image') != job['spec']['image']):
             raise ValueError('Research policy provenance mismatch')
 
+    def research_evaluation(self, job):
+        from agent_system.games.contracts import stable_hash
+        from agent_system.evaluation.openspiel_policies import PROTOCOL
+        report = json.loads((self.runs / job['id'] / 'research-evaluation.json').read_text())
+        spec = job['spec']
+        if (report.get('schema_version') != 1 or report.get('protocol') != PROTOCOL
+                or report.get('project_id') != job['project_id']
+                or report.get('game_ref') != spec['game_ref']
+                or report.get('source') != spec['source'] or report.get('image') != spec['image']
+                or report.get('config') != json.loads(spec['config'])
+                or report.get('config_sha256') != stable_hash(report.get('config'))
+                or report.get('digest') != stable_hash({k:v for k,v in report.items() if k != 'digest'})):
+            raise ValueError('Research evaluation integrity or provenance mismatch')
+        return report
+
     def _append_catalog(self, entries):
         if not entries:
             return
@@ -396,6 +425,8 @@ class Controller:
         events = run / 'events.jsonl'
         job['events'] = [json.loads(x) for x in events.read_text().splitlines() if x.strip()] if events.exists() else []
         job['run_id'] = identifier
+        job['research_evaluation'] = (self.research_evaluation(job)
+            if job['entrypoint'] == 'evaluate_research_policy' and job['status'] == 'succeeded' else None)
         job['run_files'] = sorted(p.name for p in run.iterdir()) if run.exists() else []
         job['season'] = identifier if (self.data_root / 'arena' / identifier / 'report.json').exists() else None
         diagnoses = next((p for p in (run / 'diagnoses.json', run / 'experiment' / 'diagnoses.json') if p.exists()), run / 'diagnoses.json')
