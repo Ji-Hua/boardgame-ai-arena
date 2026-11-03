@@ -1,3 +1,5 @@
+> Implementation update: see [2026-11-03 delivery record](../../../docs/MULTIGAME_RELEASE_20261103.md). The proposal below is retained as historical context.
+
 # Quoridor RL Arena 多游戏、多研究项目平台设计
 
 日期：2026-11-02。状态：设计提案，未实施、未部署。

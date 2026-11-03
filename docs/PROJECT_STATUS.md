@@ -1,3 +1,5 @@
+> 2026-11-03: Multi-game candidate completed on Dev, not deployed. See [delivery and acceptance](MULTIGAME_RELEASE_20261103.md).
+
 # Project Status
 
 > 2026-11-03 isolated Dev branch: project policy registration/download and SHA-pinned evaluation now pass real Docker round-trip acceptance. [Scope and evidence](tasks/20261103-policy-registry.md). Not deployed.
