@@ -54,7 +54,6 @@ evaluation always runs whole games without this conditioning.
 Export is actor-only NumPy arrays, with SHA-256 dependency verification and
 `allow_pickle=False`. SB3 training probability parity is checked on five
 seeded decision states, tolerance 1e-5. Optimizer resume is not supported.
-Kuhn Poker retains OpenSpiel CFR/tabular-Q and exact exploitability.
 Mr. Jack reports paired-role mean returns and standard errors, not exploitability.
 Evaluation pairs share environment seed; divergent action paths can consume
 different chance events, so this is common-seed pairing, not identical deals

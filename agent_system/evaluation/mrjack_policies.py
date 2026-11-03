@@ -1,17 +1,15 @@
-"""Versioned paired-seat evaluation of immutable Kuhn Poker policies."""
+"""Versioned paired-role evaluation of immutable Mr. Jack policies."""
 import hashlib
 import json
 from pathlib import Path
 import re
 import statistics
-from agent_system.games.contracts import KUHN_POKER, MR_JACK, Decision, stable_hash
+from agent_system.games.contracts import MR_JACK, stable_hash
 from agent_system.games.match import RandomAgent, play, replay
-from agent_system.training.openspiel_job import PolicyAgent
 
-PROTOCOL = "kuhn-policy-paired-v1"
+PROTOCOL = "mrjack-policy-paired-v1"
 
 def protocol_for(game_ref):
-    if game_ref == KUHN_POKER.wire(): return PROTOCOL
     if game_ref == MR_JACK.wire(): return "mrjack-policy-paired-v1"
     raise ValueError("Unsupported evaluation game")
 
@@ -62,21 +60,6 @@ def run_evaluation(job, run, events):
     else:
         opponent = RandomAgent()
     exact = None
-    if job["game_ref"] == KUHN_POKER.wire():
-        from open_spiel.python import policy
-        from open_spiel.python.algorithms import exploitability
-        tabular = policy.TabularPolicy(game.game)
-        expected = set()
-        for index, state in enumerate(tabular.states):
-            role = game.roles[state.current_player()]
-            request = Decision(role, game.observe(state, role), game.legal_actions(state), 0)
-            probs = candidate.probabilities(request)
-            expected.add((role, request.observation["information_state"]))
-            for action, probability in zip(request.legal_actions, probs):
-                tabular.action_probability_array[index, action] = probability
-        if expected != set(candidate.rows):
-            raise ValueError("Policy information-state coverage mismatch")
-        exact = exploitability.exploitability(game.game, tabular)
     results, by_role = [], {role: [] for role in game.roles}
     with (run/"research-metrics.jsonl").open("x") as metrics, (run/"private-replays.jsonl").open("x") as replays:
         for pair in range(config["pairs"]):

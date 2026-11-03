@@ -2,18 +2,18 @@
 import argparse
 import json
 from pathlib import Path
-from agent_system.games.contracts import QUORIDOR, KUHN_POKER
+from agent_system.games.contracts import QUORIDOR, MR_JACK
 from agent_system.games.registry import create_game
 from agent_system.games.match import RandomAgent, play, replay
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--game", choices=["quoridor", "kuhn_poker"], required=True)
+    parser.add_argument("--game", choices=["quoridor", "mr_jack"], required=True)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-decisions", type=int, default=500)
     parser.add_argument("--output", type=Path, required=True, help="Private research replay, never a public download")
     args = parser.parse_args()
-    ref = QUORIDOR if args.game == "quoridor" else KUHN_POKER
+    ref = QUORIDOR if args.game == "quoridor" else MR_JACK
     game = create_game(ref.wire())
     result = play(game, {r: RandomAgent() for r in game.roles}, environment_seed=args.seed,
                   agent_seeds={r: args.seed + i + 1 for i, r in enumerate(game.roles)},

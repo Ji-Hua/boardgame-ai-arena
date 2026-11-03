@@ -9,7 +9,7 @@ from apps.jobs.controller import Controller
 from apps.jobs.projects import LEGACY_PROJECT
 from apps.jobs.store import SCHEMA, Store
 from apps.jobs.tests.test_controller import FakeGit, FakeDocker, YAML
-from agent_system.games.contracts import QUORIDOR, KUHN_POKER
+from agent_system.games.contracts import QUORIDOR, MR_JACK
 
 class ProjectsTests(unittest.TestCase):
     def setUp(self):
@@ -23,13 +23,13 @@ class ProjectsTests(unittest.TestCase):
         return self.controller.projects.create(dict(id=id, title=id, question="compare policies", game_ref=ref.wire()))
 
     def test_projects_isolate_same_experiment_and_reject_wrong_game(self):
-        self.project("a"); self.project("b"); self.project("poker", KUHN_POKER)
+        self.project("a"); self.project("b"); self.project("jack", MR_JACK)
         a = self.controller.submit(dict(entrypoint="train_dqn", config=YAML, project_id="a", experiment="same"))
         b = self.controller.submit(dict(entrypoint="train_dqn", config=YAML, project_id="b", experiment="same"))
         self.assertEqual([j["id"] for j in self.controller.store.listing(project_id="a")], [a["id"]])
         self.assertEqual([j["id"] for j in self.controller.store.listing(project_id="b")], [b["id"]])
         self.assertEqual(a["spec"]["game_ref"], QUORIDOR.wire())
-        for extra in (dict(project_id="poker"), dict(project_id="a", game_ref=KUHN_POKER.wire())):
+        for extra in (dict(project_id="jack"), dict(project_id="a", game_ref=MR_JACK.wire())):
             with self.assertRaises(ValueError):
                 self.controller.submit(dict(entrypoint="train_dqn", config=YAML, **extra))
         with self.assertRaises(KeyError):

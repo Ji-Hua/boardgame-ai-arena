@@ -1,5 +1,4 @@
 # Approved CPU neural research profile; legacy GPU image stays independent.
-open_spiel==2.0.2
 sb3-contrib==2.9.2
 stable-baselines3==2.9.2
 gymnasium==1.2.3

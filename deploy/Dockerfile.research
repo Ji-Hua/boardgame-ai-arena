@@ -11,9 +11,6 @@ COPY packages/board-ui packages/board-ui
 RUN npm run typecheck && npm run test:ui && npm run build
 
 FROM ${RUNTIME_IMAGE}
-USER root
-RUN pip install --no-cache-dir open_spiel==2.0.2
-USER 10001:10001
 ARG SOURCE_COMMIT
 LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
 COPY scripts/start_unified_platform.sh /app/scripts/start_unified_platform.sh
@@ -22,8 +19,7 @@ COPY training-dashboard/platform_entry.py /app/training-dashboard/
 COPY apps/gameplay /app/apps/gameplay
 COPY agent_system/games /app/agent_system/games
 COPY agent_system/runtime/research_policy.py /app/agent_system/runtime/research_policy.py
-COPY agent_system/evaluation/openspiel_policies.py /app/agent_system/evaluation/openspiel_policies.py
-COPY agent_system/training/openspiel_job.py /app/agent_system/training/openspiel_job.py
+COPY agent_system/evaluation/mrjack_policies.py /app/agent_system/evaluation/mrjack_policies.py
 COPY --from=frontend /build/apps/web/dist /app/apps/web/dist
 ENV PLATFORM_FRONTEND_DIST=/app/apps/web/dist     TRAINING_DASHBOARD_SOURCE_ROOT=/app     PLATFORM_LAB_UPSTREAM=http://lab:8744
 EXPOSE 8741

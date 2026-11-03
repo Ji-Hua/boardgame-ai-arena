@@ -45,6 +45,7 @@ class Projects:
             raise KeyError("Unknown project")
         value = dict(raw)
         value["game_ref"] = json.loads(value["game_ref"])
+        validate_ref(value["game_ref"])
         return value
 
     def get(self, identifier):
@@ -53,7 +54,11 @@ class Projects:
 
     def listing(self):
         with self.lock:
-            return [self.row(r) for r in self.db.execute("select * from projects order by id").fetchall()]
+            projects=[]
+            for row in self.db.execute("select * from projects order by id").fetchall():
+                try:projects.append(self.row(row))
+                except ValueError:continue  # retained historical data is not an active supported project
+            return projects
 
     def create(self, value):
         if set(value) != {"id", "title", "question", "game_ref"}:

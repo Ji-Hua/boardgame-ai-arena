@@ -55,13 +55,13 @@ it('selects the compatible research entrypoint and blocks an unconfigured worker
  vi.spyOn(globalThis,'fetch').mockImplementation(url=>{
   urls.push(String(url))
   return response({source_ref:'test',source_commit:'c'.repeat(40),entrypoints:{
-   train_openspiel:{title:'OpenSpiel',format:'json',template:{algorithm:'cfr',iterations:20},
+   train_mrjack_ppo:{title:'Mr. Jack',format:'json',template:{algorithm:'maskable_ppo',iterations:20},
     enabled:false,unavailable_reason:'Worker image is not configured',gpu:false}
   }})
  })
- render(<MemoryRouter initialEntries={['/jobs/new?project=poker']}><JobNew/></MemoryRouter>)
- await waitFor(()=>expect((screen.getByLabelText('任务入口') as HTMLSelectElement).value).toBe('train_openspiel'))
- expect(urls).toContain('/api/v1/jobs/entrypoints?project_id=poker')
+ render(<MemoryRouter initialEntries={['/jobs/new?project=jack']}><JobNew/></MemoryRouter>)
+ await waitFor(()=>expect((screen.getByLabelText('任务入口') as HTMLSelectElement).value).toBe('train_mrjack_ppo'))
+ expect(urls).toContain('/api/v1/jobs/entrypoints?project_id=jack')
  expect(screen.getByRole('alert').textContent).toContain('Worker image is not configured')
  expect((screen.getByRole('button',{name:'提交任务'}) as HTMLButtonElement).disabled).toBe(true)
  expect(screen.queryByRole('checkbox')).toBeNull()
@@ -71,20 +71,20 @@ it('lists project policy identities and links evaluation to the exact SHA',async
  const sha='a'.repeat(64),urls:string[]=[]
  vi.spyOn(globalThis,'fetch').mockImplementation(url=>{
   urls.push(String(url))
-  return response({policies:[{sha256:sha,job_id:'training-1',game_ref:{game_id:'kuhn_poker'},source:{commit:'c'.repeat(40)},algorithm:'cfr',policy_kind:'average_policy',output_semantics:'action_probabilities'}]})
+  return response({policies:[{sha256:sha,job_id:'training-1',game_ref:{game_id:'mr_jack'},source:{commit:'c'.repeat(40)},algorithm:'maskable_ppo',policy_kind:'average_policy',output_semantics:'action_probabilities'}]})
  })
- render(<MemoryRouter initialEntries={['/projects/poker/policies']}><Routes><Route path="/projects/:id/policies" element={<ResearchPolicies/>}/></Routes></MemoryRouter>)
+ render(<MemoryRouter initialEntries={['/projects/jack/policies']}><Routes><Route path="/projects/:id/policies" element={<ResearchPolicies/>}/></Routes></MemoryRouter>)
  const link=await screen.findByRole('link',{name:'评测策略'})
- expect(urls).toContain('/api/v1/jobs/projects/poker/policies')
- expect(link.getAttribute('href')).toBe('/jobs/new?project=poker&entrypoint=evaluate_research_policy&policy='+sha)
+ expect(urls).toContain('/api/v1/jobs/projects/jack/policies')
+ expect(link.getAttribute('href')).toBe('/jobs/new?project=jack&entrypoint=evaluate_mrjack_policy&policy='+sha)
  expect(screen.getByText(sha)).toBeTruthy()
  expect(screen.getByLabelText('策略下载令牌').getAttribute('type')).toBe('password')
 })
 it('prefills evaluation with immutable policy identity from the project link',async()=>{
  const sha='b'.repeat(64)
  vi.spyOn(globalThis,'fetch').mockImplementation(()=>response({source_ref:'test',source_commit:'c'.repeat(40),entrypoints:{
-  evaluate_research_policy:{title:'Eval',format:'json',enabled:true,template:{candidate_sha:'',opponent_sha:null,pairs:100,seed:42}}
+  evaluate_mrjack_policy:{title:'Eval',format:'json',enabled:true,template:{candidate_sha:'',opponent_sha:null,pairs:100,seed:42}}
  }}))
- render(<MemoryRouter initialEntries={['/jobs/new?project=poker&entrypoint=evaluate_research_policy&policy='+sha]}><JobNew/></MemoryRouter>)
+ render(<MemoryRouter initialEntries={['/jobs/new?project=jack&entrypoint=evaluate_mrjack_policy&policy='+sha]}><JobNew/></MemoryRouter>)
  await waitFor(()=>expect(JSON.parse((screen.getByLabelText('任务配置') as HTMLTextAreaElement).value).candidate_sha).toBe(sha))
 })

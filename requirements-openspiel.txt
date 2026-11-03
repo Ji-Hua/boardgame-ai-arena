@@ -1,2 +1,0 @@
-# Optional game adapter; install in an isolated development / worker environment.
-open_spiel==2.0.2

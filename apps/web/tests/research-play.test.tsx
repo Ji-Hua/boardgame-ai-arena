@@ -2,6 +2,7 @@ import React from 'react'
 import {afterEach,expect,it,vi} from 'vitest'
 import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react'
 import {MemoryRouter,Routes,Route} from 'react-router-dom'
+import {MrJackBoard} from '../src/views/agent/MrJackBoard'
 import {ResearchPlay} from '../src/views/agent/ResearchPlay'
 afterEach(()=>{cleanup();vi.restoreAllMocks()})
 const ref={game_id:'mr_jack',ruleset:'london-2016-base',version:1}
@@ -37,4 +38,16 @@ it('renders spectator projection without action controls',async()=>{
  await screen.findByRole('button',{name:'查看本视角回放'})
  expect(screen.queryByRole('button',{name:'执行对手动作'})).toBeNull()
  expect(screen.queryByRole('button',{name:'关闭对局'})).toBeNull()
+})
+
+
+it('allows only server-provided board moves and supports keyboard activation',()=>{
+ const act=vi.fn()
+ const view=render(<MrJackBoard observation={{...obs,phase:'move'}} legalActions={[{id:105,label:'移动到 5'}]} onAction={act}/>)
+ fireEvent.click(screen.getByRole('button',{name:'移动到 5'}))
+ fireEvent.keyDown(screen.getByRole('button',{name:'移动到 5'}),{key:'Enter'})
+ expect(act.mock.calls).toEqual([[105],[105]])
+ expect(screen.queryByRole('button',{name:'移动到 6'})).toBeNull()
+ view.rerender(<MrJackBoard observation={obs} legalActions={[{id:105}]}/>)
+ expect(screen.queryByRole('button',{name:'移动到 5'})).toBeNull()
 })

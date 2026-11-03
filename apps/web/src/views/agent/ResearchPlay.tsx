@@ -50,7 +50,7 @@ export function ResearchPlay(){
  <button disabled={busy||!role} onClick={()=>void create()}>开始研究对局</button></div>}
  {watch&&<p><Link to={watch} target="_blank" rel="noreferrer">打开观战视图</Link>（仅公开信息）</p>}
  {view&&<><p>视角：{view.viewer} · 决策 {view.revision} · {view.status} · 当前角色 {view.actor??'终局'}</p>
- {game?.ref.game_id==='mr_jack'?<MrJackBoard observation={shown?.observation}/>:<Json value={shown?.observation}/>}
+ {game?.ref.game_id==='mr_jack'?<MrJackBoard observation={shown?.observation} legalActions={view.legal_actions} onAction={!busy&&!replay&&view.status==='active'&&view.viewer===view.actor?(a)=>void step(a):undefined}/>:<Json value={shown?.observation}/>}
  {view.status==='active'&&view.viewer!=='watch'&&!replay&&<div className="aw-toolbar">{view.actor===view.viewer?view.legal_actions.map((a:Obj)=><button key={a.id} disabled={busy} onClick={()=>void step(a.id)}>{a.label}</button>):<button disabled={busy} onClick={()=>void step()}>执行对手动作</button>}</div>}
  {Object.keys(view.returns??{}).length>0&&<Json value={view.returns}/>}
  <button onClick={()=>void showReplay()}>查看本视角回放</button>{replay&&<><input aria-label="研究回放进度" type="range" min={0} max={replay.frames.length-1} value={frame} onChange={e=>setFrame(Number(e.target.value))}/><button onClick={()=>setReplay(null)}>返回当前对局</button></>}

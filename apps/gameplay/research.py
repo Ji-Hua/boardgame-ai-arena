@@ -12,7 +12,7 @@ import threading
 from agent_system.games.contracts import Decision
 from agent_system.games.match import RandomAgent
 from agent_system.games.registry import create_game, validate_ref
-from agent_system.evaluation.openspiel_policies import load_policy
+from agent_system.evaluation.mrjack_policies import load_policy
 from .games import Busy, Conflict, Denied
 
 def token_hash(token):

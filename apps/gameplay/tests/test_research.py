@@ -4,8 +4,8 @@ import tempfile
 import unittest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from agent_system.games.contracts import KUHN_POKER
-from agent_system.games.openspiel import KuhnPoker
+from agent_system.games.contracts import MR_JACK
+from agent_system.games.mrjack import MrJack
 from apps.gameplay.research import ResearchGames
 from apps.gameplay.research_api import router
 
@@ -15,12 +15,12 @@ class ResearchGamesTests(unittest.TestCase):
         self.root=Path(self.tmp.name)
         from apps.jobs.projects import Projects
         projects=Projects(self.root/"jobs"/"projects.sqlite")
-        projects.create(dict(id="poker",title="Poker",question="test",game_ref=KUHN_POKER.wire()))
+        projects.create(dict(id="jack",title="Mr. Jack",question="test",game_ref=MR_JACK.wire()))
         self.games=ResearchGames(self.root/"games.sqlite",self.root)
         app=FastAPI();app.include_router(router(self.games));self.api=TestClient(app)
 
-    def create(self, role="p1"):
-        return self.games.create("poker",KUHN_POKER.wire(),role)
+    def create(self, role="detective"):
+        return self.games.create("jack",MR_JACK.wire(),role)
 
     def test_role_and_watch_capabilities_never_expose_internal_state(self):
         created=self.create();gid=created["id"]
@@ -32,7 +32,7 @@ class ResearchGamesTests(unittest.TestCase):
                 for key in ('"env_rng"','"agent_rng"','"tokens"','"initial"','"events"','"digest"'):
                     self.assertNotIn(key,text)
         watch=self.games.view(gid,created["watch_token"])
-        self.assertNotIn("information_state",watch["observation"])
+        self.assertNotIn("identity",watch["observation"])
         self.assertEqual(watch["legal_actions"],[])
         denied=self.api.post("/api/v1/play-v2/"+gid+"/step",json=dict(revision=0,action=0),
                              headers={"X-Game-Token":created["watch_token"]})
@@ -40,20 +40,21 @@ class ResearchGamesTests(unittest.TestCase):
         self.assertEqual(self.api.get("/api/v1/play-v2/"+gid).status_code,403)
 
     def test_same_information_set_same_player_and_watch_projection(self):
-        created=self.create();gid=created["id"];game=KuhnPoker()
+        created=self.create();gid=created["id"];game=MrJack()
         row=self.games.db.execute("select private from research_games where id=?",(gid,)).fetchone()
         record=json.loads(row[0]);views=[]
         for other in (1,2):
-            state=game.apply(game.apply(game.initial_state(),0),other)
+            state=game.apply(game.initial_state(),other)
+            for card in (0,2,4,6):state=game.apply(state,card)
             record["state"]=game.serialize(state)
-            record["events"]=[dict(actor="chance",action=0),dict(actor="chance",action=other)]
+            record["events"]=[dict(actor="chance",action=a) for a in (other,0,2,4,6)]
             self.games.db.execute("update research_games set private=? where id=?",(json.dumps(record),gid))
             views.append((self.games.view(gid,created["token"]),self.games.view(gid,created["watch_token"]),
                           self.games.replay(gid,created["token"])))
         self.assertEqual(views[0],views[1])
 
     def test_restart_preserves_agent_rng_and_revision_conflicts(self):
-        created=self.create("p2");gid=created["id"];token=created["token"]
+        created=self.create("jack");gid=created["id"];token=created["token"]
         other=ResearchGames(self.root/"clone.sqlite",self.root)
         self.games.db.backup(other.db)
         a=self.games.step(gid,token,0)
@@ -64,7 +65,7 @@ class ResearchGamesTests(unittest.TestCase):
         self.assertEqual(denied.status_code,409)
         restarted=ResearchGames(self.root/"games.sqlite",self.root)
         while a["status"]=="active":
-            action=a["legal_actions"][0]["id"] if a["actor"]=="p2" else None
+            action=a["legal_actions"][0]["id"] if a["actor"]=="jack" else None
             a=restarted.step(gid,token,a["revision"],action)
         replay=restarted.replay(gid,token)
         self.assertEqual(len(replay["frames"]),a["revision"]+1)
@@ -72,7 +73,7 @@ class ResearchGamesTests(unittest.TestCase):
 
     def test_bad_policy_path_and_bool_action_fail_closed(self):
         with self.assertRaises(ValueError):
-            self.games.create("poker",KUHN_POKER.wire(),"p1","../secret")
+            self.games.create("jack",MR_JACK.wire(),"detective","../secret")
         created=self.create()
         result=self.api.post("/api/v1/play-v2/"+created["id"]+"/step",
             json=dict(revision=0,action=True),headers={"X-Game-Token":created["token"]})
@@ -83,8 +84,6 @@ class ResearchGamesTests(unittest.TestCase):
     def test_mrjack_private_projection_and_restore(self):
         from agent_system.games.contracts import MR_JACK
         from apps.jobs.projects import Projects
-        Projects(self.root/"jobs"/"projects.sqlite").create(
-            dict(id="jack",title="Jack",question="test",game_ref=MR_JACK.wire()))
         created=self.games.create("jack",MR_JACK.wire(),"detective","heuristic")
         gid,token=created["id"],created["token"]
         original=self.games.view(gid,token)
@@ -99,4 +98,4 @@ class ResearchGamesTests(unittest.TestCase):
         assert restarted.replay(gid,token)["frames"][-1]["observation"]==view["observation"]
         assert restarted.context(gid,token)["complete"] is True
         with self.assertRaises(ValueError):
-            restarted.create("poker",MR_JACK.wire(),"detective")
+            restarted.create("unknown",MR_JACK.wire(),"detective")

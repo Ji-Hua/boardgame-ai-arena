@@ -11,10 +11,7 @@ FORMAT="mrjack_mlp_tanh_v1"
 
 def validate_bundle(bundle):
     if bundle.get("format")!=FORMAT:
-        if bundle.get("files"):raise ValueError("Unexpected tabular policy dependencies")
-        from agent_system.training.openspiel_job import PolicyAgent
-        PolicyAgent(bundle)
-        return
+        raise ValueError("Unsupported research policy format")
     if (bundle.get("schema_version")!=1 or bundle.get("game_ref")!=MR_JACK.wire()
             or bundle.get("output_semantics")!="policy_logits"
             or bundle.get("encoder")!="mrjack_visible_summary_v1"
@@ -68,5 +65,4 @@ def runtime(bundle,root,stored=False):
     if bundle.get("format")==FORMAT:
         filename=bundle["files"][0]["sha256"]+".npz" if stored else "actor.npz"
         return NeuralPolicy(bundle,Path(root)/filename)
-    from agent_system.training.openspiel_job import PolicyAgent
-    return PolicyAgent(bundle)
+    raise ValueError("Unsupported research policy format")

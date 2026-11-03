@@ -51,7 +51,7 @@ def _sha256(path):
 
 class Controller:
     def __init__(self, *, data_root, git, docker, image, source_ref, uid_gid='1000:1000',
-                 max_cpu_jobs=2, clock=time.time, mlflow=None, model_store=None, openspiel_image=None, neural_image=None):
+                 max_cpu_jobs=2, clock=time.time, mlflow=None, model_store=None, neural_image=None):
         self.data_root = Path(data_root).resolve()
         self.root = self.data_root / 'jobs'
         self.runs = self.root / 'runs'
@@ -60,7 +60,7 @@ class Controller:
         self.projects = Projects(self.root / 'projects.sqlite')
         self.policies = PolicyStore(self.data_root)
         self.git, self.docker, self.image, self.source_ref = git, docker, image, source_ref
-        self.profile_images = dict(quoridor_legacy=image, openspiel_cpu=openspiel_image, research_neural_cpu=neural_image)
+        self.profile_images = dict(quoridor_legacy=image, research_neural_cpu=neural_image)
         self.uid_gid, self.max_cpu_jobs, self.clock = uid_gid, max_cpu_jobs, clock
         self.lock = threading.RLock()
         self.catalog_lock = threading.Lock()
@@ -120,14 +120,11 @@ class Controller:
             parsed = json.loads(config) if isinstance(config, str) else config
             if not isinstance(parsed, dict):
                 raise ValueError('Config must be a JSON object')
-            if entrypoint == 'train_openspiel':
-                from agent_system.training.openspiel_job import validate_config
-                parsed = validate_config(parsed)
             if entrypoint == 'train_mrjack_ppo':
                 from agent_system.training.mrjack_job import validate_config
                 parsed = validate_config(parsed)
-            if entrypoint in ('evaluate_research_policy','evaluate_mrjack_policy'):
-                from agent_system.evaluation.openspiel_policies import validate_config
+            if entrypoint == 'evaluate_mrjack_policy':
+                from agent_system.evaluation.mrjack_policies import validate_config
                 parsed = validate_config(parsed)
                 for key in ('candidate_sha', 'opponent_sha'):
                     if parsed.get(key):
@@ -300,8 +297,8 @@ class Controller:
     # ---- registration -----------------------------------------------------------------------
     def register(self, job):
         run = self.runs / job['id']
-        if job['spec'].get('profile') in ('openspiel_cpu','research_neural_cpu'):
-            if job['entrypoint'] in ('evaluate_research_policy','evaluate_mrjack_policy'):
+        if job['spec'].get('profile') == 'research_neural_cpu':
+            if job['entrypoint'] == 'evaluate_mrjack_policy':
                 self.research_evaluation(job)
             else:
                 self.verify_research_policy(job, run)
@@ -347,7 +344,7 @@ class Controller:
         if manifest.get('schema_version') != 1 or len(manifest.get('artifacts', [])) != 1:
             raise ValueError('Invalid research artifact manifest')
         item = manifest['artifacts'][0]
-        if (item.get('file') != 'policy.json' or item.get('kind') not in ('openspiel_tabular_policy',FORMAT)
+        if (item.get('file') != 'policy.json' or item.get('kind') != FORMAT
                 or item.get('output_semantics') not in ('action_probabilities','policy_logits')
                 or item.get('game_ref') != job['spec']['game_ref']):
             raise ValueError('Incompatible research policy artifact')
@@ -356,7 +353,7 @@ class Controller:
             raise ValueError('Research policy SHA mismatch')
         bundle = json.loads(path.read_text())
         validate_bundle(bundle)
-        expected_kind=FORMAT if bundle.get('format')==FORMAT else 'openspiel_tabular_policy'
+        expected_kind=FORMAT
         if item['kind']!=expected_kind or item['output_semantics']!=bundle['output_semantics']:
             raise ValueError('Artifact format mismatch')
         for dependency in bundle.get('files',[]):
@@ -370,7 +367,7 @@ class Controller:
 
     def research_evaluation(self, job):
         from agent_system.games.contracts import stable_hash
-        from agent_system.evaluation.openspiel_policies import protocol_for
+        from agent_system.evaluation.mrjack_policies import protocol_for
         report = json.loads((self.runs / job['id'] / 'research-evaluation.json').read_text())
         spec = job['spec']
         if (report.get('schema_version') != 1 or report.get('protocol') != protocol_for(job['spec']['game_ref'])
@@ -438,7 +435,7 @@ class Controller:
         job['events'] = [json.loads(x) for x in events.read_text().splitlines() if x.strip()] if events.exists() else []
         job['run_id'] = identifier
         job['research_evaluation'] = (self.research_evaluation(job)
-            if job['entrypoint'] in ('evaluate_research_policy','evaluate_mrjack_policy') and job['status'] == 'succeeded' else None)
+            if job['entrypoint'] == 'evaluate_mrjack_policy' and job['status'] == 'succeeded' else None)
         job['run_files'] = sorted(p.name for p in run.iterdir()) if run.exists() else []
         job['season'] = identifier if (self.data_root / 'arena' / identifier / 'report.json').exists() else None
         diagnoses = next((p for p in (run / 'diagnoses.json', run / 'experiment' / 'diagnoses.json') if p.exists()), run / 'diagnoses.json')

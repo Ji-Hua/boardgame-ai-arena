@@ -1,7 +1,7 @@
 import copy
 import random
 import unittest
-from agent_system.games.contracts import QUORIDOR, KUHN_POKER, stable_hash
+from agent_system.games.contracts import QUORIDOR, MR_JACK, stable_hash
 from agent_system.games.registry import create_game, validate_ref
 from agent_system.games.match import RandomAgent, play, replay
 
@@ -47,34 +47,18 @@ class GamesTests(unittest.TestCase):
         broken = copy.deepcopy(record); broken["events"][0]["action"] = -1
         with self.assertRaises(ValueError): replay(game, broken, "p1")
 
-    def test_kuhn_private_observations_and_replay(self):
-        game = create_game(KUHN_POKER.wire())
-        a = game.apply(game.apply(game.initial_state(), 0), 1)
-        b = game.apply(game.apply(game.initial_state(), 0), 2)
-        self.assertEqual(game.observe(a, "p1"), game.observe(b, "p1"))
-        self.assertEqual(game.legal_actions(a), game.legal_actions(b))
-        self.assertNotEqual(game.observe(a, "p2"), game.observe(b, "p2"))
-        agents = lambda: {r: RandomAgent() for r in game.roles}
-        first = play(game, agents(), environment_seed=93)
-        self.assertEqual(first, play(game, agents(), environment_seed=93))
-        self.assertEqual(first["termination"], "engine_terminal")
-        self.assertEqual(sum(first["returns"].values()), 0)
-        for role in game.roles:
-            self.assertEqual(replay(game, first, role), game.observe(game.restore(first["final"]), role))
-        self.assertNotIn("environment_seed", replay(game, first, "p1"))
-
     def test_agent_failures_are_not_game_outcomes(self):
-        game = create_game(KUHN_POKER.wire())
+        game = create_game(MR_JACK.wire())
         class Invalid(RandomAgent):
             def act(self, decision): return -10
-        result = play(game, {"p1": Invalid(), "p2": RandomAgent()})
+        result = play(game, {"detective": Invalid(), "jack": RandomAgent()})
         self.assertEqual(result["termination"], "illegal_action")
         self.assertEqual(result["returns"], {})
-        self.assertEqual(result["offender"], "p1")
+        self.assertEqual(result["offender"], "detective")
 
     def test_repeated_actor_and_agent_rng_do_not_control_chance(self):
         class Sequence:
-            ref, roles = KUHN_POKER, ("p1", "p2")
+            ref, roles = MR_JACK, ("p1", "p2")
             def initial_state(self): return 0
             def actor(self, s): return ("chance", "p1", "p1", "p2", None)[s]
             def observe(self, s, r): return {"stage": s}

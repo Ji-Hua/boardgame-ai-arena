@@ -127,3 +127,10 @@ def test_seeded_matches_replay_and_heuristic_never_peeks():
     g,s=ready()
     for action in (True,-1,3072):
         with pytest.raises(ValueError):g.apply(s,action)
+
+
+def test_registry_only_contains_requested_games():
+    from agent_system.games.registry import DEFINITIONS,validate_ref
+    assert {row["ref"]["game_id"] for row in DEFINITIONS}=={"quoridor","mr_jack"}
+    with pytest.raises(ValueError):
+        validate_ref(dict(game_id="removed_game",ruleset="default",version=1))

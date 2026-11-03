@@ -1,3 +1,5 @@
+> SUPERSEDED: this candidate predates the user's scope correction. Its images include an unrequested game and must not be rolled out. See [Mr. Jack-only correction](tasks/20261103-mrjack-only.md) for the current implementation. The record below is historical evidence.
+
 # Multi-game research release candidate
 
 2026-11-03. Branch: codex/multi-game-rl-platform.

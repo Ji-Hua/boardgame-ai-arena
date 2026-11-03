@@ -1,9 +1,0 @@
-# Optional CPU profile. No Torch, GPU or Quoridor model dependency.
-FROM python:3.12-slim
-ARG SOURCE_COMMIT
-LABEL org.opencontainers.image.revision=$SOURCE_COMMIT
-ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/job/source
-WORKDIR /job/source
-COPY requirements-openspiel.txt /tmp/requirements-openspiel.txt
-RUN pip install --no-cache-dir -r /tmp/requirements-openspiel.txt && pip freeze > /python-dependencies.txt
-CMD ["python", "-m", "agent_system.training.jobs", "/job/job.json"]
