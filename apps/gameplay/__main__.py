@@ -1,7 +1,8 @@
 """Run the gameplay service: ``python -m apps.gameplay`` from the repository (or platform image) root.
 
 Environment: QUORIDOR_DATA_ROOT (season evidence and model catalogs, read only),
-GAMEPLAY_DB (default <data root>/games/games.sqlite, the only file it writes),
+GAMEPLAY_DB (default <data root>/games/games.sqlite),
+GAMEPLAY_RESEARCH_DB (default <data root>/games/research.sqlite),
 GAMEPLAY_HOST/GAMEPLAY_PORT (default 127.0.0.1:18797), PLATFORM_MODEL_CATALOGS.
 """
 from __future__ import annotations

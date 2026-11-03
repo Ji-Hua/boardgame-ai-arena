@@ -55,6 +55,11 @@ def main():
                 assert report["games"]==20 and report["exploitability"] is None
                 assert set(report["role_returns"])=={"detective","jack"}
                 reports.append(report)
+            audit=c.research_eligibility.record("jack",dict(sha256=policy["sha256"],
+                role="detective",target="research-play",evaluation_job=e["id"],
+                decision="approve",note="Isolated acceptance only; no deployment"))
+            assert audit["deployment_changed"] is False
+            assert audit["agent_spec"]["role"]=="detective"
         # Restore actual gameplay from the same immutable numeric policy.
         from apps.gameplay.research import ResearchGames
         games=ResearchGames(root/"games"/"acceptance.sqlite",root)

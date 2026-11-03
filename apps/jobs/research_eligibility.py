@@ -22,7 +22,7 @@ class ResearchEligibility:
         return dict(history=rows,current=list(current.values()),deployment_changed=False)
     def record(self,project,body):
         required={"sha256","role","target","evaluation_job","decision","note"}
-        if set(body)!=required:raise ValueError("Explicit policy, role, target, evaluation, decision and note required")
+        if set(body)!=required or any(not isinstance(v,str) for v in body.values()):raise ValueError("Explicit policy, role, target, evaluation, decision and note required")
         if body["target"]!="research-play":raise ValueError("Only research-play eligibility is supported")
         if body["decision"] not in ("approve","withdraw"):raise ValueError("Unknown decision")
         if not isinstance(body["note"],str) or not 1<=len(body["note"].strip())<=2000:

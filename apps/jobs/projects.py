@@ -34,6 +34,7 @@ class Projects:
             try:
                 with os.fdopen(fd,"w") as out:
                     out.write(data);out.flush();os.fsync(out.fileno())
+                os.chmod(temp,0o644)  # public project catalog must be readable by the gameplay UID
                 os.replace(temp,self.manifest)
             finally:
                 if os.path.exists(temp):os.unlink(temp)
