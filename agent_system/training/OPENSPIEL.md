@@ -37,15 +37,43 @@ Artifacts in the job run directory:
 The worker reloads exported policy and exercises the common match runner.
 Controller verifies artifact hash and provenance before marking success.
 No JSON file is registered as a legacy .pt model or published to the ladder.
-Research artifacts remain in their Job directory; a generic immutable policy
-catalog, download API and play UI are not implemented in this slice.
+Successful training additionally copies policy bytes into the immutable
+<data root>/policies/<sha>.json store and records project/job provenance in
+policies/catalog.sqlite. This remains separate from legacy Torch model catalogs.
+The project research-policy page lists identities and links to evaluation Jobs.
+Policy download requires the existing platform token. Project scoping is a data
+compatibility boundary, not a new per-user authorization model.
+Historical completed jobs are not automatically backfilled by this change.
+A neural-policy catalog and live multi-game Play UI remain future work.
 No hidden-state replay is exposed through Jobs.
 
 Reproduce container acceptance from a clean committed checkout:
 PYTHONPATH=. python scripts/verify_openspiel_jobs.py --source <commit>
   --image <built image> --data-root <new external directory>
 This creates two bounded training jobs, recreates their controller to verify
-restart reconciliation, and cancels a long-running third job.
+restart reconciliation, evaluates a registered policy against random and another
+registered policy, and cancels a long-running training job.
+
+## Registered-policy evaluation
+evaluate_research_policy takes candidate_sha, optional opponent_sha (null means
+random), pairs (1..1000), and seed. Both identities must be registered in the
+selected project and compatible with its exact GameRef. Submission and worker
+both verify policy bytes. No arbitrary path or external policy upload is accepted.
+
+Protocol kuhn-policy-paired-v1:
+- For each pair, swap candidate roles using the same environment seed.
+- Agent seeds follow candidate/opponent identity when roles swap.
+- Report both role returns and the mean of paired returns.
+- Standard error uses independent pair means, not individual games; null for
+  one pair. This is a sampling error estimate, not a competitive-strength claim.
+- Candidate exploitability uses its complete two-role policy and OpenSpiel exact
+  best responses. It is independent of the sampled opponent.
+- Store project/game, input SHAs, seed/config hash, source/image and report digest.
+- Keep full replay records in private-replays.jsonl; no public replay endpoint.
+  The job API exposes the aggregate report only.
+
+A completed evaluation does not create a Quoridor ladder season or promotion.
+
 
 Upstream algorithm sources:
 https://github.com/google-deepmind/open_spiel/blob/master/open_spiel/python/algorithms/cfr.py

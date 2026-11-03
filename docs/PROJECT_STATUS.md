@@ -1,5 +1,7 @@
 # Project Status
 
+> 2026-11-03 isolated Dev branch: project policy registration/download and SHA-pinned evaluation now pass real Docker round-trip acceptance. [Scope and evidence](tasks/20261103-policy-registry.md). Not deployed.
+
 > 2026-11-03 isolated Dev branch: OpenSpiel CFR and tabular Q-learning Jobs now pass real CPU-container acceptance, restart reconciliation and cancellation. [Scope and evidence](tasks/20261103-openspiel-jobs.md). Not deployed.
 
 > 2026-11-02 isolated Dev branch: first multi-game foundation completed on codex/multi-game-rl-platform. See [implementation scope, verification and remaining phases](tasks/20261102-multi-game-rl-platform.md). No deployment; this does not supersede the current service baseline.
