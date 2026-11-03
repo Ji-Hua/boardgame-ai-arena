@@ -1,3 +1,5 @@
+> Current candidate: [Mr. Jack and Quoridor only](MRJACK_RELEASE_20261103.md). Earlier multi-game release candidates are superseded.
+
 > 2026-11-03 scope correction: only Quoridor and Mr. Jack are supported. The unrequested Poker integration and its dependency/profile have been removed. See [task record](tasks/20261103-mrjack-only.md).
 
 > 2026-11-03: Multi-game candidate completed on Dev, not deployed. See [delivery and acceptance](MULTIGAME_RELEASE_20261103.md).
