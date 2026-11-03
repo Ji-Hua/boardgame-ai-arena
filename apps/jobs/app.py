@@ -91,6 +91,14 @@ def create_app(controller, token_file=None, stream_interval=2.0, heartbeat=15.0)
         return Response(data, media_type='application/json',
                         headers={'Content-Disposition': f'attachment; filename="{sha}.json"'})
 
+    @router.get('/projects/{project_id}/policies/{sha}/bundle')
+    def policy_bundle(project_id: str, sha: str, x_platform_token: str = Header(default='')):
+        authorize(x_platform_token)
+        call(controller.projects.get, project_id)
+        data = call(controller.policies.bundle, project_id, sha)
+        return Response(data, media_type='application/zip',
+                        headers={'Content-Disposition': f'attachment; filename="{sha}.zip"'})
+
     @router.get('/system')
     def system():
         return dict(gpu=gpu_status(), image=controller.image, source_ref=controller.source_ref,

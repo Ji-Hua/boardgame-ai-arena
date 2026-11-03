@@ -8,7 +8,7 @@ import sqlite3
 import tempfile
 import threading
 
-from agent_system.training.openspiel_job import PolicyAgent
+from agent_system.runtime.research_policy import validate_bundle, runtime
 
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -34,31 +34,44 @@ class PolicyStore:
         data = Path(source).read_bytes()
         sha = hashlib.sha256(data).hexdigest()
         bundle = json.loads(data)
-        PolicyAgent(bundle)
+        validate_bundle(bundle)
+        runtime(bundle, Path(source).parent)
         if bundle["project_id"] != job["project_id"] or bundle["game_ref"] != job["spec"]["game_ref"]:
             raise ValueError("Policy project/game mismatch")
         metadata = dict(sha256=sha, project_id=job["project_id"], job_id=job["id"],
             game_ref=bundle["game_ref"], source=bundle["source"], algorithm=bundle["config"]["algorithm"],
             policy_kind=bundle["policy_kind"], output_semantics=bundle["output_semantics"])
         with self.lock:
+            for dependency in bundle.get('files',[]):
+                source_path=Path(source).parent/dependency['name']
+                model=source_path.read_bytes()
+                if hashlib.sha256(model).hexdigest()!=dependency['sha256']:
+                    raise ValueError('Model dependency SHA mismatch')
+                target_model=self.root/(dependency['sha256']+'.npz')
+                self._publish(model,target_model)
             target = self.path(sha)
-            if not target.exists():
-                fd, temp = tempfile.mkstemp(prefix=".policy-", dir=self.root)
-                try:
-                    with os.fdopen(fd, "wb") as out:
-                        out.write(data); out.flush(); os.fsync(out.fileno())
-                    os.chmod(temp, 0o444)
-                    try:
-                        os.link(temp, target)  # atomic no-overwrite publication
-                    except FileExistsError:
-                        pass
-                finally:
-                    os.unlink(temp)
-            if target.read_bytes() != data:
-                raise ValueError("Immutable policy store corruption")
+            self._publish(data,target)
             self.db.execute("insert or ignore into policies values(?,?,?,?)",
                 (job["project_id"], sha, job["id"], json.dumps(metadata)))
         return metadata
+
+    def _publish(self,data,target):
+        if target.is_symlink():
+            raise ValueError('Symbolic link in policy store')
+        if not target.exists():
+            fd, temp = tempfile.mkstemp(prefix=".policy-", dir=self.root)
+            try:
+                with os.fdopen(fd, "wb") as out:
+                    out.write(data); out.flush(); os.fsync(out.fileno())
+                os.chmod(temp, 0o444)
+                try:
+                    os.link(temp, target)  # atomic no-overwrite publication
+                except FileExistsError:
+                    pass
+            finally:
+                os.unlink(temp)
+        if target.read_bytes() != data:
+            raise ValueError("Immutable policy store corruption")
 
     def listing(self, project_id):
         with self.lock:
@@ -77,8 +90,26 @@ class PolicyStore:
         if hashlib.sha256(data).hexdigest() != sha:
             raise ValueError("Immutable policy store corruption")
         bundle = json.loads(data)
-        PolicyAgent(bundle)
+        validate_bundle(bundle)
         meta = json.loads(row["metadata"])
         if bundle["project_id"] != project_id or bundle["game_ref"] != meta["game_ref"]:
             raise ValueError("Policy provenance mismatch")
+        runtime(bundle,self.root,stored=True)  # verifies dependent numeric weights too
         return meta, data
+
+    def bundle(self, project_id, sha):
+        import io
+        import zipfile
+        _, data = self.get(project_id, sha)
+        bundle = json.loads(data)
+        out = io.BytesIO()
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("policy.json", data)
+            for item in bundle.get("files", []):
+                path = self.root / (item["sha256"] + ".npz")
+                if path.is_symlink(): raise ValueError("Symbolic model dependency")
+                model = path.read_bytes()
+                if hashlib.sha256(model).hexdigest() != item["sha256"]:
+                    raise ValueError("Model dependency SHA mismatch")
+                archive.writestr(item["name"], model)
+        return out.getvalue()

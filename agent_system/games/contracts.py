@@ -29,6 +29,7 @@ class GameRef:
 
 QUORIDOR = GameRef("quoridor", "standard-9x9", 1)
 KUHN_POKER = GameRef("kuhn_poker", "openspiel-default", 1)
+MR_JACK = GameRef("mr_jack", "london-2016-base", 1)
 
 @dataclass(frozen=True)
 class Decision:

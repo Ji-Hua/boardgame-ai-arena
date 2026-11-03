@@ -25,6 +25,7 @@ import {Replay} from './agent/Replay'
 import {Play} from './agent/Play'
 import {Projects} from './agent/Projects'
 import {ResearchPolicies} from './agent/ResearchPolicies'
+import {ResearchPlay} from './agent/ResearchPlay'
 export {evidence, route, Participant} from './agent/shared'
 export {StepAnalysis} from './agent/StepAnalysis'
 
@@ -63,6 +64,7 @@ export default function AgentWorkspace(){
   <Route path="/" element={<Overview season={season} roster={roster.data}/>}/>
   <Route path="/projects" element={<Projects/>}/>
   <Route path="/projects/:id/policies" element={<ResearchPolicies/>}/>
+  <Route path="/projects/:id/play" element={<ResearchPlay/>}/>
   <Route path="/experiments" element={<ExperimentList/>}/>
   <Route path="/experiments/:slug" element={<ExperimentDetail season={season}/>}/>
   <Route path="/training" element={<TrainingWorkspace season={season}/>}/>

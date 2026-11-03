@@ -51,7 +51,7 @@ def _sha256(path):
 
 class Controller:
     def __init__(self, *, data_root, git, docker, image, source_ref, uid_gid='1000:1000',
-                 max_cpu_jobs=2, clock=time.time, mlflow=None, model_store=None, openspiel_image=None):
+                 max_cpu_jobs=2, clock=time.time, mlflow=None, model_store=None, openspiel_image=None, neural_image=None):
         self.data_root = Path(data_root).resolve()
         self.root = self.data_root / 'jobs'
         self.runs = self.root / 'runs'
@@ -60,7 +60,7 @@ class Controller:
         self.projects = Projects(self.root / 'projects.sqlite')
         self.policies = PolicyStore(self.data_root)
         self.git, self.docker, self.image, self.source_ref = git, docker, image, source_ref
-        self.profile_images = dict(quoridor_legacy=image, openspiel_cpu=openspiel_image)
+        self.profile_images = dict(quoridor_legacy=image, openspiel_cpu=openspiel_image, research_neural_cpu=neural_image)
         self.uid_gid, self.max_cpu_jobs, self.clock = uid_gid, max_cpu_jobs, clock
         self.lock = threading.RLock()
         self.catalog_lock = threading.Lock()
@@ -105,10 +105,10 @@ class Controller:
             raise ValueError('Worker image is not configured for ' + meta['profile'])
         if payload.get('game_ref') is not None and payload['game_ref'] != project['game_ref']:
             raise ValueError('Job game_ref does not match its project')
-        if meta['profile'] == 'openspiel_cpu':
+        if meta['profile'] != 'quoridor_legacy':
             image_id = self.docker.image_id(image)
             if not image_id:
-                raise ValueError('Configured OpenSpiel image is not available locally')
+                raise ValueError('Configured research worker image is not available locally')
             image = image_id  # persist immutable image identity, not a mutable tag
         config = payload.get('config')
         if meta['format'] == 'yaml':
@@ -121,7 +121,10 @@ class Controller:
             if entrypoint == 'train_openspiel':
                 from agent_system.training.openspiel_job import validate_config
                 parsed = validate_config(parsed)
-            if entrypoint == 'evaluate_research_policy':
+            if entrypoint == 'train_mrjack_ppo':
+                from agent_system.training.mrjack_job import validate_config
+                parsed = validate_config(parsed)
+            if entrypoint in ('evaluate_research_policy','evaluate_mrjack_policy'):
                 from agent_system.evaluation.openspiel_policies import validate_config
                 parsed = validate_config(parsed)
                 for key in ('candidate_sha', 'opponent_sha'):
@@ -295,8 +298,8 @@ class Controller:
     # ---- registration -----------------------------------------------------------------------
     def register(self, job):
         run = self.runs / job['id']
-        if job['spec'].get('profile') == 'openspiel_cpu':
-            if job['entrypoint'] == 'evaluate_research_policy':
+        if job['spec'].get('profile') in ('openspiel_cpu','research_neural_cpu'):
+            if job['entrypoint'] in ('evaluate_research_policy','evaluate_mrjack_policy'):
                 self.research_evaluation(job)
             else:
                 self.verify_research_policy(job, run)
@@ -337,20 +340,27 @@ class Controller:
         return registered
 
     def verify_research_policy(self, job, run):
-        from agent_system.training.openspiel_job import PolicyAgent
+        from agent_system.runtime.research_policy import validate_bundle, FORMAT
         manifest = json.loads((run / 'research-artifacts.json').read_text())
         if manifest.get('schema_version') != 1 or len(manifest.get('artifacts', [])) != 1:
             raise ValueError('Invalid research artifact manifest')
         item = manifest['artifacts'][0]
-        if (item.get('file') != 'policy.json' or item.get('kind') != 'openspiel_tabular_policy'
-                or item.get('output_semantics') != 'action_probabilities'
+        if (item.get('file') != 'policy.json' or item.get('kind') not in ('openspiel_tabular_policy',FORMAT)
+                or item.get('output_semantics') not in ('action_probabilities','policy_logits')
                 or item.get('game_ref') != job['spec']['game_ref']):
             raise ValueError('Incompatible research policy artifact')
         path = (run / 'policy.json').resolve()
         if not path.is_relative_to(run) or _sha256(path) != item['sha256']:
             raise ValueError('Research policy SHA mismatch')
         bundle = json.loads(path.read_text())
-        PolicyAgent(bundle)
+        validate_bundle(bundle)
+        expected_kind=FORMAT if bundle.get('format')==FORMAT else 'openspiel_tabular_policy'
+        if item['kind']!=expected_kind or item['output_semantics']!=bundle['output_semantics']:
+            raise ValueError('Artifact format mismatch')
+        for dependency in bundle.get('files',[]):
+            path=(run/dependency['name']).resolve()
+            if not path.is_relative_to(run) or _sha256(path)!=dependency['sha256']:
+                raise ValueError('Model dependency SHA mismatch')
         if (bundle.get('project_id') != job['project_id']
                 or bundle.get('source') != job['spec']['source']
                 or bundle.get('image') != job['spec']['image']):
@@ -358,10 +368,10 @@ class Controller:
 
     def research_evaluation(self, job):
         from agent_system.games.contracts import stable_hash
-        from agent_system.evaluation.openspiel_policies import PROTOCOL
+        from agent_system.evaluation.openspiel_policies import protocol_for
         report = json.loads((self.runs / job['id'] / 'research-evaluation.json').read_text())
         spec = job['spec']
-        if (report.get('schema_version') != 1 or report.get('protocol') != PROTOCOL
+        if (report.get('schema_version') != 1 or report.get('protocol') != protocol_for(job['spec']['game_ref'])
                 or report.get('project_id') != job['project_id']
                 or report.get('game_ref') != spec['game_ref']
                 or report.get('source') != spec['source'] or report.get('image') != spec['image']
@@ -426,7 +436,7 @@ class Controller:
         job['events'] = [json.loads(x) for x in events.read_text().splitlines() if x.strip()] if events.exists() else []
         job['run_id'] = identifier
         job['research_evaluation'] = (self.research_evaluation(job)
-            if job['entrypoint'] == 'evaluate_research_policy' and job['status'] == 'succeeded' else None)
+            if job['entrypoint'] in ('evaluate_research_policy','evaluate_mrjack_policy') and job['status'] == 'succeeded' else None)
         job['run_files'] = sorted(p.name for p in run.iterdir()) if run.exists() else []
         job['season'] = identifier if (self.data_root / 'arena' / identifier / 'report.json').exists() else None
         diagnoses = next((p for p in (run / 'diagnoses.json', run / 'experiment' / 'diagnoses.json') if p.exists()), run / 'diagnoses.json')

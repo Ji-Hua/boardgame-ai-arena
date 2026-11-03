@@ -26,7 +26,10 @@ def build(env=os.environ):
     evidence = dashboard_module('agent_arena').Evidence(data_root, models)
     adapter = dashboard_module('replay')._dependencies()[0]
     store = Store(env.get('GAMEPLAY_DB', str(Path(data_root) / 'games' / 'games.sqlite')))
-    return create_app(Games(store, evidence, adapter._serialize_state))
+    from .research import ResearchGames
+    research = ResearchGames(env.get('GAMEPLAY_RESEARCH_DB',
+        str(Path(data_root) / 'games' / 'research.sqlite')),data_root)
+    return create_app(Games(store, evidence, adapter._serialize_state),research)
 
 
 def main():

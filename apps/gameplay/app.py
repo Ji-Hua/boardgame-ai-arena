@@ -10,7 +10,7 @@ from fastapi import APIRouter, FastAPI, Header, HTTPException
 from .games import Busy, Conflict, CreateGame, Denied, GameStep, Listing
 
 
-def create_app(games):
+def create_app(games, research_games=None):
     app = FastAPI(title='Quoridor platform gameplay', docs_url=None, redoc_url=None)
     router = APIRouter(prefix='/api/v1/play')
 
@@ -57,5 +57,8 @@ def create_app(games):
     @app.get('/health')
     def health(): return dict(ok=True, active=games.store.count('active'))
 
+    if research_games is not None:
+        from .research_api import router as research_router
+        app.include_router(research_router(research_games))
     app.include_router(router)
     return app

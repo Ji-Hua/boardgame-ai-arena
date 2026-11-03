@@ -49,3 +49,10 @@ class KuhnPoker:
 
     def restore(self, value):
         return self.game.deserialize_state(value)
+
+    def public_observe(self, state):
+        return {"betting_history": list(state.history()[2:]),
+                "actor": self.actor(state), "terminal": state.is_terminal()}
+
+    def action_label(self, state, action):
+        return state.action_to_string(action)
