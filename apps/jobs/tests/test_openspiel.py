@@ -57,3 +57,8 @@ class OpenSpielControllerTests(unittest.TestCase):
         self.assertEqual(self.c.metrics(job["id"])["metrics"][-1]["step"], 2)
         self.assertEqual(self.c.store.get(job["id"])["registered"], [])
         self.assertFalse((self.root/"catalog-jobs.json").exists())
+        self.assertEqual(len(self.c.detail(job["id"])["research_artifacts"]), 1)
+        (run/"policy.json").write_text("{}")
+        with self.assertRaisesRegex(ValueError, "SHA mismatch"):
+            self.c.verify_research_policy(job, run)
+        self.assertEqual(self.c.detail(job["id"])["research_artifacts"], [])

@@ -5,7 +5,9 @@ The Arena matrix now uses this adapter for restoration, observations and actions
 the legacy opening book, protocol, identities and output hashes remain unchanged.
 
 Kuhn Poker delegates to OpenSpiel and is a small imperfect-information contract
-check. It is NOT an implementation of Mr. Jack, nor a new training backend.
+check. It is NOT an implementation of Mr. Jack. The optional OpenSpiel research
+Job backend now supports CFR and tabular Q-learning; see
+[backend contract](../training/OPENSPIEL.md).
 Its player information state includes only that player's visible history.
 
 Run from the repository root in an isolated environment:
