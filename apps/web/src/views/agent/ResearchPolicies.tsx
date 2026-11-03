@@ -2,6 +2,8 @@ import {useState} from 'react'
 import {Link,useParams} from 'react-router-dom'
 import {type Obj,useV1,enc,ErrorBox} from './shared'
 
+import {ResearchEligibility} from './ResearchEligibility'
+
 export function ResearchPolicies(){
  const {id=''}=useParams()
  const data=useV1('/jobs/projects/'+enc(id)+'/policies')
@@ -23,5 +25,5 @@ export function ResearchPolicies(){
  {!data.data&&!data.error&&<p role="status">加载策略…</p>}
  {data.data&&<div className="aw-table"><table><thead><tr><th>策略</th><th>算法与语义</th><th>来源</th><th>操作</th></tr></thead><tbody>
  {(data.data.policies as Obj[]).map(p=><tr key={p.sha256+p.job_id}><td><code>{p.sha256}</code><small>{p.game_ref.game_id}</small></td><td>{p.algorithm}<small>{p.policy_kind} · {p.output_semantics}</small></td><td><Link to={'/jobs/'+enc(p.job_id)}>训练任务</Link><small>{p.source.commit}</small></td><td><Link to={'/projects/'+enc(id)+'/play?policy='+enc(p.sha256)}>与策略对战</Link><Link to={'/jobs/new?project='+enc(id)+'&entrypoint='+(p.game_ref.game_id==='mr_jack'?'evaluate_mrjack_policy':'evaluate_research_policy')+'&policy='+enc(p.sha256)}>评测策略</Link><button onClick={()=>void download(p.sha256)}>下载策略</button></td></tr>)}
- </tbody></table>{!data.data.policies.length&&<p>暂无已登记策略</p>}</div>}</>
+ </tbody></table>{!data.data.policies.length&&<p>暂无已登记策略</p>}</div>}<ResearchEligibility project={id} policies={data.data?.policies??[]}/></>
 }

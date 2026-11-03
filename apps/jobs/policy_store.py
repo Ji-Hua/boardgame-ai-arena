@@ -38,7 +38,10 @@ class PolicyStore:
         runtime(bundle, Path(source).parent)
         if bundle["project_id"] != job["project_id"] or bundle["game_ref"] != job["spec"]["game_ref"]:
             raise ValueError("Policy project/game mismatch")
-        metadata = dict(sha256=sha, project_id=job["project_id"], job_id=job["id"],
+        from agent_system.definition.research_spec import policy_spec
+        from agent_system.games.registry import create_game
+        specs=[policy_spec(bundle,sha,role) for role in create_game(bundle["game_ref"]).roles]
+        metadata = dict(agent_specs=specs,sha256=sha, project_id=job["project_id"], job_id=job["id"],
             game_ref=bundle["game_ref"], source=bundle["source"], algorithm=bundle["config"]["algorithm"],
             policy_kind=bundle["policy_kind"], output_semantics=bundle["output_semantics"])
         with self.lock:

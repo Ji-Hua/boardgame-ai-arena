@@ -66,6 +66,8 @@ class Controller:
         self.catalog_lock = threading.Lock()
         self.mlflow, self.mlflow_lock, self.mlflow_busy = mlflow, threading.Lock(), set()
         self.model_store = model_store  # verification ledger and merged index (model_store.ModelStore)
+        from .research_eligibility import ResearchEligibility
+        self.research_eligibility = ResearchEligibility(self.root / 'research-eligibility.sqlite',self)
         self.promotions = Promotions(self.data_root, self.store, clock)
 
     # ---- submission -------------------------------------------------------------------------

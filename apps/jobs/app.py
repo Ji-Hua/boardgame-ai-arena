@@ -99,6 +99,15 @@ def create_app(controller, token_file=None, stream_interval=2.0, heartbeat=15.0)
         return Response(data, media_type='application/zip',
                         headers={'Content-Disposition': f'attachment; filename="{sha}.zip"'})
 
+    @router.get('/projects/{project_id}/eligibility')
+    def research_eligibility(project_id: str):
+        return call(controller.research_eligibility.listing, project_id)
+
+    @router.post('/projects/{project_id}/eligibility')
+    def decide_eligibility(project_id: str, body: dict, x_platform_token: str = Header(default='')):
+        authorize(x_platform_token)
+        return call(controller.research_eligibility.record, project_id, body)
+
     @router.get('/system')
     def system():
         return dict(gpu=gpu_status(), image=controller.image, source_ref=controller.source_ref,

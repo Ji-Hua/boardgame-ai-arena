@@ -26,7 +26,7 @@ export function ResearchPlay(){
   setBusy(true);setError('')
   try{const d=await request('/api/v1/play-v2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({project_id:id,game_ref:project.game_ref,human_role:role,opponent})})
    setWatch('/projects/'+enc(id)+'/play?session='+enc(d.id)+'#token='+enc(d.watch_token))
-   navigate('/projects/'+enc(id)+'/play?session='+enc(d.id)+'#token='+enc(d.token));setView(d.view)
+   navigate('/projects/'+enc(id)+'/play?session='+enc(d.id)+'#token='+enc(d.token))
   }catch(e){setError(String(e))}finally{setBusy(false)}
  }
  async function step(action?:number){
