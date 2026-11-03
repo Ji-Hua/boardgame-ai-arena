@@ -48,3 +48,20 @@ it('submits an explicitly selected project',async()=>{
  await waitFor(()=>expect(calls.some(c=>c.init?.method==='POST')).toBe(true))
  expect(JSON.parse(String(calls.find(c=>c.init?.method==='POST')!.init?.body)).project_id).toBe('study')
 })
+
+it('selects the compatible research entrypoint and blocks an unconfigured worker',async()=>{
+ const urls:string[]=[]
+ vi.spyOn(globalThis,'fetch').mockImplementation(url=>{
+  urls.push(String(url))
+  return response({source_ref:'test',source_commit:'c'.repeat(40),entrypoints:{
+   train_openspiel:{title:'OpenSpiel',format:'json',template:{algorithm:'cfr',iterations:20},
+    enabled:false,unavailable_reason:'Worker image is not configured',gpu:false}
+  }})
+ })
+ render(<MemoryRouter initialEntries={['/jobs/new?project=poker']}><JobNew/></MemoryRouter>)
+ await waitFor(()=>expect((screen.getByLabelText('任务入口') as HTMLSelectElement).value).toBe('train_openspiel'))
+ expect(urls).toContain('/api/v1/jobs/entrypoints?project_id=poker')
+ expect(screen.getByRole('alert').textContent).toContain('Worker image is not configured')
+ expect((screen.getByRole('button',{name:'提交任务'}) as HTMLButtonElement).disabled).toBe(true)
+ expect(screen.queryByRole('checkbox')).toBeNull()
+})

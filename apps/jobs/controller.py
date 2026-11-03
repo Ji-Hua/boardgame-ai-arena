@@ -37,7 +37,7 @@ log = logging.getLogger('quoridor.jobs')
 NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}\Z')
 TEMPLATE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}(/[A-Za-z0-9][A-Za-z0-9._ -]{0,79})?\Z')
 # Metric files in preference order: the training contract, then the CNN research runner.
-METRIC_FILES = ('metrics.jsonl', 'experiment/metrics.jsonl', 'experiment/research-metrics.jsonl')
+METRIC_FILES = ('metrics.jsonl', 'research-metrics.jsonl', 'experiment/metrics.jsonl', 'experiment/research-metrics.jsonl')
 CHECKPOINT_NAME = re.compile(r'ep(\d+)(?:_step(\d+))?')
 LIMITS = dict(cpus=(1, 12), memory_gb=(2, 48), timeout_h=(0.05, 72))
 DEFAULTS = dict(gpu=dict(cpus=6, memory_gb=24, timeout_h=12), cpu=dict(cpus=4, memory_gb=8, timeout_h=6))
@@ -50,7 +50,7 @@ def _sha256(path):
 
 class Controller:
     def __init__(self, *, data_root, git, docker, image, source_ref, uid_gid='1000:1000',
-                 max_cpu_jobs=2, clock=time.time, mlflow=None, model_store=None):
+                 max_cpu_jobs=2, clock=time.time, mlflow=None, model_store=None, openspiel_image=None):
         self.data_root = Path(data_root).resolve()
         self.root = self.data_root / 'jobs'
         self.runs = self.root / 'runs'
@@ -58,6 +58,7 @@ class Controller:
         self.store = Store(self.root / 'jobs.sqlite')
         self.projects = Projects(self.root / 'projects.sqlite')
         self.git, self.docker, self.image, self.source_ref = git, docker, image, source_ref
+        self.profile_images = dict(quoridor_legacy=image, openspiel_cpu=openspiel_image)
         self.uid_gid, self.max_cpu_jobs, self.clock = uid_gid, max_cpu_jobs, clock
         self.lock = threading.RLock()
         self.catalog_lock = threading.Lock()
@@ -66,11 +67,16 @@ class Controller:
         self.promotions = Promotions(self.data_root, self.store, clock)
 
     # ---- submission -------------------------------------------------------------------------
-    def entrypoints(self):
+    def entrypoints(self, project_id=None):
         commit = self.git.resolve(self.source_ref)
+        ref = self.projects.get(project_id)['game_ref'] if project_id else None
         rows = {}
         for name, meta in ENTRYPOINTS.items():
-            row = dict(meta)
+            if ref is not None and ref not in meta['game_refs']:
+                continue
+            image = self.profile_images.get(meta['profile'])
+            row = dict(meta, enabled=bool(image), image=image,
+                       unavailable_reason=None if image else 'Worker image is not configured')
             if 'templates' in meta:
                 pattern = re.compile(meta.get('template_pattern', r'[^/]+\.ya?ml'))
                 row['templates'] = [f for f in self.git.files(commit, meta['templates']) if pattern.fullmatch(f)]
@@ -90,11 +96,18 @@ class Controller:
         meta = ENTRYPOINTS[entrypoint]
         project_id = payload.get('project_id') or LEGACY_PROJECT
         project = self.projects.get(project_id)
-        # Existing entrypoints are Quoridor-only. Never silently train another game's project.
-        if project['game_ref'] != QUORIDOR.wire():
-            raise ValueError('This entrypoint only supports Quoridor; no training backend is registered for this game')
+        if project['game_ref'] not in meta['game_refs']:
+            raise ValueError('Entrypoint does not support this project game or rules version')
+        image = self.profile_images.get(meta['profile'])
+        if not image:
+            raise ValueError('Worker image is not configured for ' + meta['profile'])
         if payload.get('game_ref') is not None and payload['game_ref'] != project['game_ref']:
             raise ValueError('Job game_ref does not match its project')
+        if meta['profile'] == 'openspiel_cpu':
+            image_id = self.docker.image_id(image)
+            if not image_id:
+                raise ValueError('Configured OpenSpiel image is not available locally')
+            image = image_id  # persist immutable image identity, not a mutable tag
         config = payload.get('config')
         if meta['format'] == 'yaml':
             if not isinstance(config, str) or not isinstance(yaml.safe_load(config), dict):
@@ -103,6 +116,9 @@ class Controller:
             parsed = json.loads(config) if isinstance(config, str) else config
             if not isinstance(parsed, dict):
                 raise ValueError('Config must be a JSON object')
+            if entrypoint == 'train_openspiel':
+                from agent_system.training.openspiel_job import validate_config
+                parsed = validate_config(parsed)
             config = json.dumps(parsed)
         name = payload.get('name') or entrypoint
         experiment = payload.get('experiment') or None
@@ -124,7 +140,7 @@ class Controller:
         stamp = time.strftime('%Y%m%d-%H%M%S', time.gmtime(self.clock()))
         identifier = f'job-{stamp}-{secrets.token_hex(3)}'
         spec = dict(schema_version=2, project_id=project_id, game_ref=project['game_ref'],
-                    entrypoint=entrypoint, config=config, resources=resources, image=self.image,
+                    entrypoint=entrypoint, config=config, resources=resources, image=image, profile=meta['profile'],
                     source=dict(ref=payload.get('source') or self.source_ref, commit=commit),
                     follow_up={k: v for k, v in follow_up.items() if v})
         (self.root / identifier).mkdir()
@@ -230,7 +246,8 @@ class Controller:
         elif exit_code == 0:
             try:
                 fields.update(status='succeeded', registered=self.register(job))
-                self.publish_season(job)
+                if job['spec'].get('profile', 'quoridor_legacy') == 'quoridor_legacy':
+                    self.publish_season(job)
             except Exception as exc:
                 log.exception('registration failed for %s', identifier)
                 fields.update(status='failed', error=f'registration failed: {exc}')
@@ -268,6 +285,9 @@ class Controller:
     # ---- registration -----------------------------------------------------------------------
     def register(self, job):
         run = self.runs / job['id']
+        if job['spec'].get('profile') == 'openspiel_cpu':
+            self.verify_research_policy(job, run)
+            return []
         manifest = run / 'manifest.json'
         if not manifest.is_file():
             return []
@@ -301,6 +321,26 @@ class Controller:
             registered.append(item['sha256'])
         self._append_catalog(entries)
         return registered
+
+    def verify_research_policy(self, job, run):
+        from agent_system.training.openspiel_job import PolicyAgent
+        manifest = json.loads((run / 'research-artifacts.json').read_text())
+        if manifest.get('schema_version') != 1 or len(manifest.get('artifacts', [])) != 1:
+            raise ValueError('Invalid research artifact manifest')
+        item = manifest['artifacts'][0]
+        if (item.get('file') != 'policy.json' or item.get('kind') != 'openspiel_tabular_policy'
+                or item.get('output_semantics') != 'action_probabilities'
+                or item.get('game_ref') != job['spec']['game_ref']):
+            raise ValueError('Incompatible research policy artifact')
+        path = (run / 'policy.json').resolve()
+        if not path.is_relative_to(run) or _sha256(path) != item['sha256']:
+            raise ValueError('Research policy SHA mismatch')
+        bundle = json.loads(path.read_text())
+        PolicyAgent(bundle)
+        if (bundle.get('project_id') != job['project_id']
+                or bundle.get('source') != job['spec']['source']
+                or bundle.get('image') != job['spec']['image']):
+            raise ValueError('Research policy provenance mismatch')
 
     def _append_catalog(self, entries):
         if not entries:
@@ -364,6 +404,16 @@ class Controller:
         except ValueError:
             job['diagnoses'] = []  # rewritten after every checkpoint; may be mid-write
         job['checkpoints'] = self._checkpoints(run)
+        artifact_manifest = run / 'research-artifacts.json'
+        job['research_artifacts'] = []
+        if artifact_manifest.exists():
+            try:
+                for item in json.loads(artifact_manifest.read_text())['artifacts']:
+                    path = (run / item['file']).resolve()
+                    if path.is_relative_to(run) and path.is_file() and _sha256(path) == item['sha256']:
+                        job['research_artifacts'].append(item)
+            except (ValueError, KeyError, TypeError):
+                pass
         try:
             job['mlflow'] = json.loads((run / 'mlflow.json').read_text()) if (run / 'mlflow.json').exists() else None
         except ValueError:

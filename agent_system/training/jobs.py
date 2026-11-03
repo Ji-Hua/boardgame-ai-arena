@@ -24,7 +24,14 @@ import subprocess
 import sys
 import time
 
+from agent_system.games.contracts import QUORIDOR, KUHN_POKER
+
 ENTRYPOINTS = {
+    'train_openspiel': dict(
+        kind='research', gpu=False, format='json', title='OpenSpiel · CFR / Tabular Q-learning',
+        profile='openspiel_cpu', game_refs=[KUHN_POKER.wire()],
+        template=dict(algorithm='cfr', iterations=200, eval_every=20, seed=42),
+        description='Kuhn Poker: CFR solver reference or independent tabular Q-learning. Exact exploitability; JSON policy export.'),
     'train_dqn': dict(
         kind='train', gpu=True, format='yaml', title='DQN / CNN-DQN 训练',
         templates='agent_system/training/configs/dqn', template_pattern=r'[^/]+\.ya?ml',
@@ -53,6 +60,10 @@ ENTRYPOINTS = {
                   'games_per_opponent': 20, 'max_steps': 3000, 'seed': 42},
         description='Registered checkpoints (full SHA) against fixed opponents; DQN checkpoint agents, argmax.'),
 }
+for _meta in ENTRYPOINTS.values():
+    _meta.setdefault('profile', 'quoridor_legacy')
+    _meta.setdefault('game_refs', [QUORIDOR.wire()])
+
 CHECKPOINT_METADATA = ('checkpoint_id', 'agent_id', 'episode_count', 'training_step', 'observation_version',
                        'action_space_version', 'action_count', 'created_at', 'model_config')
 
@@ -244,7 +255,9 @@ def evaluate_checkpoints(job: dict, run: Path, events: Events):
     return []
 
 
-RUNNERS = {'train_dqn': train_dqn, 'train_cnn_experiment': train_cnn_experiment, 'run_arena_matrix': run_arena_matrix,
+from agent_system.training.openspiel_job import run_openspiel
+
+RUNNERS = {'train_openspiel': run_openspiel, 'train_dqn': train_dqn, 'train_cnn_experiment': train_cnn_experiment, 'run_arena_matrix': run_arena_matrix,
            'diagnose_checkpoint': diagnose_checkpoints, 'evaluate_checkpoints': evaluate_checkpoints}
 
 

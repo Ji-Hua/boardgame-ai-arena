@@ -5,7 +5,7 @@ DEFINITIONS = (
     {"ref": QUORIDOR.wire(), "title": "Quoridor", "roles": ["p1", "p2"],
      "perfect_information": True, "chance": False, "training_backend": "quoridor_legacy"},
     {"ref": KUHN_POKER.wire(), "title": "Kuhn Poker", "roles": ["p1", "p2"],
-     "perfect_information": False, "chance": True, "training_backend": None},
+     "perfect_information": False, "chance": True, "training_backend": "openspiel_cpu"},
 )
 
 def validate_ref(value):

@@ -5,6 +5,7 @@ holding the submitted commits), JOBS_IMAGE (GPU training image), JOBS_SOURCE_REF
 ref for new Jobs), JOBS_TOKEN_FILE (shared write token), JOBS_HOST/JOBS_PORT, JOBS_MAX_CPU_JOBS,
 JOBS_MLFLOW_URI (MLflow tracking server; finished Jobs are logged there when set), JOBS_MODEL_INDEX=1
 (keep models/verified.json and the merged research-catalog-current.json up to date; model_store.py),
+JOBS_OPENSPIEL_IMAGE (optional CPU image; disabled when absent),
 JOBS_SYNC_COMMAND (run after each model store refresh, e.g. start the Dev evidence mirror).
 """
 from __future__ import annotations
@@ -28,6 +29,7 @@ def main():
     controller = Controller(data_root=env('JOBS_DATA_ROOT', '/home/jihua/quoridor-data'),
                             git=Git(env('JOBS_REPO', '/home/jihua/workspace/boardgame-ai-arena')), docker=Docker(),
                             image=env('JOBS_IMAGE', 'quoridor-train-gpu:latest'),
+                            openspiel_image=env('JOBS_OPENSPIEL_IMAGE'),
                             source_ref=env('JOBS_SOURCE_REF', 'feature/unified-rl-platform'),
                             uid_gid=f'{os.getuid()}:{os.getgid()}', max_cpu_jobs=int(env('JOBS_MAX_CPU_JOBS', '2')),
                             mlflow=MlflowLog(env('JOBS_MLFLOW_URI')) if env('JOBS_MLFLOW_URI') else None)

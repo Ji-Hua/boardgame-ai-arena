@@ -60,12 +60,13 @@ export function JobList(){
 }
 
 export function JobNew(){
- const [params]=useSearchParams();const navigate=useNavigate();const meta=useV1('/jobs/entrypoints')
+ const [params]=useSearchParams();const navigate=useNavigate();const meta=useV1('/jobs/entrypoints'+(params.get('project')?'?project_id='+enc(params.get('project')!):''))
  const projectId=params.get('project')??'quoridor-legacy'
  const [entrypoint,setEntrypoint]=useState(params.get('entrypoint')??'train_dqn'),[template,setTemplate]=useState(''),[config,setConfig]=useState('')
  const [name,setName]=useState(''),[experiment,setExperiment]=useState(params.get('experiment')??''),[resources,setResources]=useState<Record<string,string>>({}),[source,setSource]=useState('')
  const [token,setToken]=useState(readToken),[error,setError]=useState(''),[busy,setBusy]=useState(false),[gate,setGate]=useState(false)
  const entry=meta.data?.entrypoints?.[entrypoint]
+ useEffect(()=>{if(meta.data&&!meta.data.entrypoints?.[entrypoint])setEntrypoint(Object.keys(meta.data.entrypoints??{})[0]??'')},[meta.data,entrypoint])
  useEffect(()=>{if(!entry)return;setTemplate('');if(entry.format==='json'&&entry.template){const value={...entry.template};if(params.get('sha')&&Array.isArray(value[entrypoint==='run_arena_matrix'?'candidates':'checkpoints']))value[entrypoint==='run_arena_matrix'?'candidates':'checkpoints']=[params.get('sha')];setConfig(JSON.stringify(value,null,2))}else setConfig('')},[entrypoint,meta.data])
  useEffect(()=>{if(!template)return;const c=new AbortController();fetch('/api/v1/jobs/templates/'+enc(entrypoint)+'/'+enc(template),{signal:c.signal}).then(r=>r.ok?r.text():Promise.reject(new Error('模板读取失败'))).then(setConfig).catch(e=>{if(!c.signal.aborted)setError(String(e))});return()=>c.abort()},[template])
  async function submit(){setBusy(true);setError('');try{try{localStorage.setItem(TOKEN_KEY,token)}catch{/* optional */}
@@ -73,16 +74,16 @@ export function JobNew(){
   const job=await request('/api/v1/jobs',{method:'POST',headers:{'Content-Type':'application/json','X-Platform-Token':token},body:JSON.stringify(body)});navigate('/jobs/'+enc(job.id))}catch(e){setError(String(e))}finally{setBusy(false)}}
  return <><div className="aw-breadcrumb"><Link to="/jobs">任务</Link> / 新建</div><div className="aw-toolbar"><h1>新建任务</h1></div><ErrorBox text={meta.error} retry={meta.retry}/>{!meta.data&&!meta.error&&<p role="status">读取入口与源码版本…</p>}
  {meta.data&&<div className="pf-form"><p>所属项目：<Link to="/projects">{projectId}</Link></p>
-  <label>入口<select aria-label="任务入口" value={entrypoint} onChange={e=>setEntrypoint(e.target.value)}>{Object.entries(meta.data.entrypoints as Record<string,Obj>).map(([k,v])=><option key={k} value={k}>{v.title} · {k}</option>)}</select></label>
-  {entry&&<small>{entry.description} · {entry.gpu?'GPU':'CPU'}</small>}
+  <label>入口<select aria-label="任务入口" value={entrypoint} onChange={e=>setEntrypoint(e.target.value)}>{Object.entries(meta.data.entrypoints as Record<string,Obj>).map(([k,v])=><option key={k} value={k}>{v.title} · {k}{v.enabled===false?'（未配置执行环境）':''}</option>)}</select></label>
+  {entry&&<small>{entry.description} · {entry.gpu?'GPU':'CPU'}</small>}{entry?.enabled===false&&<p role="alert">{entry.unavailable_reason}</p>}
   {entry?.templates&&<label>配置模板<select aria-label="配置模板" value={template} onChange={e=>setTemplate(e.target.value)}><option value="">选择模板</option>{entry.templates.map((t:string)=><option key={t} value={t}>{t}</option>)}</select></label>}
   <label>配置（{entry?.format==='json'?'JSON':'YAML'}）<textarea aria-label="任务配置" rows={18} value={config} onChange={e=>setConfig(e.target.value)} spellCheck={false}/></label>
   <div className="pf-form-row"><label>名称<input aria-label="任务名称" value={name} placeholder={entrypoint} onChange={e=>setName(e.target.value)}/></label><label>实验<input aria-label="所属实验" value={experiment} placeholder="可选" onChange={e=>setExperiment(e.target.value)}/></label><label>源码<input aria-label="源码版本" value={source} placeholder={meta.data.source_ref+' @ '+meta.data.source_commit.slice(0,8)} onChange={e=>setSource(e.target.value)}/></label></div>
   <div className="pf-form-row">{[['cpus','CPU'],['memory_gb','内存 GB'],['timeout_h','超时 小时']].map(([k,label])=><label key={k}>{label}<input aria-label={label} type="number" min={0} step="any" value={resources[k]??''} placeholder="默认" onChange={e=>setResources(r=>({...r,[k]:e.target.value}))}/></label>)}</div>
   {entry?.kind==='train'&&<label className="pf-check"><input type="checkbox" checked={gate} onChange={e=>setGate(e.target.checked)}/>成功后对最后一个 checkpoint 自动门槛评测（gate-v1，结果发布为天梯评测批次）</label>}
   <label>写入令牌<input aria-label="写入令牌" type="password" value={token} onChange={e=>setToken(e.target.value)} autoComplete="off"/></label>
-  <small>训练镜像 {meta.data.image}；提交后源码固定为当时的完整 commit</small>
-  <ErrorBox text={error}/><div className="aw-toolbar"><button disabled={busy||!config.trim()} onClick={()=>void submit()}>{busy?'提交中…':'提交任务'}</button></div>
+  <small>执行镜像 {entry?.image??meta.data.image}；提交后源码固定为当时的完整 commit</small>
+  <ErrorBox text={error}/><div className="aw-toolbar"><button disabled={busy||!config.trim()||!entry||entry.enabled===false} onClick={()=>void submit()}>{busy?'提交中…':'提交任务'}</button></div>
  </div>}</>
 }
 
@@ -106,6 +107,7 @@ export function JobDetail(){
  <div className="aw-toolbar aw-metrics"><span>{j.entrypoint}</span><span>{j.spec.resources.gpu?'GPU':'CPU'} · {j.spec.resources.cpus} CPU · {j.spec.resources.memory_gb} GB</span><span>源码 {j.spec.source.commit.slice(0,10)}</span><span>用时 {duration(j)}</span>{j.exit_code!=null&&<span>退出码 {j.exit_code}</span>}</div>
  {j.error&&<p className="warning">{j.error}</p>}<ErrorBox text={error}/><JobAlerts alerts={metrics.data?.alerts??[]}/>
  <div className="aw-toolbar">{j.run_files.includes('metrics.jsonl')&&<Link to={'/training?run='+enc(j.run_id)}>在训练工作区查看</Link>}{j.registered.map((sha:string)=><Link key={sha} to={'/models/'+sha}>模型 {sha.slice(0,12)}</Link>)}{j.experiment&&<Link to={'/experiments/'+enc(j.experiment)}>实验 {j.experiment}</Link>}{j.mlflow&&<a href={`/mlflow/#/experiments/${enc(j.mlflow.experiment_id)}/runs/${enc(j.mlflow.run_id)}`}>MLflow 运行</a>}{j.season&&<Link to={'/ladder?season='+enc(j.season)}>天梯评测批次 {j.season}</Link>}{j.spec.follow_up?.gate&&<small>成功后门槛评测 {j.spec.follow_up.gate}</small>}</div>
+ {j.research_artifacts?.length>0&&<section aria-label="研究策略产物"><h2>研究策略产物</h2>{j.research_artifacts.map((a:Obj)=><p key={a.sha256}>{a.file} · {a.output_semantics}<small>SHA-256 {a.sha256}</small></p>)}<small>保存在任务产物目录；未注册为 Quoridor 模型。</small></section>}
  <div className="aw-tabs" role="tablist" aria-label="任务视图">{[['curves','训练曲线'],['checkpoints',`Checkpoint · ${j.checkpoints?.length??0}`],['evaluation',`评测 · ${metrics.data?.evaluations?.length??0}`],['diagnosis',`诊断 · ${j.diagnoses?.length??0}`],['log','日志'],['events',`事件 · ${j.events.length}`],['spec','规格']].map(([k,label])=><button key={k} role="tab" aria-selected={tab===k} onClick={()=>setTab(k)}>{label}</button>)}</div>
  <div className="pf-tab-body" role="tabpanel">
  {tab==='curves'&&(rows.length?<JobCurves rows={rows} source={metrics.data?.metric_source} live={metrics.live}/>:<><ErrorBox text={metrics.error}/><p>{active?'等待第一批训练指标…':'没有训练指标'}</p></>)}

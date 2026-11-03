@@ -38,6 +38,9 @@ class FakeDocker:
     def __init__(self):
         self.runs, self.states, self.stopped, self.removed = [], {}, [], []
 
+    def image_id(self, image):
+        return 'sha256:' + 'd' * 64
+
     def run(self, args):
         name = args[args.index('--name') + 1]
         self.runs.append(args)

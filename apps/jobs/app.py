@@ -84,7 +84,7 @@ def create_app(controller, token_file=None, stream_interval=2.0, heartbeat=15.0)
                     max_cpu_jobs=controller.max_cpu_jobs, writes_enabled=bool(token_file and Path(token_file).is_file()))
 
     @router.get('/entrypoints')
-    def entrypoints(): return call(controller.entrypoints)
+    def entrypoints(project_id: str = 'quoridor-legacy'): return call(controller.entrypoints, project_id)
 
     @router.get('/templates/{entrypoint}/{name:path}', response_class=PlainTextResponse)
     def template(entrypoint: str, name: str): return call(controller.template, entrypoint, name)
