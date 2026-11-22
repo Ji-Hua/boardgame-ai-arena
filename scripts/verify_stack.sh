@@ -9,11 +9,11 @@
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DATA=/home/jihua/quoridor-data
-PY=${VERIFY_PYTHON:-/home/jihua/workspace/boardgame-ai-arena/.venv/bin/python}
+PY=${VERIFY_PYTHON:-/home/jihua/quoridor-runtime/python/bin/python}
 EVIDENCE=${EVIDENCE_DIR:-/home/jihua/quoridor-backups/verify-stack}
 GATEWAY_IMAGE=${VERIFY_GATEWAY_IMAGE:-sha256:7dbe0cad93934fb6fac1638c471bf8d86a7cdcdf5c611bd5fdcc7f70aef66f07}
 LAB_CATALOG=${LAB_MODEL_CATALOG:-$DATA/platform-p1-p2/catalogs/research-catalog-17a0fc10c1260ac107745604a5836f580087ab3936465e520b804ce1ed338e46.json}
-ARTIFACTS=/home/jihua/workspace/boardgame-ai-arena/agent_system/training/artifacts
+ARTIFACTS=$DATA/legacy-artifacts/training-artifacts
 NAME=quoridor-verify-gateway
 JOBS_IMAGE=${JOBS_IMAGE:-quoridor-train-gpu:latest}
 TOKEN_FILE=${JOBS_TOKEN_FILE:-/home/jihua/quoridor-releases/jobs/private/token}
@@ -42,7 +42,7 @@ start)
     --host 127.0.0.1 --port 18793 >"$EVIDENCE/platform.log" 2>&1 &
   echo $! >"$EVIDENCE/platform.pid"
   JOBS_MLFLOW_URI=${VERIFY_JOBS_MLFLOW:-} JOBS_DATA_ROOT=$JOBS_DATA JOBS_IMAGE="$JOBS_IMAGE" JOBS_TOKEN_FILE="$TOKEN_FILE" JOBS_PORT=18796 \
-  JOBS_SOURCE_REF=${JOBS_SOURCE_REF:-feature/unified-rl-platform} nohup "$PY" -m apps.jobs >"$EVIDENCE/jobs.log" 2>&1 &
+  JOBS_SOURCE_REF=${JOBS_SOURCE_REF:-$(git -C "$ROOT" rev-parse HEAD)} nohup "$PY" -m apps.jobs >"$EVIDENCE/jobs.log" 2>&1 &
   echo $! >"$EVIDENCE/jobs.pid"
   rm -f "$EVIDENCE"/games.sqlite*
   PLATFORM_MODEL_CATALOGS=discover QUORIDOR_DATA_ROOT=$DATA GAMEPLAY_DB="$EVIDENCE/games.sqlite" GAMEPLAY_PORT=18797 \

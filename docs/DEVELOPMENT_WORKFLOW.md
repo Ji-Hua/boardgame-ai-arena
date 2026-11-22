@@ -26,8 +26,8 @@ Never use `reset --hard`, `clean`, `push --force`, or a source-tree copy to
 
 ## Branch and commit protocol
 
-1. Branch from the agreed integration/development baseline:
-   `git switch -c feature/<topic> <base>`.
+1. Branch from updated main:
+   `git switch -c codex/<topic> origin/main`.
 2. Keep one logical concern per commit. Use the repository convention:
    `Feature: ...`, `Fix: ...`, `Test: ...`, `Documents: ...`, or
    `Infrastructure: ...`.

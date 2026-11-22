@@ -1,3 +1,5 @@
+> Current consolidation: [Quoridor main baseline](../docs/MAIN_CONSOLIDATION.md). Earlier paths and deployment statements below are historical; use the release manifest for actual deployed commit.
+
 # Platform releases (current)
 
 Last verified: 2026-11-01. Design: [unified-rl-platform.md](../documents/system/design/unified-rl-platform.md).

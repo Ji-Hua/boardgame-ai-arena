@@ -16,6 +16,6 @@ wait_ok "$API/health"
 ssh "$DEV" "cat > '$DEV_DIR/release.env'" <"$P/dev-release.env"
 ssh "$DEV" "cat > '$DEV_DIR/compose.dev-entry.yaml'" <"$P/dev-compose.yaml"
 ssh "$DEV" "cat > '$DEV_DIR/sync_gameplay_mirror.sh'" <"$P/dev-sync_gameplay_mirror.sh"
-ddc up -d gateway
+ddc up -d gameplay gateway
 wait_ok "$ENTRY/health"
 echo "rolled back: $(systemctl --user show quoridor-jobs -p Description --value)"

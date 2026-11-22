@@ -19,7 +19,7 @@ services:
     cpus: 2
     restart: unless-stopped
   lab:
-    image: sha256:5746cf19c0c0eb126759cfe24a77d60953bdf6d4d64fa3c06409db5055a4ee7f
+    image: ${PREVIEW_IMAGE:?required}
     environment:
       LAB_MODEL_CATALOG: ${LAB_MODEL_CATALOG:?required}
     command: [python, -m, uvicorn, 'agent_system.analysis.app:app', --host, '0.0.0.0', --port, '8744']

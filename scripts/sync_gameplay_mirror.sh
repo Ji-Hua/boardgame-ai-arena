@@ -9,5 +9,6 @@ TARGET=${MIRROR_TARGET:-/home/jihua/quoridor-data/}
 mkdir -p "$TARGET" "$TARGET/games"
 exec rsync -a --delete --partial --timeout=120 \
   --exclude=/games/ --exclude=/mlflow/ --exclude='/jobs/job-*/' --exclude='/jobs/*.sqlite*' --exclude=/legacy-artifacts/ \
+  --exclude='private-*.jsonl' --exclude='*.research-private.json' --exclude='/policies/*.sqlite*' \
   --exclude='*.tmp' --exclude='.*.swp' \
   "$SOURCE" "$TARGET"

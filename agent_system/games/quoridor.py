@@ -51,3 +51,9 @@ class Quoridor:
     def restore(self, value):
         from agent_system.evaluation.arena.agents.scorers import _build_state
         return _build_state(value)
+
+    def public_observe(self, state):
+        return self.observe(state, self.roles[0])
+
+    def action_label(self, state, action):
+        return str(action)

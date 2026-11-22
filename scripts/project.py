@@ -41,8 +41,8 @@ def check():
     missing = [p for p in DOCUMENTS if not (ROOT / p).is_file()]
     if missing:
         raise ValueError("missing authority documents: " + ", ".join(missing))
-    for name in ROLES:
-        text = (ROOT / ("deploy/compose." + name + ".yaml")).read_text()
+    for name in ("compose.dev-entry.yaml", "compose.training-api.yaml"):
+        text = (ROOT / "deploy" / name).read_text()
         if "build:" in text or "/workspace/" in text:
             raise ValueError("release Compose must not build or mount development source")
     print("Documentation entry points and release source-isolation checks passed.")

@@ -1,3 +1,5 @@
+> Current consolidation: [Quoridor main baseline](MAIN_CONSOLIDATION.md). Earlier paths and deployment statements below are historical; use the release manifest for actual deployed commit.
+
 # Worktrees and workspace layout
 
 **Last verified:** 2026-11-01. Since the 10-31 retirement and P8, only the shared repository `~/workspace/boardgame-ai-arena` (git objects for Job snapshots, `JOBS_REPO`, and the venv used by the Job controller and tests) is still used by a running service; the other worktrees below run nothing and can be archived. Releases: [deploy/RELEASE.md](../deploy/RELEASE.md). Active development branch: `feature/unified-rl-platform`.

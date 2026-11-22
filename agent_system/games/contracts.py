@@ -28,7 +28,6 @@ class GameRef:
         return asdict(self)
 
 QUORIDOR = GameRef("quoridor", "standard-9x9", 1)
-KUHN_POKER = GameRef("kuhn_poker", "openspiel-default", 1)
 
 @dataclass(frozen=True)
 class Decision:

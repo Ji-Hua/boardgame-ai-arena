@@ -38,7 +38,7 @@ def rows_to_metrics(train_rows, eval_rows, stamp):
     (start + row index in ms), so a file that repeats an episode still yields distinct (key, step, timestamp) records."""
     out = []
     for index, row in enumerate(train_rows):
-        step = row.get('episode', index)
+        step = row.get('episode', row.get('step', index))
         for key, value in row.items():
             if key not in SKIP and isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
                 out.append(_metric(key, value, step, stamp + index))

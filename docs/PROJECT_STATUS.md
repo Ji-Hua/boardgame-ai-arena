@@ -1,3 +1,5 @@
+> Current consolidation: [Quoridor main baseline](MAIN_CONSOLIDATION.md). Earlier paths and deployment statements below are historical; use the release manifest for actual deployed commit.
+
 # Project Status
 
 > 2026-11-02 isolated Dev branch: first multi-game foundation completed on codex/multi-game-rl-platform. See [implementation scope, verification and remaining phases](tasks/20261102-multi-game-rl-platform.md). No deployment; this does not supersede the current service baseline.

@@ -52,6 +52,11 @@ class MlflowLogTests(unittest.TestCase):
         twice = rows_to_metrics([dict(episode=5, loss=0.5), dict(episode=5, loss=0.5)], [], 1000)
         self.assertEqual([m['timestamp'] for m in twice], [1000, 1001])  # distinct MLflow keys
 
+    def test_research_metrics_keep_solver_steps(self):
+        rows = [dict(type='train', step=20, progress_unit='solver_iteration', exploitability=0.1)]
+        self.assertEqual(rows_to_metrics(rows, [], 1000),
+                         [dict(key='exploitability', value=0.1, step=20, timestamp=1000)])
+
     def test_a_failed_write_deletes_the_new_run(self):
         job = dict(id='job-2', name='x', entrypoint='train_dqn', experiment='e', status='succeeded', created=1.0,
                    started=None, finished=2.0, spec=dict(source=dict(commit=COMMIT)))

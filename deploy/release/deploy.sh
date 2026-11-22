@@ -1,6 +1,6 @@
 #!/bin/sh
 # Platform release: Job controller from source $COMMIT, Training platform image, Dev entry gateway image.
-# The compose files come from the release source snapshot. Lab and gameplay are not changed.
+# The compose files come from the release source snapshot. Lab and gameplay use the same tested source as platform.
 set -eu
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 n=$(active_jobs)
@@ -44,7 +44,7 @@ cp "$SRC/deploy/compose.training-api.yaml" "$R/compose.yaml"
 [ -z "${PLATFORM_IMAGE:-}" ] || set_env "$R/release.env" PREVIEW_IMAGE "$PLATFORM_IMAGE"
 # The Training API listener and the 8790 redirect run the same gateway image as the Dev entry.
 [ -z "${GATEWAY_IMAGE:-}" ] || set_env "$R/release.env" GATEWAY_IMAGE "$GATEWAY_IMAGE"
-services="platform gateway redirect"
+services="platform gateway redirect lab"
 if [ -n "${LAB_CATALOG:-}" ]; then
   for _ in $(seq 1 120); do [ -s "$LAB_CATALOG" ] && break; sleep 1; done
   [ -s "$LAB_CATALOG" ] || { echo "Lab catalog was not written: $LAB_CATALOG" >&2; exit 1; }
@@ -63,6 +63,11 @@ if [ -n "${GATEWAY_IMAGE:-}" ]; then
 fi
 ssh "$DEV" "cat > '$DEV_DIR/compose.dev-entry.yaml'" <"$SRC/deploy/compose.dev-entry.yaml"
 ssh "$DEV" "cat > '$DEV_DIR/sync_gameplay_mirror.sh.partial' && chmod +x '$DEV_DIR/sync_gameplay_mirror.sh.partial' && mv '$DEV_DIR/sync_gameplay_mirror.sh.partial' '$DEV_DIR/sync_gameplay_mirror.sh'" <"$SRC/scripts/sync_gameplay_mirror.sh"
-ddc up -d gateway
+if [ -n "${PLATFORM_IMAGE:-}" ]; then
+  ssh "$DEV" "docker image inspect $PLATFORM_IMAGE >/dev/null 2>&1" \
+    || docker save "$PLATFORM_IMAGE" | gzip -1 | ssh "$DEV" "gunzip | docker load" >/dev/null
+  ssh "$DEV" "sed -i 's#^PLATFORM_IMAGE=.*#PLATFORM_IMAGE=$PLATFORM_IMAGE#' '$DEV_DIR/release.env'"
+fi
+ddc up -d gameplay gateway
 wait_ok "$ENTRY/health"
 "$B/check.sh"

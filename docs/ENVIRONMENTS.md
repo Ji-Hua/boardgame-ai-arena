@@ -1,3 +1,5 @@
+> Current consolidation: [Quoridor main baseline](MAIN_CONSOLIDATION.md). Earlier paths and deployment statements below are historical; use the release manifest for actual deployed commit.
+
 # Environments
 
 > Migration update 2026-10-25: use [MIGRATION_STATUS.md](MIGRATION_STATUS.md) for the current candidate baseline. The deployment/preview observations below are historical and do not establish current availability. Frontend entries have now been switched; see [the current release](UNIFIED_WEB_RELEASE_20261025.md) for authoritative paths, ports and remaining old-service dependencies.
