@@ -11,7 +11,7 @@ if [ ! -f "$P/saved" ]; then
   mkdir -p "$P"
   cp "$UNIT" "$P/quoridor-jobs.service"
   ssh "$DEV" "cat '$DEV_DIR/sync_gameplay_mirror.sh'" >"$P/dev-sync_gameplay_mirror.sh"
-  cp "$R/release.env" "$P/training-release.env"; cp "$R/compose.yaml" "$P/training-compose.yaml"
+  cp "$R/release.env" "$P/training-release.env"; cp "$R/compose.training-api.yaml" "$P/training-compose.yaml"
   ssh "$DEV" "cat '$DEV_DIR/release.env'" >"$P/dev-release.env"
   ssh "$DEV" "cat '$DEV_DIR/compose.dev-entry.yaml'" >"$P/dev-compose.yaml"
   grep -q '^GATEWAY_IMAGE=sha256:' "$P/dev-release.env" && grep -q '^PREVIEW_IMAGE=' "$P/training-release.env"
@@ -27,7 +27,10 @@ fi
 for hook in "$B"/hooks.d/*.sh; do [ -f "$hook" ] && { echo "== hook $(basename "$hook")"; . "$hook"; }; done
 
 echo "== Job controller"
-sed -e "s#src-[0-9a-f]\{7,\}#src-$COMMIT#g" -e "s#(source [0-9a-f]*)#(source $COMMIT)#" \
+sed -e "s#^WorkingDirectory=.*#WorkingDirectory=$SRC#" \
+  -e "s#^Environment=PYTHONPATH=.*#Environment=PYTHONPATH=$SRC#" \
+  -e "s#^Environment=JOBS_SOURCE_REF=.*#Environment=JOBS_SOURCE_REF=$COMMIT#" \
+  -e "s#^Description=.*#Description=Quoridor main $COMMIT#" \
   -e '/^Environment=JOBS_MLFLOW_URI=/d' -e '/^Environment=JOBS_MODEL_INDEX=/d' -e '/JOBS_SYNC_COMMAND=/d' \
   "$P/quoridor-jobs.service" >"$UNIT.partial"
 for pair in ${MLFLOW_URI:+JOBS_MLFLOW_URI=$MLFLOW_URI} ${JOBS_ENV:-}; do
@@ -40,7 +43,7 @@ mv "$UNIT.partial" "$UNIT"
 restart_jobs
 
 echo "== Training platform"
-cp "$SRC/deploy/compose.training-api.yaml" "$R/compose.yaml"
+cp "$SRC/deploy/compose.training-api.yaml" "$R/compose.training-api.yaml"
 [ -z "${PLATFORM_IMAGE:-}" ] || set_env "$R/release.env" PREVIEW_IMAGE "$PLATFORM_IMAGE"
 # The Training API listener and the 8790 redirect run the same gateway image as the Dev entry.
 [ -z "${GATEWAY_IMAGE:-}" ] || set_env "$R/release.env" GATEWAY_IMAGE "$GATEWAY_IMAGE"

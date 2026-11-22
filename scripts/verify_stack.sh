@@ -16,7 +16,7 @@ LAB_CATALOG=${LAB_MODEL_CATALOG:-$DATA/platform-p1-p2/catalogs/research-catalog-
 ARTIFACTS=$DATA/legacy-artifacts/training-artifacts
 NAME=quoridor-verify-gateway
 JOBS_IMAGE=${JOBS_IMAGE:-quoridor-train-gpu:latest}
-TOKEN_FILE=${JOBS_TOKEN_FILE:-/home/jihua/quoridor-releases/jobs/private/token}
+TOKEN_FILE=${JOBS_TOKEN_FILE:-/home/jihua/quoridor-runtime/private/token}
 JOBS_DATA=${VERIFY_JOBS_DATA:-$DATA}
 
 stop() {
