@@ -8,7 +8,7 @@ n=$(active_jobs || echo 0)
 [ "$n" = 0 ] || echo "warning: $n Job(s) active; the controller reconciles them after the restart"
 cp "$P/quoridor-jobs.service" "$UNIT"
 restart_jobs
-cp "$P/training-release.env" "$R/release.env"; cp "$P/training-compose.yaml" "$R/compose.yaml"
+cp "$P/training-release.env" "$R/release.env"; cp "$P/training-compose.yaml" "$R/compose.training-api.yaml"
 dc up -d platform gateway redirect lab
 # nginx resolves upstream names once; a recreated platform or Lab gets a new address.
 dc restart gateway

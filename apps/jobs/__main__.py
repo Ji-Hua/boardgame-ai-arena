@@ -28,7 +28,7 @@ def main():
     controller = Controller(data_root=env('JOBS_DATA_ROOT', '/home/jihua/quoridor-data'),
                             git=Git(env('JOBS_REPO', '/home/jihua/workspace/boardgame-ai-arena')), docker=Docker(),
                             image=env('JOBS_IMAGE', 'quoridor-train-gpu:latest'),
-                            source_ref=env('JOBS_SOURCE_REF', 'feature/unified-rl-platform'),
+                            source_ref=env('JOBS_SOURCE_REF', 'main'),
                             uid_gid=f'{os.getuid()}:{os.getgid()}', max_cpu_jobs=int(env('JOBS_MAX_CPU_JOBS', '2')),
                             mlflow=MlflowLog(env('JOBS_MLFLOW_URI')) if env('JOBS_MLFLOW_URI') else None)
     if env('JOBS_MODEL_INDEX') == '1':
