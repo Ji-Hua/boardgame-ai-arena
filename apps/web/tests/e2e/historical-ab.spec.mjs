@@ -1,0 +1,51 @@
+import {test,expect} from '@playwright/test'
+import fs from 'node:fs'
+const season='cnn-architecture-20261021-213018'
+const fixture='/home/jihua/quoridor-backups/cycle-diagnosis-20261030/reconstructed.json'
+test('historical A/B uses real model evidence without mutating a game',async({page},info)=>{
+ test.setTimeout(90000);expect.configure({timeout:20000});test.skip(!fs.existsSync(fixture),'External historical fixture unavailable')
+ const f=JSON.parse(fs.readFileSync(fixture,'utf8')),mutations=[],errors=[],branches=[]
+ page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.url().includes('/api/v1/play')&&r.method()!=='GET')mutations.push(r.url());if(r.url().endsWith('/api/v1/lab/branch'))branches.push(r.postDataJSON())})
+ await page.route('**/api/v1/play/history-fixture',route=>route.fulfill({json:{id:'history-fixture',identities:f.identities,position:f.positions[73],positions:f.positions.slice(0,73),actions:f.actions,revision:73,winner:null,limit:false,legal_actions:[],status:'active',role:'player',listed:false}}))
+ await page.goto('/play?'+new URLSearchParams({season,game:'history-fixture'}))
+ await page.getByText('走子记录',{exact:true}).click()
+ await page.getByRole('button',{name:'40. P2 a2',exact:true}).click()
+ await expect(page.getByLabel('诊断历史步')).toHaveValue('39')
+ await expect(page.getByTestId('historical-trails')).toBeVisible();await page.getByRole('button',{name:'历史轨迹',exact:true}).click();await expect(page.getByTestId('historical-trails')).toHaveCount(0);await page.getByRole('button',{name:'历史轨迹',exact:true}).click()
+ const expected=f.positions.slice(0,40).map(p=>p.pawns[0]).filter((p,i,all)=>!i||p[0]!==all[i-1][0]||p[1]!==all[i-1][1]).map(([x,y])=>`${x*51+34},${(8-y)*51+34}`).join(' ');await expect(page.locator('[data-trail-player="1"] polyline')).toHaveAttribute('points',expected)
+
+ for(const a of f.actions.slice(0,39).filter(a=>a.type!=='pawn')){const wall=page.locator(`[data-wall="${a.type}:${a.target[0]}:${a.target[1]}"]`);await expect(wall).toHaveAttribute('data-owner',String(a.player));await expect(wall).toHaveAttribute('fill',a.player===1?'#4CAF50':'#2196F3')}
+
+ await expect(page.locator('.aw-actor-context')).toContainText(f.identities[1].name)
+ const pair=page.getByLabel('动作 A B 比较');await expect(pair).toContainText('实际动作：a2')
+ await page.getByLabel('对照动作 B').selectOption('pawn:2:1')
+ await pair.getByRole('tab',{name:'输入证据',exact:true}).click()
+ await expect(pair.locator('.lab-tensor')).toHaveCount(2)
+ await expect(pair.locator('.lab-tensor svg')).toHaveCount(2)
+ expect(branches.length).toBe(2);expect(branches[0].position).toEqual(f.positions[39]);expect(branches[0].action.target).toEqual([0,1]);expect(branches[1].action.target).toEqual([2,1]);expect(branches[0].model_id).toBe(f.identities[1].sha256)
+ await expect(pair.locator('.aw-pair-scores')).toContainText('1.19')
+ await page.screenshot({path:info.outputPath('historical-input.png'),fullPage:true})
+ await pair.getByRole('tab',{name:'分支比较',exact:true}).click();await pair.getByRole('button',{name:'查看 B 分支'}).click()
+ await expect(page.locator('.aw-analysis>.aw-proof-note')).toContainText('假设分支 B')
+ await pair.getByRole('tab',{name:'输入证据',exact:true}).click();await expect(page.locator('.aw-analysis>.aw-proof-note')).toContainText('原局面')
+ expect(branches.length).toBe(2)
+ await page.getByRole('tab',{name:'神经网络诊断',exact:true}).click();await expect(page.getByLabel('对照动作 B')).toHaveValue('pawn:2:1')
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+ await page.screenshot({path:info.outputPath('historical-mobile.png'),fullPage:true})
+ await page.getByLabel('诊断历史步').selectOption('38');await expect(page.locator('.aw-actor-context')).toContainText(f.identities[0].name);await expect(pair).toContainText('实际动作：c6')
+ await page.getByLabel('诊断历史步').selectOption('73');await expect(pair).toContainText('复算首选')
+ const wall=page.locator('[data-wall="horizontal:4:2"]');await expect(wall.locator('title')).toHaveText('P1 · 第 7 手 · 点击查看决策');await wall.click();await expect(page.getByLabel('诊断历史步')).toHaveValue('6');await expect(page.locator('.aw-actor-context')).toContainText(f.identities[0].name);await expect(pair).toContainText('实际动作：e3h');await expect(page.locator('[data-wall="horizontal:4:2"]')).toHaveCount(0)
+ expect(mutations).toEqual([]);expect(errors).toEqual([])
+})
+
+
+test('archived replay shares A/B evidence and bounded heuristic branches',async({page})=>{
+ await page.goto('/games/049f457b806f4604720d%3A0?'+new URLSearchParams({season,agent:'A-baseline_seed-44',opponent:'greedy',ply:'14'}))
+ const pair=page.getByLabel('动作 A B 比较');await expect(pair).toContainText('实际动作')
+ await pair.getByRole('tab',{name:'分支比较',exact:true}).click();await expect(pair.getByRole('button',{name:'查看 A 分支'})).toBeVisible()
+ await pair.getByRole('button',{name:'查看 A 分支'}).click();await expect(page.locator('.aw-analysis>.aw-proof-note')).toContainText('假设分支 A')
+ await page.getByRole('button',{name:'下一步',exact:true}).click();await expect(page.locator('.aw-actor-context')).toContainText('greedy')
+ await expect(pair).toContainText('启发式分');await pair.getByRole('tab',{name:'分支比较',exact:true}).click();await expect(pair.getByRole('button',{name:'查看 B 分支'})).toBeVisible()
+ await expect(pair).toContainText('相同算法与深度');await pair.getByRole('tab',{name:'输入证据',exact:true}).click();await expect(pair).toContainText('无神经网络输入')
+ const wall=page.locator('[data-wall][data-ply]').first();const target=await wall.getAttribute('data-ply');await wall.focus();await wall.press('Enter');await expect(page).toHaveURL(new RegExp('ply='+target+'(?:&|$)'));await expect(page.getByRole('tab',{name:'逐步分析',exact:true})).toHaveAttribute('aria-selected','true');await expect(pair).toContainText('实际动作')
+})

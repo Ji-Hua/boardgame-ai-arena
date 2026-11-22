@@ -1,0 +1,17 @@
+import {test,expect} from '@playwright/test'
+test('Lab editor, native diagnostics and mobile layout',async({page},info)=>{
+ const errors=[];page.on('pageerror',e=>errors.push(e.message))
+ await page.goto('/lab')
+ await expect(page.getByRole('button',{name:'Run analysis',exact:true})).toBeEnabled()
+ await page.getByLabel('Board editor').selectOption('p1')
+ await page.getByRole('button',{name:'Cell e2',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Derived position · P1 to move'})).toBeVisible()
+ await page.getByRole('button',{name:'Run analysis',exact:true}).click()
+ await expect(page.getByRole('button',{name:/Inspect/}).first()).toBeVisible()
+ await page.getByRole('button',{name:'Return to root',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Root position · P1 to move'})).toBeVisible()
+ await page.setViewportSize({width:390,height:844})
+ await page.screenshot({path:info.outputPath('native-lab-mobile.png'),fullPage:true})
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)
+ expect(errors).toEqual([])
+})

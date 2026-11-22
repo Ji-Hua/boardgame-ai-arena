@@ -1,0 +1,44 @@
+{
+  "output": "/home/jihua/quoridor-data/experiments/cnn-alphazero-lite-20261021/01-calibration",
+  "book_manifest": "/home/jihua/quoridor-data/arena/matrix-20261020-v2/manifest.json",
+  "hypothesis": "A value head fitted to actual frozen-policy outcomes can supply measured leaf estimates without changing the D2 actor.",
+  "training": {
+    "agent_id": "cnn_az_calibrated",
+    "model_arch": "cnn",
+    "device": "cuda",
+    "seed": 42,
+    "episodes": 1024,
+    "lr": 2e-05,
+    "batch_size": 256,
+    "grad_clip_norm": 1.0,
+    "checkpoint_dir": "/home/jihua/quoridor-data/experiments/cnn-alphazero-lite-20261021/01-calibration/checkpoints"
+  },
+  "alphazero": {
+    "phase": "calibration",
+    "parent_checkpoint": "/home/jihua/quoridor-data/models/09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4.pt",
+    "parent_sha256": "09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4",
+    "batch_seed": 4201,
+    "rollout_seed": 2026102701,
+    "games_per_batch": 32,
+    "random_prefix_max": 24,
+    "max_plies": 160,
+    "calibration_temperature": 0.8,
+    "calibration_lr": 0.0001,
+    "calibration_epochs": 16,
+    "search": {
+      "simulations": 50,
+      "c_puct": 1.5,
+      "max_depth": 128,
+      "dirichlet_alpha": 0.15,
+      "noise_fraction": 0.25
+    },
+    "temperature_plies": 24,
+    "updates_per_batch": 64,
+    "replay_capacity": 64000,
+    "weight_decay": 0.0001,
+    "value_weight": 1.0,
+    "checkpoint_episodes": [
+      1024
+    ]
+  }
+}

@@ -38,6 +38,12 @@ def build_scorer(algo_type: str, algo_params: dict[str, Any]) -> Scorer:
 
     Params are passed opaquely to the Scorer constructor.
     """
+    if algo_type == "dqn":
+        from agent_system.evaluation.arena.agents.dqn_scorer import DQNScorer
+        return DQNScorer(**algo_params)
+    if algo_type == "mcts":
+        from agent_system.evaluation.arena.agents.mcts_scorer import MCTSScorer
+        return MCTSScorer(**algo_params)
     cls = _SCORER_REGISTRY.get(algo_type)
     if cls is None:
         raise ValueError(
@@ -114,6 +120,6 @@ def load_agents_from_dir(directory: str | Path) -> list[Agent]:
     """
     agents: list[Agent] = []
     for spec in _load_shared_specs_from_dir(directory):
-        if spec.algo_type in _SCORER_REGISTRY:
+        if spec.algo_type in _SCORER_REGISTRY or spec.algo_type in {"dqn", "mcts"}:
             agents.append(materialize_agent(spec))
     return agents

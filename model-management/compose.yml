@@ -1,0 +1,16 @@
+services:
+  mlflow:
+    build: .
+    ports:
+      - "8742:8742"
+    volumes:
+      - /home/jihua/quoridor-data/mlflow:/data
+      - /home/jihua/quoridor-data:/quoridor-data:ro
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8742/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s

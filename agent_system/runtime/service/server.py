@@ -7,8 +7,12 @@ The Backend communicates with this service via HTTP.
 from __future__ import annotations
 
 from typing import Any, Literal
+import os
+import secrets
+import threading
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from agent_system.runtime.service.service import AgentService
@@ -17,6 +21,84 @@ from agent_system.runtime.service.service import AgentService
 
 app = FastAPI(title="Quoridor Agent Service", version="0.2.0")
 service = AgentService()
+research_init_lock = threading.Lock()
+
+
+@app.middleware("http")
+async def research_only(request: Request, call_next):
+    if (os.environ.get("QUORIDOR_RESEARCH_ONLY") == "1" and request.url.path != "/health"
+            and not request.url.path.startswith("/agent/research/")):
+        return JSONResponse({"detail": "Legacy controls disabled in isolated research Runtime"}, status_code=404)
+    return await call_next(request)
+
+
+def research_service(authorization: str = Header(default="")):
+    key = os.environ.get("QUORIDOR_RESEARCH_SERVICE_KEY", "")
+    if not key:
+        raise HTTPException(404, "Research sessions are disabled")
+    if not secrets.compare_digest(authorization, "Bearer " + key):
+        raise HTTPException(403, "Research service authorization required")
+    with research_init_lock:
+        if not hasattr(app.state, "research"):
+            from agent_system.runtime.service.research import ResearchSessions
+            import torch
+            torch.set_num_threads(1)
+            app.state.research = ResearchSessions(
+                os.environ["QUORIDOR_RESEARCH_CATALOG"],
+                os.environ["QUORIDOR_RESEARCH_ROOTS"].split(os.pathsep))
+    return app.state.research
+
+
+class ResearchCreateRequest(BaseModel):
+    sha256: str
+    room_id: str
+    seat: Literal[1, 2]
+
+
+class ResearchActionRequest(BaseModel):
+    session_id: str
+    token: str
+    room_id: str
+    seat: Literal[1, 2]
+    game_state: dict[str, Any]
+    legal_actions: list[dict[str, Any]]
+
+
+class ResearchDestroyRequest(BaseModel):
+    session_id: str
+    token: str
+
+
+@app.post("/agent/research/create")
+def create_research(body: ResearchCreateRequest, manager=Depends(research_service)):
+    try:
+        return manager.create(body.sha256, body.room_id, body.seat)
+    except (OSError, ValueError, KeyError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@app.post("/agent/research/action")
+def research_action(body: ResearchActionRequest, manager=Depends(research_service)):
+    try:
+        return manager.action(body.session_id, body.token, body.room_id, body.seat,
+                              body.game_state, body.legal_actions)
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@app.post("/agent/research/destroy")
+def destroy_research(body: ResearchDestroyRequest, manager=Depends(research_service)):
+    try:
+        manager.destroy(body.session_id, body.token)
+        return {"ok": True}
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc)) from exc
 
 
 # ── Request/Response Schemas ───────────────────────────────────

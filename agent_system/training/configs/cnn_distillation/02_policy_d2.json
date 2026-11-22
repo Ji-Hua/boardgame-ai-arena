@@ -1,0 +1,56 @@
+{
+  "output": "/home/jihua/quoridor-data/experiments/cnn-distillation-20261020/02-policy-d2",
+  "book_manifest": "/home/jihua/quoridor-data/arena/matrix-20261020-v2/manifest.json",
+  "baseline_sha256": "d823125353ffb5e902ddbfba8d6086b88c87354375839682783fd38c86e0abcf",
+  "hypothesis": "Shared diverse 2000-game dataset, legal-action policy distillation and exact reflection augmentation improve generalization. Same CNN architecture, initial weights and minibatches for D1 and D2. Development selection precedes fresh holdout.",
+  "training": {
+    "episodes": 2000,
+    "max_steps_per_episode": 3000,
+    "buffer_capacity": 100000,
+    "warmup_size": 512,
+    "batch_size": 256,
+    "lr": 0.0002,
+    "gamma": 0.95,
+    "epsilon_start": 0.2,
+    "epsilon_end": 0.05,
+    "epsilon_decay_steps": 20000,
+    "target_sync_interval": 1000,
+    "checkpoint_dir": "/home/jihua/quoridor-data/experiments/cnn-distillation-20261020/02-policy-d2/checkpoints",
+    "checkpoint_interval": 500,
+    "agent_id": "cnn_policy_d2_2k",
+    "eval_interval": 0,
+    "seed": 42,
+    "grad_clip_norm": 1.0,
+    "device": "cuda",
+    "log_interval": 100,
+    "opponent": "greedy",
+    "train_opponent_cfg": {
+      "type": "greedy"
+    },
+    "model_arch": "cnn",
+    "cnn_channels": [
+      32,
+      64,
+      64
+    ],
+    "cnn_activation": "leaky_relu",
+    "warm_start_checkpoint": null,
+    "reward_mode": "distance_delta",
+    "distance_reward_weight": 0.04,
+    "distance_delta_clip": 1.0,
+    "algorithm": "policy_distillation",
+    "cnn_hierarchical": false
+  },
+  "distillation": {
+    "depth": 2,
+    "dataset": "/home/jihua/quoridor-data/experiments/cnn-distillation-20261020/shared-data/shared.pt",
+    "updates": 12000,
+    "checkpoint_updates": [
+      3000,
+      6000,
+      12000
+    ],
+    "batch_seed": 874,
+    "tactical_fraction": 0.25
+  }
+}

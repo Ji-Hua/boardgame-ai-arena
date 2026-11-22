@@ -21,9 +21,6 @@ generated/
 build_artifacts/
 tests/tmp/
 
-# Documentation (ignore unless explicitly needed)
-/docs/
-
 # Legacy code archive (ignore unless explicitly needed)
 /legacy/
 
@@ -66,6 +63,7 @@ node_modules/
 *.code-workspace
 
 # Training/ML artifacts (if any)
+agent_system/training/artifacts/
 checkpoints/
 logs/
 wandb/

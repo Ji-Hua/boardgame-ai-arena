@@ -1,0 +1,116 @@
+agent_id: dqn_cnn_curriculum_observation_2k_001
+algorithm: double_dqn
+batch_size: 128
+buffer_capacity: 100000
+checkpoint_dir: agent_system/training/artifacts/dqn/cnn_curriculum_observation_2k_001/checkpoints
+checkpoint_interval: 500
+cnn_channels:
+- 32
+- 64
+- 64
+device: auto
+distance_delta_clip: 1.0
+distance_reward_weight: 0.04
+episodes: 5000
+epsilon_decay_steps: 200000
+epsilon_end: 0.05
+epsilon_start: 1.0
+eval_games: 200
+eval_interval: 500
+eval_max_steps: 3000
+eval_opponent_cfgs:
+- name: pawn_random
+  type: pawn_random
+- name: random_legal
+  type: random_legal
+- depth: 1
+  name: minimax_d1
+  type: minimax
+- depth: 2
+  name: minimax_d2
+  type: minimax
+eval_replay_sample_every: 100
+gamma: 0.95
+grad_clip_norm: 10.0
+hidden_layers:
+- 256
+- 256
+log_interval: 10
+lr: 0.0001
+max_steps_per_episode: 3000
+model_arch: cnn
+obs_version: v1
+opponent: random_legal
+opponent_depth: 2
+opponent_mix_dummy: 0.0
+opponent_mix_minimax_d1: 0.0
+opponent_mix_minimax_d2: 0.0
+opponent_mix_minimax_d3: 0.0
+opponent_mix_random: 0.0
+reward_mode: distance_delta
+seed: 42
+target_sync_interval: 200
+train_opponent_cfg: {}
+train_opponent_schedule:
+- from_episode: 1
+  opponent:
+    opponents:
+    - name: random_legal
+      type: random_legal
+      weight: 1.0
+    type: mixed
+  to_episode: 500
+- from_episode: 501
+  opponent:
+    opponents:
+    - name: random_legal
+      type: random_legal
+      weight: 0.8
+    - depth: 1
+      name: minimax_d1
+      type: minimax
+      weight: 0.2
+    type: mixed
+  to_episode: 1000
+- from_episode: 1001
+  opponent:
+    opponents:
+    - name: random_legal
+      type: random_legal
+      weight: 0.6
+    - depth: 1
+      name: minimax_d1
+      type: minimax
+      weight: 0.4
+    type: mixed
+  to_episode: 1500
+- from_episode: 1501
+  opponent:
+    opponents:
+    - name: random_legal
+      type: random_legal
+      weight: 0.4
+    - depth: 1
+      name: minimax_d1
+      type: minimax
+      weight: 0.6
+    type: mixed
+  to_episode: 2000
+- from_episode: 2001
+  opponent:
+    opponents:
+    - name: random_legal
+      type: random_legal
+      weight: 0.2
+    - depth: 1
+      name: minimax_d1
+      type: minimax
+      weight: 0.8
+    type: mixed
+  to_episode: 2500
+- from_episode: 2501
+  opponent:
+    depth: 1
+    type: minimax
+  to_episode: 5000
+warmup_size: 5000

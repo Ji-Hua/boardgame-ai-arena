@@ -80,7 +80,11 @@ The Agent Service materializes runtime instances from Agent Spec for serving thr
 
 **Owns:** Training-oriented workflows.
 
-Currently a placeholder. The architectural location exists so that training code has a clear home when it is developed.
+Contains engine-backed DQN training plus CNN policy-distillation and research
+workflows. Generated checkpoints, datasets, replay buffers, metrics, and other
+run artifacts are external to Git; see
+[`docs/DEVELOPMENT_WORKFLOW.md`](../docs/DEVELOPMENT_WORKFLOW.md) and
+[`training/README.md`](training/README.md).
 
 ## Key Design Principles
 

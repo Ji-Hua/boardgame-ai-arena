@@ -1,0 +1,38 @@
+# Backfilled config for dqn_cnn_distance_delta_w004_random_2k_001 (inferred from train.log)
+# Latest CNN run: CNN model, Double DQN, distance_delta reward shaping.
+
+episodes: 2000
+max_steps_per_episode: 3000  # defaulted
+
+buffer_capacity: 100000
+warmup_size: 5000
+batch_size: 128
+lr: 1.0e-4
+gamma: 0.95
+
+epsilon_start: 1.0
+epsilon_end: 0.05
+epsilon_decay_steps: 200000
+
+target_sync_interval: 200  # defaulted
+
+checkpoint_dir: agent_system/training/artifacts/dqn/dqn_cnn_distance_delta_w004_random_2k_001/checkpoints
+checkpoint_interval: 500  # inferred from checkpoint filenames
+agent_id: dqn_cnn_distance_delta_w004_random_2k_001  # defaulted
+
+eval_games: 200  # inferred from periodic eval entries
+eval_interval: 500  # inferred from eval_episodes=[500,1000,1500,2000]
+
+obs_version: v1  # unused when model_arch=cnn
+model_arch: cnn
+cnn_channels: [32, 64, 64]
+algorithm: double_dqn
+
+opponent: random_legal
+reward_mode: distance_delta
+distance_reward_weight: 0.04
+distance_delta_clip: 1.0
+
+seed: 42  # defaulted
+log_interval: 100
+device: auto

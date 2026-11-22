@@ -1,0 +1,54 @@
+{
+  "output": "/home/jihua/quoridor-data/experiments/cnn-repair-20261020/03-demonstrations",
+  "book_manifest": "/home/jihua/quoridor-data/arena/matrix-20261020-v2/manifest.json",
+  "baseline_sha256": "d823125353ffb5e902ddbfba8d6086b88c87354375839682783fd38c86e0abcf",
+  "hypothesis": "Recover useful learning signals with completed Greedy demonstration games: DDQN + actual Monte Carlo return + expert action margin. Inference is CNN-only.",
+  "training": {
+    "episodes": 2000,
+    "max_steps_per_episode": 240,
+    "buffer_capacity": 20000,
+    "warmup_size": 512,
+    "batch_size": 256,
+    "lr": 0.0001,
+    "gamma": 0.95,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.1,
+    "epsilon_decay_steps": 20000,
+    "target_sync_interval": 1000,
+    "checkpoint_dir": "/home/jihua/quoridor-data/experiments/cnn-repair-20261020/03-demonstrations/checkpoints",
+    "checkpoint_interval": 500,
+    "agent_id": "cnn_repair_demo",
+    "eval_interval": 0,
+    "seed": 42,
+    "grad_clip_norm": 1.0,
+    "device": "cuda",
+    "log_interval": 100,
+    "opponent": "greedy",
+    "train_opponent_cfg": {
+      "type": "greedy"
+    },
+    "model_arch": "cnn",
+    "cnn_channels": [
+      32,
+      64,
+      64
+    ],
+    "cnn_activation": "leaky_relu",
+    "warm_start_checkpoint": null,
+    "reward_mode": "distance_delta",
+    "distance_reward_weight": 0.04,
+    "distance_delta_clip": 1.0,
+    "algorithm": "double_dqn"
+  },
+  "demonstrations": {
+    "episodes": 1500,
+    "data_seed": 314159,
+    "max_plies": 160,
+    "random_prefix_max": 16,
+    "exploration": 0.15,
+    "updates": 6000,
+    "checkpoint_updates": 2000,
+    "margin": 0.1,
+    "margin_weight": 1.0
+  }
+}

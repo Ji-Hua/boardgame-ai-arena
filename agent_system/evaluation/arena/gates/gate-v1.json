@@ -1,0 +1,83 @@
+{
+  "id": "gate-v1",
+  "description": "Candidates against the fixed opponents of the cnn-architecture-20261021-213018 season, on its 25 openings plus the standard opening, both seats. Results are comparable with that season's pair records.",
+  "book": "/home/jihua/quoridor-data/arena/cnn-architecture-20261021-213018/manifest.json",
+  "pairs": 25,
+  "seed": 2026102111,
+  "max_plies": 500,
+  "agents": [
+    {
+      "id": "random_legal",
+      "display_name": "Uniform random",
+      "deterministic": false,
+      "algo": {
+        "type": "random",
+        "params": {}
+      },
+      "policy": {
+        "type": "top_k",
+        "k": 209
+      }
+    },
+    {
+      "id": "greedy",
+      "display_name": "Greedy",
+      "deterministic": true,
+      "algo": {
+        "type": "greedy",
+        "params": {}
+      },
+      "policy": {
+        "type": "top_k",
+        "k": 1
+      }
+    },
+    {
+      "id": "minimax_d1",
+      "display_name": "Minimax D1",
+      "deterministic": true,
+      "algo": {
+        "type": "minimax",
+        "params": {
+          "depth": 1
+        }
+      },
+      "policy": {
+        "type": "top_k",
+        "k": 1
+      }
+    },
+    {
+      "id": "minimax_d2",
+      "display_name": "Minimax D2",
+      "deterministic": true,
+      "algo": {
+        "type": "minimax",
+        "params": {
+          "depth": 2
+        }
+      },
+      "policy": {
+        "type": "top_k",
+        "k": 1
+      }
+    },
+    {
+      "id": "frozen_d2_policy",
+      "display_name": "Frozen D2 policy CNN",
+      "deterministic": true,
+      "algo": {
+        "type": "dqn",
+        "params": {
+          "checkpoint": "/home/jihua/quoridor-data/models/09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4.pt",
+          "sha256": "09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4",
+          "device": "cpu"
+        }
+      },
+      "policy": {
+        "type": "top_k",
+        "k": 1
+      }
+    }
+  ]
+}

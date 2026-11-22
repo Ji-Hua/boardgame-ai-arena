@@ -1,0 +1,58 @@
+{
+  "output": "/home/jihua/quoridor-data/experiments/cnn-policy-rl-20261020/07-random-ddqn",
+  "book_manifest": "/home/jihua/quoridor-data/arena/matrix-20261020-v2/manifest.json",
+  "hypothesis": "Isolate double_dqn, initialization=random; unchanged CNN; terminal-only RL reward; parent and evaluation frozen.",
+  "training": {
+    "episodes": 4096,
+    "max_steps_per_episode": 300,
+    "buffer_capacity": 100000,
+    "warmup_size": 512,
+    "batch_size": 256,
+    "lr": 5e-05,
+    "gamma": 0.99,
+    "epsilon_start": 0.2,
+    "epsilon_end": 0.05,
+    "epsilon_decay_steps": 20000,
+    "target_sync_interval": 500,
+    "checkpoint_dir": "/home/jihua/quoridor-data/experiments/cnn-policy-rl-20261020/07-random-ddqn/checkpoints",
+    "checkpoint_interval": 500,
+    "agent_id": "cnn_rl_random_ddqn",
+    "eval_interval": 0,
+    "seed": 42,
+    "grad_clip_norm": 0.5,
+    "device": "cuda",
+    "log_interval": 100,
+    "opponent": "greedy",
+    "model_arch": "cnn",
+    "cnn_channels": [
+      32,
+      64,
+      64
+    ],
+    "cnn_activation": "leaky_relu",
+    "warm_start_checkpoint": null,
+    "reward_mode": "terminal",
+    "algorithm": "double_dqn",
+    "cnn_hierarchical": false
+  },
+  "research": {
+    "method": "double_dqn",
+    "initialization": "random",
+    "parent_checkpoint": "/home/jihua/quoridor-data/models/09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4.pt",
+    "parent_sha256": "09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4",
+    "rollout_seed": 2026102501,
+    "batch_seed": 1874,
+    "games_per_batch": 32,
+    "random_prefix_max": 24,
+    "max_plies": 300,
+    "checkpoint_episodes": [
+      1024,
+      2048,
+      4096
+    ],
+    "replay_capacity": 60000,
+    "updates_per_transition": 0.25,
+    "epsilon_start": 0.3,
+    "epsilon_end": 0.05
+  }
+}

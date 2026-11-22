@@ -1,0 +1,72 @@
+{
+  "output": "/home/jihua/quoridor-data/experiments/cnn-policy-rl-20261020/04-selfplay-ppo",
+  "book_manifest": "/home/jihua/quoridor-data/arena/matrix-20261020-v2/manifest.json",
+  "hypothesis": "Isolate selfplay_ppo, initialization=policy; unchanged CNN; terminal-only RL reward; parent and evaluation frozen.",
+  "training": {
+    "episodes": 4096,
+    "max_steps_per_episode": 300,
+    "buffer_capacity": 100000,
+    "warmup_size": 512,
+    "batch_size": 256,
+    "lr": 2e-05,
+    "gamma": 0.99,
+    "epsilon_start": 0.2,
+    "epsilon_end": 0.05,
+    "epsilon_decay_steps": 20000,
+    "target_sync_interval": 500,
+    "checkpoint_dir": "/home/jihua/quoridor-data/experiments/cnn-policy-rl-20261020/04-selfplay-ppo/checkpoints",
+    "checkpoint_interval": 500,
+    "agent_id": "cnn_rl_selfplay_ppo",
+    "eval_interval": 0,
+    "seed": 42,
+    "grad_clip_norm": 0.5,
+    "device": "cuda",
+    "log_interval": 100,
+    "opponent": "greedy",
+    "model_arch": "cnn",
+    "cnn_channels": [
+      32,
+      64,
+      64
+    ],
+    "cnn_activation": "leaky_relu",
+    "warm_start_checkpoint": null,
+    "reward_mode": "terminal",
+    "algorithm": "selfplay_ppo",
+    "cnn_hierarchical": false
+  },
+  "research": {
+    "method": "selfplay_ppo",
+    "initialization": "policy",
+    "parent_checkpoint": "/home/jihua/quoridor-data/models/09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4.pt",
+    "parent_sha256": "09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4",
+    "rollout_seed": 2026102501,
+    "batch_seed": 1874,
+    "games_per_batch": 32,
+    "random_prefix_max": 24,
+    "max_plies": 300,
+    "checkpoint_episodes": [
+      1024,
+      2048,
+      4096
+    ],
+    "gae_lambda": 0.95,
+    "epochs": 4,
+    "clip": 0.2,
+    "target_kl": 0.03,
+    "value_weight": 0.5,
+    "entropy_weight": 0.01,
+    "opponents": [
+      {
+        "id": "cnn_policy_d2_2k_update012000",
+        "checkpoint": "/home/jihua/quoridor-data/models/09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4.pt",
+        "sha256": "09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4"
+      },
+      {
+        "id": "cnn_policy_d2_s43_2k_update012000",
+        "checkpoint": "/home/jihua/quoridor-data/models/5ab312c7b2ac0720b13c2a783a90f919ee0327555f74c4751c1b903fe623c1a0.pt",
+        "sha256": "5ab312c7b2ac0720b13c2a783a90f919ee0327555f74c4751c1b903fe623c1a0"
+      }
+    ]
+  }
+}

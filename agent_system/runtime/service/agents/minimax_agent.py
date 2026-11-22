@@ -8,18 +8,17 @@ Supports an optional top-k policy for controlled randomness.  When no
 policy is configured the agent is strictly deterministic (identical to
 the original implementation).
 
-Greedy equivalence:
-    MinimaxAgent(depth=1) is functionally equivalent to GreedyAgent.
-    At depth 1 the agent evaluates each action by its immediate effect
-    on shortest-path lengths, with no opponent modelling.  Deeper depths
-    enable the agent to anticipate opponent replies.
+Greedy relationship:
+    At depth 1, non-terminal evaluations differ from Greedy by a constant
+    baseline. Terminal handling differs: Minimax uses +/- infinity while
+    Greedy retains its distance-change score.
 """
 
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Callable
 
 from quoridor_engine import Player, RawState, RuleEngine
 from quoridor_engine import calculation
@@ -75,6 +74,7 @@ class SearchContext:
     depth_limit: int = 3
     nodes: int = 0
     cutoffs: int = 0
+    observer: Callable[[str, dict], None] | None = None
 
 
 def _evaluate(state: RawState, maximizing_player: Player) -> float:
@@ -127,50 +127,119 @@ def _alphabeta(
         Evaluation score from the perspective of maximizing_player.
     """
     context.nodes += 1
+    observer = context.observer
+    if observer is not None:
+        observer("enter", {
+            "state": state, "depth": depth, "alpha": alpha, "beta": beta,
+            "maximizing": maximizing,
+        })
 
     if depth == 0 or _ENGINE.is_game_over(state):
-        return _evaluate(state, maximizing_player)
+        value = _evaluate(state, maximizing_player)
+        if observer is not None:
+            observer("exit", {"value": value, "leaf": True, "pruned": 0})
+        return value
 
     actions = _ENGINE.legal_actions(state)
+    pruned = 0
 
     if maximizing:
         value = float("-inf")
-        for action in actions:
+        for index, action in enumerate(actions):
             try:
                 next_state = _ENGINE.apply_action(state, action)
             except ValueError:
                 continue
+            if observer is not None:
+                observer("edge", {"action": action})
             score = _alphabeta(next_state, depth - 1, alpha, beta,
                                False, maximizing_player, context)
             value = max(value, score)
             if value >= beta:
                 context.cutoffs += 1
+                pruned = len(actions) - index - 1
                 break
             alpha = max(alpha, value)
+        if observer is not None:
+            observer("exit", {"value": value, "leaf": False, "pruned": pruned})
         return value
     else:
         value = float("inf")
-        for action in actions:
+        for index, action in enumerate(actions):
             try:
                 next_state = _ENGINE.apply_action(state, action)
             except ValueError:
                 continue
+            if observer is not None:
+                observer("edge", {"action": action})
             score = _alphabeta(next_state, depth - 1, alpha, beta,
                                True, maximizing_player, context)
             value = min(value, score)
             if value <= alpha:
                 context.cutoffs += 1
+                pruned = len(actions) - index - 1
                 break
             beta = min(beta, value)
+        if observer is not None:
+            observer("exit", {"value": value, "leaf": False, "pruned": pruned})
         return value
+
+
+def score_bound(value: float, alpha: float, beta: float) -> str:
+    """Conservative fail-soft bounds, relative to the original window."""
+    if alpha != float("-inf") and value <= alpha:
+        return "upper"
+    if beta != float("inf") and value >= beta:
+        return "lower"
+    return "exact"
+
+
+def score_position(state: RawState, depth: int = 2, observer=None):
+    """The serving root search, with optional read-only diagnostic events."""
+    if depth < 1:
+        raise ValueError("depth must be positive")
+    context = SearchContext(depth_limit=depth, observer=observer)
+    results = []
+    alpha, beta = float("-inf"), float("inf")
+    for action in _ENGINE.legal_actions(state):
+        try:
+            after = _ENGINE.apply_action(state, action)
+        except ValueError:
+            continue
+        before_nodes, before_cutoffs = context.nodes, context.cutoffs
+        context.nodes += 1
+        if observer is not None:
+            observer("root_action", {"action": action})
+        value = _alphabeta(after, depth - 1, alpha, beta, False,
+                           state.current_player, context)
+        bound = "exact" if depth == 1 or _ENGINE.is_game_over(after) else score_bound(value, alpha, beta)
+        results.append({
+            "action": action, "state": after, "score": value, "bound": bound,
+            "nodes": context.nodes - before_nodes,
+            "cutoffs": context.cutoffs - before_cutoffs,
+        })
+        alpha = max(alpha, value)
+    return results, context
+
+
+def inspect_branch(state: RawState, action, depth: int, observer=None):
+    """Search one candidate with a full window, yielding its exact depth value."""
+    if depth < 1:
+        raise ValueError("depth must be positive")
+    after = _ENGINE.apply_action(state, action)
+    context = SearchContext(depth_limit=depth, observer=observer)
+    if observer is not None:
+        observer("root_action", {"action": action})
+    value = _alphabeta(after, depth - 1, float("-inf"), float("inf"),
+                       False, state.current_player, context)
+    return value, context
 
 
 class MinimaxAgent(BaseAgent):
     """Minimax agent with alpha-beta pruning.
 
-    Configurable depth (default 2).  At depth=1 this agent is equivalent
-    to the GreedyAgent: it evaluates each action by its immediate effect
-    on shortest-path lengths without modelling the opponent's reply.
+    Configurable depth (default 2). Depth 1 evaluates immediate positions
+    without modelling an opponent reply, but retains terminal win/loss scores.
 
     Configuration via ``configure({"depth": N})`` or constructor kwarg.
     """
@@ -201,39 +270,13 @@ class MinimaxAgent(BaseAgent):
     def make_action(self, game_state: dict, legal_actions: list[dict]) -> dict:
         state = _build_state(game_state)
         seat = game_state["current_player"]
-        maximizing_player = state.current_player
-
-        context = SearchContext(depth_limit=self._depth)
-
-        # Generate full action space via local engine (includes walls).
-        all_engine_actions = _ENGINE.legal_actions(state)
-
         scored_actions: list[tuple[dict, float]] = []
         best_value = float("-inf")
         best_wire_action: dict | None = None
-        alpha = float("-inf")
-        beta = float("inf")
-
-        for engine_action in all_engine_actions:
-            try:
-                next_state = _ENGINE.apply_action(state, engine_action)
-            except ValueError:
-                continue
-
-            context.nodes += 1
-
-            # After our move, opponent plays — so next layer is minimizing.
-            value = _alphabeta(
-                next_state,
-                self._depth - 1,
-                alpha,
-                beta,
-                False,
-                maximizing_player,
-                context,
-            )
-
-            wire_action = _engine_action_to_wire(engine_action, seat)
+        candidates, _ = score_position(state, self._depth)
+        for candidate in candidates:
+            value = candidate["score"]
+            wire_action = _engine_action_to_wire(candidate["action"], seat)
 
             if self._policy is not None:
                 scored_actions.append((wire_action, value))
@@ -241,8 +284,6 @@ class MinimaxAgent(BaseAgent):
             if value > best_value:
                 best_value = value
                 best_wire_action = wire_action
-
-            alpha = max(alpha, best_value)
 
         # Policy path: delegate selection to policy with injected RNG.
         if self._policy is not None and self._rng is not None and scored_actions:

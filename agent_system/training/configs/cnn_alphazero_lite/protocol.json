@@ -1,0 +1,59 @@
+{
+  "suite": "/home/jihua/quoridor-data/experiments/cnn-alphazero-lite-20261021",
+  "parent_id": "cnn_policy_d2_2k_update012000",
+  "parent_sha256": "09ce6ba9b46ad1cde01407f8293da41fffe7c44492f41f8bab4850c1a1a0c5a4",
+  "parent_registry_version": 6,
+  "baseline": "A: frozen original policy; no value head or search",
+  "search_only": "B: frozen original actor plus outcome-calibrated value head; no self-play updates",
+  "trained": "C: same calibrated initialization; joint policy/value training on 2000 MCTS self-play games; report WITH and WITHOUT search",
+  "calibration": {
+    "games": 1024,
+    "validation": "episode % 5 == 0; select minimum validation MSE among epochs 0..16; fallback to zero/train outcome mean if no improvement",
+    "opponents": "half stochastic frozen-policy self-play; half stochastic frozen policy vs Greedy, alternating Greedy seat",
+    "actor_frozen": true
+  },
+  "selfplay": {
+    "games": 2000,
+    "simulations_per_move": 50,
+    "games_per_batch": 32,
+    "gradient_updates_per_batch": 64,
+    "lr": 2e-05,
+    "checkpoint_episodes": [
+      512,
+      1024,
+      2000
+    ],
+    "final_selection": "fixed final ep02000; never select on heldout scores",
+    "temperature": "visit sampling first 24 moves then max visits; root Dirichlet noise throughout",
+    "adjudication": "goal first, threefold exact repetition second, 160-play cap third; repetition and cap targets zero, reported separately",
+    "symmetry": "shared X/Y reflection; policy permuted, current-player value unchanged"
+  },
+  "evaluation": {
+    "opening_pairs": 100,
+    "games_per_matchup": 200,
+    "seed": 2026102801,
+    "max_plies": 300,
+    "device": "cpu",
+    "torch_threads": 1,
+    "workers": 6,
+    "search": {
+      "simulations": 50,
+      "c_puct": 1.5,
+      "max_depth": 128,
+      "noise_fraction": 0
+    },
+    "fixed_opponents": [
+      "greedy",
+      "minimax_d1",
+      "minimax_d2",
+      "cnn_policy_d2_2k_update012000",
+      "cnn_rl_ppo_imitation_ep04096"
+    ],
+    "protocol": "existing Arena paired-opening-v1; common independent openings, same pair in both seats; standard start separate control; exact deterministic cycles draws",
+    "ci": "existing 95% pair-level Hoeffding score bounds; W/D/L rate bounds on pair means; paired method contrasts with prespecified simultaneous correction",
+    "exclusions": "all historical recorded training geometry, calibration/self-play geometry and historical heldout opening books; no evaluation games enter training",
+    "additional_greedy_diagnostics": "50 development games and 18 immediate-win probes for every checkpoint via existing diagnose_checkpoint"
+  },
+  "compute": "actual games, plies, simulations, neural state evaluations, batch forwards, gradient updates, CPU wall time, CUDA event elapsed intervals; intervals not exclusive GPU kernel time",
+  "reference": "https://arxiv.org/abs/1712.01815"
+}

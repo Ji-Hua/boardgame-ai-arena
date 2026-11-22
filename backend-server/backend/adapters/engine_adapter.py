@@ -150,6 +150,26 @@ class EngineAdapter:
                 return {"valid": True, "reason": None}
         return {"valid": False, "reason": "Action is not legal"}
 
+    def research_snapshot(self) -> dict:
+        state = self.get_state()
+        masks = state["wall_state"]
+        walls = []
+        for orientation in ("horizontal", "vertical"):
+            heads = masks[orientation + "_heads"]
+            for index in range(64):
+                if heads & (1 << index):
+                    walls.append(dict(x=index % 8, y=index // 8, orientation=orientation))
+        state["walls"] = walls
+        state["wall_state"] = {name: str(value) for name, value in masks.items()}
+        legal = []
+        if not self.is_game_over():
+            for action in self._gm.legal_actions():
+                kind = "pawn" if str(action.kind) == "MovePawn" else (
+                    "horizontal" if action.coordinate_kind == "Horizontal" else "vertical")
+                legal.append(dict(player=_seat_from_player(action.player), type=kind,
+                                  target=[action.target_x, action.target_y]))
+        return dict(state=state, legal_actions=legal)
+
     def is_game_over(self) -> bool:
         if self._gm is None:
             return False

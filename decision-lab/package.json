@@ -1,0 +1,6 @@
+{
+  "name": "quoridor-decision-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node --test tests/units/*.test.js"}
+}

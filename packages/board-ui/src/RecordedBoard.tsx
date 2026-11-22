@@ -1,0 +1,276 @@
+/**
+ * EvalReplayBoard — self-contained SVG board for rendering Quoridor game states
+ * from evaluation replay snapshots.
+ *
+ * Coordinate system (matches engine / replay_writer.py):
+ *   Engine: x = column 0-8 (left→right), y = row 0-8 (bottom→top)
+ *   Screen: col = x, screen_row = 8 - y (0 at top)
+ *
+ * Wall rendering:
+ *   H wall head (wx, wy): horizontal wall between engine rows wy and wy+1,
+ *     spanning engine cols wx and wx+1.
+ *     Screen: sits in the gap between screen rows (7-wy) and (8-wy).
+ *   V wall head (wx, wy): vertical wall between engine cols wx and wx+1,
+ *     spanning engine rows wy and wy+1.
+ *     Screen: sits in the gap between screen cols wx and wx+1.
+ */
+
+import React, {useState} from 'react'
+import { PLAYER_COLORS } from './theme/playerColors'
+interface EvalReplayState { trails?: [number,number][][]; p1: [number, number]; p2: [number, number]; h_walls: [number, number][]; v_walls: [number, number][]; wall_owners?: Record<string, 1 | 2>; wall_history?: Record<string,{player:1|2;ply:number}> }
+
+// -------------------------------------------------------------------------
+// Board geometry constants
+// -------------------------------------------------------------------------
+
+const CELL = 44          // cell square side in px
+const GAP = 7            // gap between cells (wall slot width/height)
+const STEP = CELL + GAP  // distance between cell origins
+const BORDER = 12        // outer padding
+
+/** Total SVG dimensions */
+export const BOARD_SVG_SIZE = 9 * STEP + BORDER * 2 - GAP   // = 9*51 + 24 - 7 = 476
+
+// -------------------------------------------------------------------------
+// Helpers
+// -------------------------------------------------------------------------
+
+function cellLeft(x: number): number {
+  return x * STEP + BORDER
+}
+
+function cellTop(y_engine: number): number {
+  const screen_row = 8 - y_engine
+  return screen_row * STEP + BORDER
+}
+
+// -------------------------------------------------------------------------
+// Component
+// -------------------------------------------------------------------------
+
+interface EvalReplayBoardProps {
+  state: EvalReplayState
+  /** Highlight the last action. */
+  lastActionType?: 'pawn' | 'hwall' | 'vwall'
+  lastActionX?: number
+  lastActionY?: number
+  lastActionPlayer?: 'P1' | 'P2'
+  onCellClick?: (x: number, y: number) => void
+  onWallInspect?: (ply:number) => void
+  onWallClick?: (x: number, y: number, orientation: "horizontal" | "vertical") => void
+  size?: number  // optional override for total SVG size (renders via viewBox scaling)
+}
+
+const P1_COLOR = PLAYER_COLORS.P1.primary
+const P2_COLOR = PLAYER_COLORS.P2.primary
+const P1_WALL_COLOR = PLAYER_COLORS.P1.primary
+const P2_WALL_COLOR = PLAYER_COLORS.P2.primary
+const BOARD_BG = 'var(--board-bg, #f5e6c8)'
+const CELL_COLOR = 'var(--board-cell, #fdf5e6)'
+const CELL_GOAL_P1 = 'var(--board-goal-p1, #d4edda)'   // light green — P1 goal row (y=8, top)
+const CELL_GOAL_P2 = 'var(--board-goal-p2, #dbeafe)'   // light red   — P2 goal row (y=0, bottom)
+const GRID_COLOR = 'var(--board-grid, #c8a96e)'
+
+/** Build a CSS colour from a wall array element's owner. */
+function wallColor(player?: 1 | 2): string {
+  return player === 1 ? P1_WALL_COLOR : player === 2 ? P2_WALL_COLOR : '#888'
+}
+
+export const EvalReplayBoard: React.FC<EvalReplayBoardProps> = ({
+  state,
+  lastActionType,
+  lastActionX,
+  lastActionY,
+  lastActionPlayer,
+  size, onCellClick, onWallClick, onWallInspect,
+}) => {
+  const [showTrails,setShowTrails]=useState(true)
+  const hasTrails=state.trails?.some(path=>path.length>1)
+  const viewSize = BOARD_SVG_SIZE
+
+  const cells = []
+  for (let y = 0; y <= 8; y++) {
+    for (let x = 0; x <= 8; x++) {
+      const isGoalP1 = y === 8
+      const isGoalP2 = y === 0
+      let fill = CELL_COLOR
+      if (isGoalP1) fill = CELL_GOAL_P1
+      if (isGoalP2) fill = CELL_GOAL_P2
+      cells.push(
+        <rect
+          key={`cell-${x}-${y}`}
+          onClick={()=>onCellClick?.(x,y)}
+          role={onCellClick?"button":undefined} tabIndex={onCellClick?0:undefined}
+          aria-label={onCellClick?`Cell ${String.fromCharCode(97+x)}${y+1}`:undefined}
+          onKeyDown={e=>{if(onCellClick && (e.key==="Enter"||e.key===" ")){e.preventDefault();onCellClick(x,y)}}}
+          x={cellLeft(x)}
+          y={cellTop(y)}
+          width={CELL}
+          height={CELL}
+          fill={fill}
+          stroke={GRID_COLOR}
+          strokeWidth={0.5}
+        />
+      )
+    }
+  }
+
+  // Ownership comes from explicit recorded actions; missing provenance remains neutral.
+  const hWallRects = state.h_walls.map(([wx, wy], i) => {
+    // H wall: between screen rows (7-wy) and (8-wy), spanning cols wx and wx+1
+    const left = cellLeft(wx)
+    const top = cellTop(wy) - GAP   // cellTop(wy) is screen row 8-wy; gap above it
+    const width = 2 * CELL + GAP
+    const height = GAP
+    const isLast = lastActionType === 'hwall' && lastActionX === wx && lastActionY === wy
+    const owner = state.wall_owners?.[`horizontal:${wx}:${wy}`] ?? (isLast ? (lastActionPlayer === 'P1' ? 1 : lastActionPlayer === 'P2' ? 2 : undefined) : undefined)
+    const entry=state.wall_history?.[`horizontal:${wx}:${wy}`]
+    const inspect=entry&&onWallInspect?()=>onWallInspect(entry.ply):undefined
+    const label=entry?`P${entry.player} · 第 ${entry.ply+1} 手${inspect?' · 点击查看决策':''}`:`${owner?'P'+owner:'归属未知'} · 无历史落子记录`
+    const color = wallColor(owner)
+    return (
+      <rect
+        data-wall={`horizontal:${wx}:${wy}`} data-owner={owner??'unknown'} aria-label={label} data-ply={entry?.ply} key={`hw-${i}`} role={inspect?'button':undefined} tabIndex={inspect?0:undefined} style={{cursor:inspect?'pointer':undefined}} onKeyDown={e=>{if(inspect&&(e.key==='Enter'||e.key===' ')){e.preventDefault();inspect()}}} onClick={()=>{if(inspect)inspect();else onWallClick?.(wx,wy,"horizontal")}}
+        x={left}
+        y={top}
+        width={width}
+        height={height}
+        fill={color}
+        rx={2}
+      ><title>{label}</title></rect>
+    )
+  })
+
+  const vWallRects = state.v_walls.map(([wx, wy], i) => {
+    // V wall: between cols wx and wx+1, spanning rows wy and wy+1
+    const left = cellLeft(wx) + CELL   // to the right of col wx
+    const top = cellTop(wy + 1)        // cellTop(wy+1) = screen row (7-wy)
+    const width = GAP
+    const height = 2 * CELL + GAP
+    const isLast = lastActionType === 'vwall' && lastActionX === wx && lastActionY === wy
+    const owner = state.wall_owners?.[`vertical:${wx}:${wy}`] ?? (isLast ? (lastActionPlayer === 'P1' ? 1 : lastActionPlayer === 'P2' ? 2 : undefined) : undefined)
+    const entry=state.wall_history?.[`vertical:${wx}:${wy}`]
+    const inspect=entry&&onWallInspect?()=>onWallInspect(entry.ply):undefined
+    const label=entry?`P${entry.player} · 第 ${entry.ply+1} 手${inspect?' · 点击查看决策':''}`:`${owner?'P'+owner:'归属未知'} · 无历史落子记录`
+    const color = wallColor(owner)
+    return (
+      <rect
+        data-wall={`vertical:${wx}:${wy}`} data-owner={owner??'unknown'} aria-label={label} data-ply={entry?.ply} key={`vw-${i}`} role={inspect?'button':undefined} tabIndex={inspect?0:undefined} style={{cursor:inspect?'pointer':undefined}} onKeyDown={e=>{if(inspect&&(e.key==='Enter'||e.key===' ')){e.preventDefault();inspect()}}} onClick={()=>{if(inspect)inspect();else onWallClick?.(wx,wy,"vertical")}}
+        x={left}
+        y={top}
+        width={width}
+        height={height}
+        fill={color}
+        rx={2}
+      ><title>{label}</title></rect>
+    )
+  })
+
+  // Pawns
+  const [p1x, p1y] = state.p1
+  const [p2x, p2y] = state.p2
+  const pawnRadius = CELL * 0.36
+
+  const p1Highlight = lastActionType === 'pawn' && lastActionPlayer === 'P1'
+  const p2Highlight = lastActionType === 'pawn' && lastActionPlayer === 'P2'
+
+  const pawns = [
+    <circle
+      key="pawn-p1" style={{pointerEvents:"none"}}
+      cx={cellLeft(p1x) + CELL / 2}
+      cy={cellTop(p1y) + CELL / 2}
+      r={pawnRadius}
+      fill={P1_COLOR}
+      stroke={p1Highlight ? '#ffff00' : '#fff'}
+      strokeWidth={p1Highlight ? 3 : 2}
+    />,
+    <text
+      key="pawn-p1-label"
+      x={cellLeft(p1x) + CELL / 2}
+      y={cellTop(p1y) + CELL / 2 + 4}
+      textAnchor="middle"
+      fontSize={12}
+      fontWeight="bold"
+      fill="#fff"
+      style={{ pointerEvents: 'none', userSelect: 'none' }}
+    >1</text>,
+    <circle
+      key="pawn-p2" style={{pointerEvents:"none"}}
+      cx={cellLeft(p2x) + CELL / 2}
+      cy={cellTop(p2y) + CELL / 2}
+      r={pawnRadius}
+      fill={P2_COLOR}
+      stroke={p2Highlight ? '#ffff00' : '#fff'}
+      strokeWidth={p2Highlight ? 3 : 2}
+    />,
+    <text
+      key="pawn-p2-label"
+      x={cellLeft(p2x) + CELL / 2}
+      y={cellTop(p2y) + CELL / 2 + 4}
+      textAnchor="middle"
+      fontSize={12}
+      fontWeight="bold"
+      fill="#fff"
+      style={{ pointerEvents: 'none', userSelect: 'none' }}
+    >2</text>,
+  ]
+
+  // Coordinate labels (col letters at bottom, row numbers at left)
+  const colLabels = Array.from({ length: 9 }, (_, x) => (
+    <text
+      key={`col-${x}`}
+      x={cellLeft(x) + CELL / 2}
+      y={BOARD_SVG_SIZE - 1}
+      textAnchor="middle"
+      fontSize={9}
+      fill="var(--board-coordinates, #8a7050)"
+    >{String.fromCharCode(97+x)}</text>
+  ))
+  const rowLabels = Array.from({ length: 9 }, (_, y) => (
+    <text
+      key={`row-${y}`}
+      x={4}
+      y={cellTop(y) + CELL / 2 + 3}
+      textAnchor="middle"
+      fontSize={9}
+      fill="var(--board-coordinates, #8a7050)"
+    >{y+1}</text>
+  ))
+
+  const svgProps: React.SVGProps<SVGSVGElement> = size
+    ? { width: size, height: size, viewBox: `0 0 ${viewSize} ${viewSize}` }
+    : { width: viewSize, height: viewSize }
+
+  return (
+    <>
+    {hasTrails&&<button type="button" className="aw-trail-toggle" aria-label="历史轨迹" aria-pressed={showTrails} onClick={()=>setShowTrails(v=>!v)}>历史轨迹 {showTrails?'开':'关'}</button>}
+    <svg
+      {...svgProps}
+      role="img"
+      aria-label="Recorded Quoridor position"
+      style={{ background: BOARD_BG, borderRadius: 8, border: '1px solid var(--board-grid, #c8a96e)', maxWidth: '100%', height: 'auto', display: 'block' }}
+    >
+      {/* Background */}
+      <rect x={0} y={0} width={viewSize} height={viewSize} fill={BOARD_BG} />
+      {cells}
+      {showTrails&&hasTrails&&<g data-testid="historical-trails" opacity={0.16} pointerEvents="none" aria-label="双方历史移动轨迹">
+        {state.trails?.map((path,player)=>path.length>1&&<g key={player} data-trail-player={player+1}>
+          <polyline points={path.map(([x,y])=>`${cellLeft(x)+CELL/2},${cellTop(y)+CELL/2}`).join(' ')} fill="none" stroke={player===0?P1_COLOR:P2_COLOR} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round"/>
+          {path.slice(1).map(([x,y],i)=>{
+            const [px,py]=path[i],dx=x-px,dy=py-y
+            if(!dx&&!dy)return null
+            const cx=(cellLeft(px)+cellLeft(x))/2+CELL/2,cy=(cellTop(py)+cellTop(y))/2+CELL/2
+            return <path key={'arrow-'+i} data-trail-arrow="true" d="M -3 -3 L 1 0 L -3 3" transform={`translate(${cx} ${cy}) rotate(${Math.atan2(dy,dx)*180/Math.PI})`} fill="none" stroke={player===0?P1_COLOR:P2_COLOR} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+          })}
+          {path.map(([x,y],i)=><circle key={i} cx={cellLeft(x)+CELL/2} cy={cellTop(y)+CELL/2} r={2} fill={player===0?P1_COLOR:P2_COLOR}/>)}
+        </g>)}
+      </g>}
+      {hWallRects}
+      {vWallRects}
+      {pawns}
+      {colLabels}
+      {rowLabels}
+    </svg>
+    </>
+  )
+}

@@ -1,0 +1,33 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: { dedupe: ['react', 'react-dom'] },
+  server: {
+    host: '0.0.0.0',
+    port: 8741,
+    strictPort: true,
+    proxy: {
+      '/research-lab': { target: 'http://localhost:8740', changeOrigin: true },
+      '/api': {
+        target: 'http://localhost:8740',
+        changeOrigin: true,
+      },
+      '/health': {
+        target: 'http://localhost:8740',
+        changeOrigin: true,
+      },
+    },
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: 8741,
+    strictPort: true,
+    proxy: {
+      '/research-lab': { target: 'http://localhost:8740', changeOrigin: true },
+      '/api': { target: 'http://localhost:8740', changeOrigin: true },
+      '/health': { target: 'http://localhost:8740', changeOrigin: true },
+    },
+  },
+})

@@ -135,3 +135,44 @@ class AgentServiceAdapter:
         )
         resp.raise_for_status()
         return resp.json()["category"]
+
+    def _research_headers(self):
+        key = os.environ.get("QUORIDOR_RESEARCH_SERVICE_KEY", "")
+        if not key:
+            raise RuntimeError("Research Runtime is not configured")
+        return {"Authorization": "Bearer " + key}
+
+    async def create_research(self, sha256, room_id, seat):
+        try:
+            response = await self._async_client.post("/agent/research/create",
+                headers=self._research_headers(),
+                json=dict(sha256=sha256, room_id=room_id, seat=seat), timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as exc:
+            detail = exc.response.text if isinstance(exc, httpx.HTTPStatusError) else str(exc)
+            raise RuntimeError("Research model could not be loaded: " + detail) from exc
+
+    async def research_action(self, binding, state, legal):
+        identity = binding["identity"]
+        try:
+            response = await self._async_client.post("/agent/research/action",
+                headers=self._research_headers(), json=dict(session_id=binding["session_id"],
+                    token=binding["token"], room_id=identity["room_id"], seat=identity["agent_seat"],
+                    game_state=state, legal_actions=legal), timeout=AGENT_ACTION_TIMEOUT)
+            response.raise_for_status()
+            payload = response.json()
+            if payload["identity"] != identity:
+                raise RuntimeError("Runtime model identity changed; action rejected")
+            return payload["action"]
+        except httpx.TimeoutException as exc:
+            raise TimeoutError("Research Agent timed out; position unchanged, retry explicitly") from exc
+        except httpx.HTTPError as exc:
+            detail = exc.response.text if isinstance(exc, httpx.HTTPStatusError) else str(exc)
+            raise RuntimeError("Research Agent unavailable: " + detail) from exc
+
+    async def destroy_research(self, binding):
+        response = await self._async_client.post("/agent/research/destroy",
+            headers=self._research_headers(),
+            json={key: binding[key] for key in ("session_id", "token")}, timeout=10)
+        response.raise_for_status()

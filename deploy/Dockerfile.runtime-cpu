@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim AS engine-builder
+RUN apt-get update && apt-get install -y --no-install-recommends cargo rustc gcc libc6-dev && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir maturin==1.9.6
+COPY engine/Cargo.toml engine/Cargo.lock engine/pyproject.toml /build/engine/
+COPY engine/src /build/engine/src
+RUN cd /build/engine && maturin build --release --locked --out /wheels
+
+FROM python:3.12-slim
+ARG SOURCE_COMMIT
+LABEL org.opencontainers.image.source="https://github.com/Ji-Hua/boardgame-ai-arena"       org.opencontainers.image.revision=$SOURCE_COMMIT
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1     PYTHONPATH=/app:/app/backend-server:/app/engine     OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+WORKDIR /app
+COPY deploy/requirements.runtime-cpu.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt &&     pip install --no-cache-dir torch==2.11.0 --index-url https://download.pytorch.org/whl/cpu
+COPY --from=engine-builder /wheels /tmp/wheels
+RUN pip install --no-cache-dir /tmp/wheels/*.whl && rm -rf /tmp/wheels
+COPY agent_system /app/agent_system
+COPY engine/game_manager /app/engine/game_manager
+COPY backend-server /app/backend-server
+COPY decision-lab/web /app/decision-lab/web
+RUN pip freeze > /app/python-dependencies.txt
+USER 10001:10001
+EXPOSE 8743 8744
+CMD ["python", "-m", "uvicorn", "agent_system.runtime.service.server:app", "--host", "0.0.0.0", "--port", "8743"]

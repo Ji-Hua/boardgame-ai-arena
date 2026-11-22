@@ -1,0 +1,43 @@
+{
+  "output": "/home/jihua/quoridor-data/experiments/cnn-repair-20261020/02-fresh-ddqn",
+  "book_manifest": "/home/jihua/quoridor-data/arena/matrix-20261020-v2/manifest.json",
+  "baseline_sha256": "d823125353ffb5e902ddbfba8d6086b88c87354375839682783fd38c86e0abcf",
+  "hypothesis": "Same CNN size, stable DDQN from fresh weights; compare learning with repaired gradients against damaged 2k initialization.",
+  "training": {
+    "episodes": 2000,
+    "max_steps_per_episode": 240,
+    "buffer_capacity": 20000,
+    "warmup_size": 512,
+    "batch_size": 128,
+    "lr": 3e-05,
+    "gamma": 0.95,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.1,
+    "epsilon_decay_steps": 20000,
+    "target_sync_interval": 1000,
+    "checkpoint_dir": "/home/jihua/quoridor-data/experiments/cnn-repair-20261020/02-fresh-ddqn/checkpoints",
+    "checkpoint_interval": 500,
+    "agent_id": "cnn_repair_fresh",
+    "eval_interval": 0,
+    "seed": 42,
+    "grad_clip_norm": 1.0,
+    "device": "cuda",
+    "log_interval": 100,
+    "opponent": "greedy",
+    "train_opponent_cfg": {
+      "type": "greedy"
+    },
+    "model_arch": "cnn",
+    "cnn_channels": [
+      32,
+      64,
+      64
+    ],
+    "cnn_activation": "leaky_relu",
+    "warm_start_checkpoint": null,
+    "reward_mode": "distance_delta",
+    "distance_reward_weight": 0.04,
+    "distance_delta_clip": 1.0,
+    "algorithm": "double_dqn"
+  }
+}
