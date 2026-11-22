@@ -10,3 +10,9 @@ class ReleasePathsTests(unittest.TestCase):
    values=subprocess.check_output(['sh',str(p/'check.sh')],text=True).splitlines()
    self.assertEqual(values[:2],['/home/jihua/quoridor-releases/main-current']*2)
    self.assertEqual(values[2],str(pathlib.Path.home()/'quoridor-runtime/releases'/('a'*40)))
+ def test_operation_templates_have_no_retired_runtime_paths(self):
+  for p in (ROOT/'deploy').rglob('*'):
+   if p.is_file() and p.suffix in ('.sh','.service'):
+    text=p.read_text()
+    for retired in ('/workspace/boardgame-ai-arena/.venv/', '/quoridor-releases/p5-dev/'):
+     self.assertNotIn(retired,text,str(p))

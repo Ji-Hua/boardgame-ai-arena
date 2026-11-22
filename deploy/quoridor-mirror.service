@@ -4,6 +4,6 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=%h/quoridor-releases/p5-dev/sync_gameplay_mirror.sh
+ExecStart=%h/quoridor-releases/main-current/sync_gameplay_mirror.sh
 Nice=10
 IOSchedulingClass=idle
